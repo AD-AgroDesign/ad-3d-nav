@@ -11,12 +11,14 @@
    El JS de acá abajo sólo dibuja lo que la base ya decidió devolver: aunque
    alguien lo manipule desde la consola, no puede ver ni bajar un campo ajeno.
 
-   La anon key es pública por diseño (va en el HTML del dashboard también);
-   sin sesión válida no abre ninguna puerta.
+   La publishable key es pública por diseño (va en el HTML del dashboard
+   también); sin sesión válida no abre ninguna puerta.
    ==================================================================== */
 
-const SUPABASE_URL      = "https://ivucpzmedseoanjrwutn.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml2dWNwem1lZHNlb2FuanJ3dXRuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyMzIyODcsImV4cCI6MjA5NzgwODI4N30.fDk8fujjqyga6jRM9JxrGfwmlRl96O2PoYfQedHKTLE";
+const SUPABASE_URL = "https://ivucpzmedseoanjrwutn.supabase.co";
+/* Clave publishable (reemplaza a la vieja anon key, migración 2026-08-07).
+   Mismos privilegios bajos: la RLS se comporta igual. */
+const SUPABASE_ANON_KEY = "sb_publishable_JCCcFphCzigm36R1bFIzDw_Xk0M1wbm";
 
 const GIS_BUCKET     = "gis3d";
 const SIGNED_URL_TTL = 3600;   // 1 h; los datos ya quedan en memoria del visor
