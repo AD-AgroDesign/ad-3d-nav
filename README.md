@@ -44,6 +44,17 @@ Supabase Auth  →  profiles (rol, cliente_id)  →  campos [RLS]  →  bucket g
 
 ## Agregar otro campo
 
+**Desde el 2026-08-11 esto es automático**: `python upload_cliente.py <carpeta> --apply` en
+`D:\Claude\PBI_dashboards` publica el campo acá como último paso (`publish_nav3d.py`). Sube
+los mismos dos GeoJSON al bucket, arma las rutas y escribe las columnas `nav3d_*`; respeta el
+`nav3d_slug` que ya tenga el campo y no toca `nav3d_maxzoom` si ya está determinado. Para
+publicar sin repetir toda la carga: `python publish_nav3d.py <carpeta> --apply`.
+
+Ese camino **no usa `data/`**: sube directo desde `mapas/<carpeta>/` del dashboard. Las copias
+locales sólo hacen falta para el procedimiento manual de abajo.
+
+### A mano (si hace falta)
+
 1. Que el campo exista en la tabla `campos` del dashboard, con su `cliente_id`.
 2. Copiar los dos GeoJSON a `data/<slug>/inicial.geojson` y `data/<slug>/multifuncional.geojson`.
 3. Marcarlo como publicado en el visor (ver el bloque 4 de `tools/supabase_setup.sql` como
