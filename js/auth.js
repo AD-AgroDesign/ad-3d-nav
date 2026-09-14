@@ -101,6 +101,7 @@ async function doLogin() {
     const { data, error } = await _sb.auth.signInWithPassword({ email, password: pass });
     if (error) throw error;
     await afterLogin(data.session);
+    if (AD_AUTH.campos.length) registrarAcceso("login");
   } catch (err) {
     console.error("Error de acceso:", err);
     showError(traducirError(err));
@@ -195,6 +196,24 @@ function registrarIngreso(perfil) {
   if (nombre) upd.nombre = nombre;
   _sb.from("profiles").update(upd).eq("id", AD_AUTH.user.id)
     .then(({ error }) => { if (error) console.warn("No se registró el ingreso:", error.message); });
+}
+
+/* Historial de ingresos para el informe semanal: tabla accesos, compartida con
+   el dashboard (que escribe plataforma 'dashboard'). 'login' = entró con
+   contraseña; 'sesion' = volvió con la sesión guardada. registrarIngreso() no
+   sirve para eso: suma también al restaurar la sesión y no guarda fechas.
+   La base completa usuario, cliente y rol, y descarta las 'sesion' a menos de
+   30 min de otro ingreso — cambiar de campo recarga la página y no es otra
+   visita. El tope local sólo ahorra el request; un error nunca frena el ingreso. */
+const ACCESO_SESION_MS = 30 * 60 * 1000;
+function registrarAcceso(evento) {
+  try {
+    const ult = parseInt(localStorage.getItem("ad_acceso_ult") || "0", 10);
+    if (evento === "sesion" && Date.now() - ult < ACCESO_SESION_MS) return;
+    localStorage.setItem("ad_acceso_ult", String(Date.now()));
+  } catch (e) { /* sin localStorage decide sólo la base */ }
+  _sb.from("accesos").insert({ plataforma: "nav3d", evento })
+    .then(({ error }) => { if (error) console.warn("No se registró el acceso:", error.message); });
 }
 
 /* ---------- Selector de campos dentro de la tarjeta ---------- */
@@ -305,7 +324,8 @@ if (initSupabase()) {
   _sb.auth.getSession()
     .then(({ data }) => {
       if (!data.session) { setCardState("form"); $("login-email").focus(); return; }
-      return afterLogin(data.session);
+      return afterLogin(data.session)
+        .then(() => { if (AD_AUTH.campos.length) registrarAcceso("sesion"); });
     })
     .catch(err => {
       console.error("No se pudo restaurar la sesión:", err);
