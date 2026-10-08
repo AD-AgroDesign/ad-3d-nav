@@ -97,7 +97,18 @@ export const host = {
       this.scene.add(group);
     }
 
+    /* Three r170 sube texturas 3D/array vacías al crear el renderer; con UNPACK_FLIP_Y o
+       UNPACK_PREMULTIPLY_ALPHA en true (estado que deja MapLibre en el contexto compartido)
+       WebGL tira "INVALID_OPERATION: texImage3D: FLIP_Y or PREMULTIPLY_ALPHA isn't allowed
+       for uploading 3D textures". Se apagan durante la creación y se restauran después
+       (MapLibre las vuelve a fijar él mismo en cada subida de textura). */
+    const flipY = gl.getParameter(gl.UNPACK_FLIP_Y_WEBGL);
+    const premul = gl.getParameter(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
     this.renderer = new THREE.WebGLRenderer({ canvas: mapInstance.getCanvas(), context: gl });
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, flipY);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, premul);
     this.renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
     this.renderer.autoClear = false;
   },
