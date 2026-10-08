@@ -20,8 +20,9 @@ import { emit, hasListeners, on } from "../core/events.js";
 import { mulberry32 } from "../core/geo.js";
 import { quality } from "../core/quality.js";
 import { HOME_VIEW, state } from "../core/state.js";
-import { createLights, uniforms } from "./lighting.js";
+import { createLights, uniforms, updateFog } from "./lighting.js";   // A1: updateFog (niebla)
 import * as shaderlib from "./shaderlib.js";
+import { scenarioFade } from "./shaderlib.js";   // A1: uniforme de fade dither por escenario
 import trees from "./systems/trees.js";
 import grass from "./systems/grass.js";
 
@@ -90,6 +91,9 @@ export const host = {
       for (const sys of this.systems) {
         const built = sys.build(ctx, key, state.data[key], state.veg[key]);
         group.add(built.object3d);
+        /* A1: niebla para los materiales de todos los sistemas, compuesta con lo que ya
+           tengan (viento). Idempotente: si un sistema ya hizo patch(mat,{fog:true}) no se repite. */
+        for (const m of built.materials || []) shaderlib.patchExtra(m, { fog: true });
       }
       group.scale.y = state.growth[key] || 0.0001;
       this.groups[key] = group;
@@ -114,6 +118,9 @@ export const host = {
   },
 
   setOpacity(key, o) {
+    // A1 (fade dither): uniforme compartido del escenario; los materiales parchados con
+    // patch(mat, { fade: key }) lo leen solos. Los sistemas que aún usan material.opacity no se enteran.
+    if (scenarioFade[key]) scenarioFade[key].value = o;
     for (const sys of this.systems) if (sys.setOpacity) sys.setOpacity(key, o);
     if (this.groups[key]) this.groups[key].visible = o > 0.02;
   },
@@ -147,6 +154,7 @@ export const host = {
     /* Cámara real (T1): posición en metros de escena → uCamPos, compartido por niebla, LOD, agua… */
     const cam = this.camera3d = updateCamera(this.map, this.origin, this.scale, matrix);
     uniforms.uCamPos.value.set(cam.camPosScene[0], cam.camPosScene[1], cam.camPosScene[2]);
+    updateFog(cam, this.map.getCanvas().clientHeight);   // A1: uFogNear/uFogFar de este frame (lighting.js)
     const frame = { now, dt, camPosScene: uniforms.uCamPos.value, viewProj: this.camera.projectionMatrix,
                     camera: cam, quality: this.quality, preset: null };
     for (const sys of this.systems) if (sys.update) sys.update(frame);

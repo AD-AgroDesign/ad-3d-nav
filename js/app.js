@@ -12,6 +12,7 @@ import { map } from "./map/style.js";
 import { updatePanel } from "./ui/panel.js";
 import { mapStyle } from "./map/style.js";
 import { DEBUG, state } from "./core/state.js";
+import "./render/atmo.js";   // A1: capa atmo-fog (se registra sola en host.registerBeforeLayer, antes de addScenarioLayers)
 import "./ui/controls.js";
 import "./debug/fps.js";
 import "./debug/qa-api.js";

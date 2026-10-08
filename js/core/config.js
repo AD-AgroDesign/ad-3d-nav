@@ -76,3 +76,22 @@ export const GRASS_LOD_FAR_MULT = 3.0;     // LOD_FAR = mult × quality.grassLod
 export const GRASS_LOD_COMP_MAX = 2.2;     // tope del agrandado que compensa el raleo (conserva la masa de color a lo lejos)
 export const GRASS_LOD_BAND = 0.15;        // franja de encogimiento progresivo por instancia (fracción del orden aleatorio)
 /* === A2: fin === */
+
+/* === A1: inicio === */
+/* Niebla / perspectiva atmosférica unificada (suelo MapLibre vía capa atmo-fog + objetos Three).
+   El color es el horizon-color del `sky` de map/style.js: la niebla "entra" en el degradado
+   del cielo sin costura. Si un preset de hora cambia uno, cambia los dos a la vez. */
+export const A1_SKY = {
+  skyColor: "#87b9e0",
+  horizonColor: "#dfe9d8"
+};
+export const A1_FOG = {
+  color: A1_SKY.horizonColor,
+  near: 1200,       // m · inicio mínimo de la niebla
+  nearK: 1.6,       // near >= nearK · (distancia cámara-centro): el entorno de la cámara queda nítido
+  farFrac: 0.98,    // far = farFrac · distancia al suelo en la línea del sky (llega a 1 en el horizonte)
+  nearMaxFrac: 0.6, // tope de near como fracción de far (garantiza rampa visible)
+  max: 1.0,         // opacidad máxima de la niebla
+  skyOverlapPx: 3   // la capa atmo se solapa ~3 px con la línea del sky (evita rendija oscura)
+};
+/* === A1: fin === */
