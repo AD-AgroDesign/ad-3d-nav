@@ -3,10 +3,10 @@
    sin cambios de geometría, colores, densidades, semillas ni orden de construcción (§4).
    Contrato: §6.3. */
 import * as THREE from "three";
-import { CHUNK_CELL_GRASS, GRASS_CLASSES, GRASS_LOD_BAND, GRASS_LOD_COMP_MAX, GRASS_LOD_FAR_MULT, GRASS_LOD_NEAR_MULT, GRASS_SCALE } from "../../core/config.js";
+import { CHUNK_CELL_GRASS, GRASS_CLASSES, GRASS_AO, GRASS_LOD_BAND, GRASS_LOD_COMP_MAX, GRASS_LOD_FAR_MULT, GRASS_LOD_NEAR_MULT, GRASS_SCALE } from "../../core/config.js";
 import { quality } from "../../core/quality.js";
 import { patch } from "../shaderlib.js";
-import { ChunkLod, addRank, applyLod, cellSeed, partitionCells, shuffleDet } from "./chunks.js";
+import { ChunkLod, addRank, applyAO, applyLod, cellSeed, partitionCells, shuffleDet } from "./chunks.js";
 
 /* Geometría unitaria de una mata: 4 hojas inclinadas hacia afuera
    (base y=0, puntas y≈1). Gradiente base → punta vía colores de vértice
@@ -95,14 +95,13 @@ export default {
     if (grass && Object.values(grass).some(t => t.length)) {
       grassMat = new THREE.MeshPhongMaterial({
         color: 0xffffff, flatShading: true, shininess: 0,
-        transparent: true, vertexColors: true, side: THREE.DoubleSide
+        vertexColors: true, side: THREE.DoubleSide
       });
-      /* Una sola pasada: DoubleSide+transparent hacía que Three dibujara cada mata dos veces
-         (caras traseras y delanteras). Con opacidad 1 el resultado es el mismo (la profundidad
-         resuelve); solo durante el cross-fade (opacity<1) las caras se mezclan en un único orden. */
-      grassMat.forceSinglePass = true;
-      patch(grassMat, { wind: true });   // viento: ver shaderlib.js
-      applyLod(grassMat, ctx.uniforms.uCamPos, lodU);   // LOD: se encadena DESPUÉS del viento
+      /* Cross-fade de escenario por fade dither (A1, shaderlib): material OPACO, una sola pasada
+         (sin transparencias ni orden de dibujo). Niebla unificada por distancia real. */
+      patch(grassMat, { wind: true, fog: true, fade: scenarioKey });
+      applyLod(grassMat, ctx.uniforms.uCamPos, lodU);   // LOD: se encadena DESPUÉS de patch()
+      applyAO(grassMat, GRASS_AO.amount, 0, GRASS_AO.top);   // E-AO: solo el tramo inferior
       const m = new THREE.Matrix4();
       const q = new THREE.Quaternion();
       const eul = new THREE.Euler();
@@ -151,10 +150,7 @@ export default {
     return { object3d: group, materials: grassMat ? [grassMat] : [] };
   },
 
-  setOpacity(scenarioKey, o) {
-    const b = built[scenarioKey];
-    if (b && b.grassMat) b.grassMat.opacity = o;
-  },
+  setOpacity() {},   // el fade lo hace el dither (shaderlib.scenarioFade, escrito por host.setOpacity)
 
   setGrowth() {},   // el crecimiento lo aplica el host con scale.y del grupo del escenario
 
