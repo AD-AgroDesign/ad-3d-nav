@@ -3,8 +3,10 @@
    sin cambios de geometría, colores, densidades, semillas ni orden de construcción (§4).
    Contrato: §6.3. */
 import * as THREE from "three";
-import { GRASS_CLASSES, GRASS_SCALE } from "../../core/config.js";
+import { CHUNK_CELL_GRASS, GRASS_CLASSES, GRASS_LOD_BAND, GRASS_LOD_COMP_MAX, GRASS_LOD_FAR_MULT, GRASS_LOD_NEAR_MULT, GRASS_SCALE } from "../../core/config.js";
+import { quality } from "../../core/quality.js";
 import { patch } from "../shaderlib.js";
+import { ChunkLod, addRank, applyLod, cellSeed, partitionCells, shuffleDet } from "./chunks.js";
 
 /* Geometría unitaria de una mata: 4 hojas inclinadas hacia afuera
    (base y=0, puntas y≈1). Gradiente base → punta vía colores de vértice
@@ -63,7 +65,18 @@ for (const [cls, cfg] of Object.entries(GRASS_CLASSES)) {
   if (cfg.alt) TUFT_GEOS[cls + "/alt"] = buildTuftGeometry(4, cfg.alt.tip, cfg.alt.base, cfg.alt.mid, cfg.alt.midCol);
 }
 
-const built = {};   // scenarioKey → { grassMat, meshes: [{ label, mesh }] }
+/* Sal estable por clase para la semilla del orden aleatorio de cada celda */
+const labelSalt = s => [...s].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7);
+
+const built = {};   // scenarioKey → { grassMat, group, lod: ChunkLod, meshes: [{ label, n, mesh }] }
+
+/* Uniform de LOD compartido por todos los materiales de pasto: (near m, far m, band, compMax). */
+const lodU = { value: new THREE.Vector4(600, 3000, GRASS_LOD_BAND, GRASS_LOD_COMP_MAX) };
+function setLodFromQuality(q) {
+  const d = q.grassLodDist === Infinity ? 1e9 : q.grassLodDist;
+  lodU.value.set(d * GRASS_LOD_NEAR_MULT, d * GRASS_LOD_FAR_MULT, GRASS_LOD_BAND, GRASS_LOD_COMP_MAX);
+}
+setLodFromQuality(quality);
 
 export default {
   id: "grass",
@@ -72,51 +85,69 @@ export default {
     const grass = veg.grass;
     const group = new THREE.Group();
     const meshes = [];
+    const lod = new ChunkLod();
 
-    /* Matas de pasto instanciadas: un mesh por clase (cada clase tiene su
-       geometría con el color de punta propio); material compartido */
+    /* Matas de pasto instanciadas: por clase y por CELDA de CHUNK_CELL_GRASS m (una InstancedMesh
+       por celda y clase; cada clase tiene su geometría con el color de punta propio); material
+       compartido. El chunking solo reordena: las posiciones, colores y escalas por mata son las
+       mismas de siempre (mismo `t.lon/lat/j/h/c`). */
     let grassMat = null;
     if (grass && Object.values(grass).some(t => t.length)) {
       grassMat = new THREE.MeshPhongMaterial({
         color: 0xffffff, flatShading: true, shininess: 0,
         transparent: true, vertexColors: true, side: THREE.DoubleSide
       });
+      /* Una sola pasada: DoubleSide+transparent hacía que Three dibujara cada mata dos veces
+         (caras traseras y delanteras). Con opacidad 1 el resultado es el mismo (la profundidad
+         resuelve); solo durante el cross-fade (opacity<1) las caras se mezclan en un único orden. */
+      grassMat.forceSinglePass = true;
       patch(grassMat, { wind: true });   // viento: ver shaderlib.js
+      applyLod(grassMat, ctx.uniforms.uCamPos, lodU);   // LOD: se encadena DESPUÉS del viento
       const m = new THREE.Matrix4();
       const q = new THREE.Quaternion();
       const eul = new THREE.Euler();
       const col = new THREE.Color();
+      const pos = new THREE.Vector3(), scl = new THREE.Vector3();
       for (const [cls, list] of Object.entries(grass)) {
         if (!list.length) continue;
         // Las matas marcadas como variante (sin flor) van en su propio
         // mesh con la geometría alternativa de la clase
         const batches = [[cls, TUFT_GEOS[cls], list.filter(t => !t.v)]];
         if (TUFT_GEOS[cls + "/alt"]) batches.push([cls + "/alt", TUFT_GEOS[cls + "/alt"], list.filter(t => t.v)]);
-        for (const [label, geo, sub] of batches) {
-          if (!sub.length) continue;
-          const tufts = new THREE.InstancedMesh(geo, grassMat, sub.length);
-          tufts.frustumCulled = false;   // ver nota en systems/trees.js (paridad con r149)
-          sub.forEach((t, i) => {
-            const [x, z] = ctx.toScene(t.lon, t.lat);
-            eul.set(0, t.j * Math.PI * 2, 0);
-            m.compose(
-              new THREE.Vector3(x, 0, z),
-              q.setFromEuler(eul),
-              new THREE.Vector3(t.h * 0.9 * GRASS_SCALE, t.h * GRASS_SCALE, t.h * 0.9 * GRASS_SCALE)
-            );
-            tufts.setMatrixAt(i, m);
-            col.setHex(t.c).offsetHSL(0, 0, (t.j - 0.5) * 0.09);
-            tufts.setColorAt(i, col);
-          });
-          tufts.instanceMatrix.needsUpdate = true;
-          if (tufts.instanceColor) tufts.instanceColor.needsUpdate = true;
-          group.add(tufts);
-          meshes.push({ label, mesh: tufts });
-        }
+        batches.forEach(([label, geo, sub]) => {
+          if (!sub.length) return;
+          const withXZ = sub.map(t => ({ t, xz: ctx.toScene(t.lon, t.lat) }));
+          const cells = partitionCells(withXZ, CHUNK_CELL_GRASS, o => o.xz);
+          for (const cell of cells.values()) {
+            shuffleDet(cell.items, cellSeed(cell.ix, cell.iz, labelSalt(label)));
+            const n = cell.items.length;
+            const cg = geo.clone();             // geometría propia de la celda (lleva aRank)
+            addRank(cg, n);
+            const tufts = new THREE.InstancedMesh(cg, grassMat, n);
+            cell.items.forEach(({ t, xz }, i) => {
+              const [x, z] = xz;
+              eul.set(0, t.j * Math.PI * 2, 0);
+              m.compose(
+                pos.set(x, 0, z),
+                q.setFromEuler(eul),
+                scl.set(t.h * 0.9 * GRASS_SCALE, t.h * GRASS_SCALE, t.h * 0.9 * GRASS_SCALE)
+              );
+              tufts.setMatrixAt(i, m);
+              col.setHex(t.c).offsetHSL(0, 0, (t.j - 0.5) * 0.09);
+              tufts.setColorAt(i, col);
+            });
+            tufts.instanceMatrix.needsUpdate = true;
+            if (tufts.instanceColor) tufts.instanceColor.needsUpdate = true;
+            lod.add(tufts, n);
+            tufts.boundingSphere.radius += 1.5;   // holgura por el vaivén del viento
+            group.add(tufts);
+            meshes.push({ label, n, mesh: tufts });
+          }
+        });
       }
     }
 
-    built[scenarioKey] = { grassMat, meshes };
+    built[scenarioKey] = { grassMat, group, lod, meshes };
     return { object3d: group, materials: grassMat ? [grassMat] : [] };
   },
 
@@ -127,11 +158,26 @@ export default {
 
   setGrowth() {},   // el crecimiento lo aplica el host con scale.y del grupo del escenario
 
-  /* Instancias por clase (para __nav3d.stats); la variante sin flor va como "<clase>/alt" */
+  /* LOD por distancia a la cámara (uCamPos): ajusta visibilidad y cuenta de cada celda */
+  update(frame) {
+    const c = frame.camPosScene;
+    const lod = lodU.value;
+    for (const b of Object.values(built)) {
+      if (b.group.visible) b.visibleChunks = b.lod.update(c, lod.x, lod.y, lod.z);
+    }
+  },
+
+  onQuality(q) { setLodFromQuality(q); },
+
+  /* Instancias por clase (para __nav3d.stats); la variante sin flor va como "<clase>/alt".
+     Son las instancias TOTALES construidas (no las dibujadas tras el LOD). */
   stats(scenarioKey) {
     const b = built[scenarioKey];
     const grass = {};
-    if (b) for (const { label, mesh } of b.meshes) grass[label] = mesh.count;
-    return { grass, grassTotal: Object.values(grass).reduce((s, n) => s + n, 0) };
+    if (b) for (const { label, n } of b.meshes) grass[label] = (grass[label] || 0) + n;
+    return {
+      grass, grassTotal: Object.values(grass).reduce((s, n) => s + n, 0),
+      grassChunks: b ? b.meshes.length : 0, grassChunksVisibles: b ? (b.visibleChunks ?? b.meshes.length) : 0
+    };
   }
 };
