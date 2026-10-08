@@ -1,5 +1,6 @@
 import { HOME_VIEW } from "../core/state.js";
 import { resolveQuality } from "../core/quality.js";
+import { A1_SKY } from "../core/config.js";   // A1: colores del cielo (también los usa la niebla)
 
 /* ---------- Estilo base del mapa (sin terreno: llanura, evita
    artefactos de extrusiones cortadas en pendientes) ---------- */
@@ -21,8 +22,8 @@ export const mapStyle = {
   },
   layers: [{ id: "satellite", type: "raster", source: "esri" }],
   sky: {
-    "sky-color": "#87b9e0",
-    "horizon-color": "#dfe9d8",
+    "sky-color": A1_SKY.skyColor,
+    "horizon-color": A1_SKY.horizonColor,   // = color de la niebla (config.js A1_FOG)
     "fog-color": "#e6ecdc",
     "sky-horizon-blend": 0.6,
     "horizon-fog-blend": 0.65,
