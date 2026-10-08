@@ -45,11 +45,14 @@
       }
       await sleep(50);
     }
-    // Saltea el splash sin disparar el vuelo ni el tour automático
-    document.getElementById("splash").classList.add("hidden");
-    // Sin fundido de teselas ráster: capturas deterministas
-    map.setPaintProperty("satellite", "raster-fade-duration", 0);
-    await waitIdle();
+    /* Solo con ?qa (con ?debug solo se expone la API, sin cambiar lo visible):
+       saltea el splash sin disparar el vuelo ni el tour automático y apaga el
+       fundido de teselas ráster para tener capturas deterministas. */
+    if (_q.has("qa")) {
+      document.getElementById("splash").classList.add("hidden");
+      map.setPaintProperty("satellite", "raster-fade-duration", 0);
+      await waitIdle();
+    }
   })();
 
   /* ---------- Tiempo congelado ----------
