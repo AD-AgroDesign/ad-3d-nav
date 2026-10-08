@@ -1,4 +1,5 @@
 import { HOME_VIEW } from "../core/state.js";
+import { resolveQuality } from "../core/quality.js";
 
 /* ---------- Estilo base del mapa (sin terreno: llanura, evita
    artefactos de extrusiones cortadas en pendientes) ---------- */
@@ -28,6 +29,11 @@ export const mapStyle = {
     "fog-ground-blend": 0.85
   }
 };
+
+/* T3: el nivel de calidad se resuelve ANTES de crear el Map (antialias y pixelRatio se
+   fijan al crear el contexto WebGL). Hoy no se consume ningún parámetro (sin cambios
+   visibles); A1 conectará antialias/pixelRatio acá. */
+export const QUALITY = resolveQuality();
 
 export const map = new maplibregl.Map({
   container: "map",
