@@ -2,7 +2,7 @@ import { CLASS_META, HERB_HEIGHT, HERB_LIKE_CLASSES, MISC_CLASSES, WOODY_BASE } 
 import { state } from "../core/state.js";
 import { setupInteractivity } from "./interact.js";
 import { map } from "./style.js";
-import { vegLayer } from "../render/host.js";
+import { host } from "../render/host.js";
 
 export const clsFilter = (...classes) => ["in", ["get", "_cls"], ["literal", classes]];
 
@@ -111,7 +111,7 @@ export function addScenarioLayers() {
     });
   }
 
-  map.addLayer(vegLayer);
+  host.addToMap(map);
   setupInteractivity();
 }
 
@@ -147,11 +147,11 @@ export function applyGrowth(key, t) {
   map.setPaintProperty(`${p}-woody-base`, "fill-extrusion-height", WOODY_BASE.height * t);
   map.setPaintProperty(`${p}-herb-ext`, "fill-extrusion-height", HERB_HEIGHT * t);
   map.setPaintProperty(`${p}-herb-pattern`, "fill-extrusion-height", (HERB_HEIGHT + 0.05) * t);
-  vegLayer.setGrowth(key, t);
+  host.setGrowth(key, t);
 }
 
 export function applyOpacity(key, t) {
   const f = t * state.designOpacity;
   for (const l of SCENARIO_LAYERS[key]) map.setPaintProperty(l.id, l.prop, l.on * f);
-  vegLayer.setOpacity(key, f);
+  host.setOpacity(key, f);
 }

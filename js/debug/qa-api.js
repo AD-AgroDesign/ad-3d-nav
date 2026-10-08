@@ -11,11 +11,11 @@
    la API y el tour/órbita solo corren si se piden (startTour/startOrbit).
    ==================================================================== */
 import { HOME_VIEW, state } from "../core/state.js";
-import { GRASS_CLASSES } from "../core/config.js";
 import { featureCentroid, mulberry32, ringAreaHa } from "../core/geo.js";
 import { map } from "../map/style.js";
 import { setScenario } from "../map/scenario.js";
-import { TUFT_GEOS, vegLayer } from "../render/host.js";
+import { host } from "../render/host.js";
+import { uniforms } from "../render/lighting.js";
 import { RAZANTE_CAM, corridorCenterline, makeFlight } from "../tour/flight.js";
 import { startOrbit, startTour, stopOrbit, stopTour } from "../tour/tour.js";
 
@@ -64,11 +64,11 @@ import { startOrbit, startTour, stopOrbit, stopTour } from "../tour/tour.js";
   })();
 
   /* ---------- Tiempo congelado ----------
-     vegLayer.render() escribe timeUniform.value = performance.now()/1000 en cada
+     host.render() escribe uniforms.uTime.value = performance.now()/1000 en cada
      frame. Se reemplaza 'value' por un accesor que ignora esa escritura mientras
      el tiempo esté congelado (viento quieto y reproducible). */
   let frozen = null;
-  const tu = vegLayer.timeUniform;
+  const tu = uniforms.uTime;
   let liveValue = tu.value;
   Object.defineProperty(tu, "value", {
     configurable: true,
@@ -145,26 +145,9 @@ import { startOrbit, startTour, stopOrbit, stopTour } from "../tour/tour.js";
   async function stats() {
     await new Promise(r => { map.once("render", r); map.triggerRepaint(); });
     await nextFrame();
-    const info = vegLayer.renderer.info;
-    const geoCls = new Map();
-    for (const cls of Object.keys(GRASS_CLASSES)) {
-      geoCls.set(TUFT_GEOS[cls], cls);
-      if (TUFT_GEOS[cls + "/alt"]) geoCls.set(TUFT_GEOS[cls + "/alt"], cls + "/alt");
-    }
-    const instances = {};
-    for (const key of ["inicial", "multi"]) {
-      const g = vegLayer.groups[key];
-      if (!g) continue;
-      const o = { visible: g.group.visible, trunks: 0, crowns: 0, grass: {} };
-      for (const m of g.group.children) {
-        const cls = geoCls.get(m.geometry);
-        if (cls) o.grass[cls] = m.count;
-        else if (m.material === g.trunkMat) o.trunks = m.count;
-        else if (m.material === g.crownMat) o.crowns = m.count;
-      }
-      o.grassTotal = Object.values(o.grass).reduce((s, n) => s + n, 0);
-      instances[key] = o;
-    }
+    const info = host.renderer.info;
+    // instancias por escenario y sistema: las informa cada sistema del host (render/host.js)
+    const instances = host.instanceStats();
     const mem = performance.memory;
     return {
       scenario: state.scenario,
