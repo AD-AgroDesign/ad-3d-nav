@@ -94,4 +94,48 @@ export const A1_FOG = {
   max: 1.0,         // opacidad máxima de la niebla
   skyOverlapPx: 3   // la capa atmo se solapa ~3 px con la línea del sky (evita rendija oscura)
 };
+/* ---- 1.3: color, luz, sol, ráster (A1) ---- */
+/* Render: tone mapping y exposición. Se elige con capturas (handoffs/a1-color.md).
+   toneMapping: "none" | "aces" | "agx" | "neutral". */
+export const A1_RENDER = { toneMapping: "agx", exposure: 1.75 };
+/* Luz: hemisférica (cielo cálido / suelo = color medio del satélite del campo) + sol.
+   Las intensidades están en unidades de r170 (Lambert/π ya compensado: ~1 = albedo pleno). */
+export const A1_LIGHT = {
+  hemiSky: "#cddbec", hemiSkyInt: 0.55,
+  hemiGround: "#6d6a4c",       // default regional si el campo no tiene groundColor medido
+  hemiGroundInt: 0.45,
+  sunColor: "#fff1d6", sunInt: 2.2
+};
+/* Sol: elevación 50–55° por defecto; el azimut sale de las sombras horneadas del satélite
+   (T13, método y valores en handoffs/a1-color.md). Brújula: 0 = N, 90 = E; es el azimut HACIA el sol. */
+export const A1_SUN = { elevation: 52, defaultAzimuth: 40 };
+/* Por campo: sunAzimuth (medido) y groundColor (color medio del satélite). */
+export const A1_CAMPOS = {
+  // sunAzimuth solo donde las sombras de las arboledas se midieron con confianza (a1_sun.mjs, ver handoff);
+  // el resto usa A1_SUN.defaultAzimuth. groundColor = color medio del satélite crudo del campo (cenital del home).
+  el_carmen: { sunAzimuth: 43, groundColor: "#6a5f45" },
+  monte_hermoso: { groundColor: "#6b6247" },
+  nikunihue: { groundColor: "#69604a" },
+  chapa_i_iii_iv: { sunAzimuth: 19, groundColor: "#5d553e" },
+  chapa_ii_v: { groundColor: "#5e5b41" },
+  frente_planta_quinta_lima: { groundColor: "#55533a" },
+  la_haydee: { sunAzimuth: 41, groundColor: "#5e5a3f" },
+  silesia: { groundColor: "#635e42" },
+};
+/* Follaje: wrap lighting (cuánto "dobla" la luz del sol alrededor del volumen) y translucidez
+   barata (luz que atraviesa el follaje desde atrás). 0 = Lambert puro. */
+export const A1_FOLIAGE = { wrap: 0.35, trans: 0.25 };
+/* Satélite (raster-*): lo lleva a la misma "foto" que el 3D. */
+export const A1_RASTER = { saturation: 0.12, contrast: 0.06, brightnessMin: 0, brightnessMax: 1, hueRotate: 0 };
+/* Ajuste fino en caliente (solo ?debug/?qa): ?a1={"A1_RENDER":{"exposure":1.2}} mezcla sobre los diales. */
+{
+  const q = new URLSearchParams(location.search);
+  if ((q.has("debug") || q.has("qa")) && q.get("a1")) {
+    try {
+      const o = JSON.parse(q.get("a1"));
+      const T = { A1_RENDER, A1_LIGHT, A1_SUN, A1_FOLIAGE, A1_RASTER, A1_FOG, A1_SKY, A1_CAMPOS };
+      for (const k in o) if (T[k]) Object.assign(T[k], o[k]);
+    } catch (e) { console.warn("a1: JSON inválido en ?a1"); }
+  }
+}
 /* === A1: fin === */

@@ -75,7 +75,7 @@ export function resolveQuality() {
 /* Cuando A1 conecte antialias/pixelRatio al crear el Map, poner esto en true: entonces
    un cambio de nivel que modifique esos parámetros recarga la página (T3). Hoy no
    afectan nada visible, así que no hay motivo para recargar. */
-export const CONTEXT_PARAMS_ACTIVE = false;
+export const CONTEXT_PARAMS_ACTIVE = true;   // A1 1.3: style.js ya conecta antialias/pixelRatio
 
 /* Cambia el nivel en caliente. Devuelve false si el nombre no es válido.
    opts.persist (true): lo recuerda en localStorage; opts.reload (true): permite la

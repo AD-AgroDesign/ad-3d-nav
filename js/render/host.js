@@ -20,7 +20,7 @@ import { emit, hasListeners, on } from "../core/events.js";
 import { mulberry32 } from "../core/geo.js";
 import { quality } from "../core/quality.js";
 import { HOME_VIEW, state } from "../core/state.js";
-import { createLights, uniforms, updateFog } from "./lighting.js";   // A1: updateFog (niebla)
+import { applyCampoLighting, applyRenderSettings, createLights, uniforms, updateFog } from "./lighting.js";   // A1: updateFog (niebla)
 import * as shaderlib from "./shaderlib.js";
 import { scenarioFade } from "./shaderlib.js";   // A1: uniforme de fade dither por escenario
 import trees from "./systems/trees.js";
@@ -58,6 +58,7 @@ export const host = {
     this.camera = new THREE.Camera();
     this.scene = new THREE.Scene();
     createLights(this.scene);
+    applyCampoLighting(state.campo && state.campo.id);   // A1: azimut del sol y color de suelo del campo
 
     const origin = maplibregl.MercatorCoordinate.fromLngLat(HOME_VIEW.center, 0);
     this.scale = origin.meterInMercatorCoordinateUnits();
@@ -93,7 +94,7 @@ export const host = {
         group.add(built.object3d);
         /* A1: niebla para los materiales de todos los sistemas, compuesta con lo que ya
            tengan (viento). Idempotente: si un sistema ya hizo patch(mat,{fog:true}) no se repite. */
-        for (const m of built.materials || []) shaderlib.patchExtra(m, { fog: true });
+        for (const m of built.materials || []) shaderlib.patchExtra(m, { fog: true, foliage: true, srgbVC: !!m.vertexColors });
       }
       group.scale.y = state.growth[key] || 0.0001;
       this.groups[key] = group;
@@ -113,7 +114,7 @@ export const host = {
     this.renderer = new THREE.WebGLRenderer({ canvas: mapInstance.getCanvas(), context: gl });
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, flipY);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, premul);
-    this.renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+    applyRenderSettings(this.renderer);   // A1 1.3: salida sRGB + tone mapping (lighting.js)
     this.renderer.autoClear = false;
   },
 
