@@ -15,7 +15,10 @@
    ctx = { THREE, toScene, heightAt, quality, shaderlib, uniforms, config, rng }. */
 import * as THREE from "three";
 import * as config from "../core/config.js";
+import { updateCamera } from "../core/camera.js";
+import { emit, hasListeners, on } from "../core/events.js";
 import { mulberry32 } from "../core/geo.js";
+import { quality } from "../core/quality.js";
 import { HOME_VIEW, state } from "../core/state.js";
 import { createLights, uniforms } from "./lighting.js";
 import * as shaderlib from "./shaderlib.js";
@@ -32,7 +35,8 @@ export const host = {
   groups: {},          // scenarioKey → THREE.Group del escenario (contiene los objetos de todos los sistemas)
   systems: [],         // sistemas registrados, en orden de construcción
   preLayers: [],       // capas custom extra que deben quedar ANTES de ésta (p. ej. atmo-fog de A1)
-  quality: null,       // lo completa core/quality.js (P-7)
+  quality,             // nivel de calidad vigente (core/quality.js: objeto único y mutable)
+  camera3d: null,      // última cámara real calculada por core/camera.js (ver render())
 
   /* Registra un sistema. Se construye en onAdd, en el orden de registro. */
   register(system) { this.systems.push(system); return system; },
@@ -49,6 +53,7 @@ export const host = {
   },
 
   onAdd(mapInstance, gl) {
+    this.map = mapInstance;
     this.camera = new THREE.Camera();
     this.scene = new THREE.Scene();
     createLights(this.scene);
@@ -128,9 +133,13 @@ export const host = {
     this._lastNow = now;
     uniforms.uTime.value = now / 1000;
     this.camera.projectionMatrix = this.sceneMatrix(matrix);
+    /* Cámara real (T1): posición en metros de escena → uCamPos, compartido por niebla, LOD, agua… */
+    const cam = this.camera3d = updateCamera(this.map, this.origin, this.scale, matrix);
+    uniforms.uCamPos.value.set(cam.camPosScene[0], cam.camPosScene[1], cam.camPosScene[2]);
     const frame = { now, dt, camPosScene: uniforms.uCamPos.value, viewProj: this.camera.projectionMatrix,
-                    quality: this.quality, preset: null };
+                    camera: cam, quality: this.quality, preset: null };
     for (const sys of this.systems) if (sys.update) sys.update(frame);
+    if (hasListeners("frame")) emit("frame", frame);
     this.renderer.resetState();
     this.renderer.render(this.scene, this.camera);
   },
@@ -154,5 +163,6 @@ export const host = {
   }
 };
 
+on("quality", q => host.setQuality(q));
 host.register(trees);
 host.register(grass);

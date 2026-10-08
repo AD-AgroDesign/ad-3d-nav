@@ -1,4 +1,5 @@
 import { state } from "../core/state.js";
+import { emit } from "../core/events.js";
 import { applyGrowth, applyOpacity } from "./layers.js";
 import { updatePanel } from "../ui/panel.js";
 
@@ -9,6 +10,7 @@ export function setScenario(next, animate = true) {
   if (next === state.scenario) return;
   const prev = state.scenario;
   state.scenario = next;
+  emit("scenario", { key: next, prev });
   updatePanel();
   document.getElementById("sw-inicial").classList.toggle("active", next === "inicial");
   document.getElementById("sw-multi").classList.toggle("active", next === "multi");

@@ -14,6 +14,8 @@ import { HOME_VIEW, state } from "../core/state.js";
 import { featureCentroid, mulberry32, ringAreaHa } from "../core/geo.js";
 import { map } from "../map/style.js";
 import { setScenario } from "../map/scenario.js";
+import { getCamera } from "../core/camera.js";
+import { LEVELS, setQuality } from "../core/quality.js";
 import { host } from "../render/host.js";
 import { uniforms } from "../render/lighting.js";
 import { RAZANTE_CAM, corridorCenterline, makeFlight } from "../tour/flight.js";
@@ -209,10 +211,24 @@ import { startOrbit, startTour, stopOrbit, stopTour } from "../tour/tour.js";
     frameTimes,
     views: computeViews,
     startTour, stopTour, startOrbit, stopOrbit,
-    /* Stubs: todavía no hay presets de hora ni niveles de calidad (P-7 / A1).
-       Devuelven false sin hacer nada; las listas de nombres válidos se irán llenando. */
-    presets: [], qualities: [],
+    /* Cámara real (core/camera.js) del último frame + centro del mapa en metros de escena,
+       para verificar uCamPos contra la altitud/distancia de MapLibre (P-7). */
+    async camera() {
+      await new Promise(r => { map.once("render", r); map.triggerRepaint(); });
+      const cam = getCamera();
+      const cs = host.ctx.toScene(map.getCenter().lng, map.getCenter().lat);
+      const p = cam.camPosScene;
+      const dist = Math.hypot(p[0] - cs[0], p[1], p[2] - cs[1]);
+      const cp = map.transform.getCameraPosition();
+      return { camPosScene: p, altitudeM: cam.altitudeM, altitudeMapLibre: cp.altitude, ctdM: cam.ctdM, ctdPx: cam.ctdPx,
+               pxPerMeter: cam.pxPerMeter, horizonPx: cam.horizonPx, centerScene: cs, distToCenter: dist,
+               pitch: map.getPitch(), zoom: map.getZoom(), rays: cam.rays };
+    },
+    /* Presets de hora: todavía no existen (A1, Ola 3). Stub documentado: devuelve false. */
+    presets: [],
     setPreset(name) { console.warn("__nav3d.setPreset: sin presets todavía:", name); return false; },
-    setQuality(name) { console.warn("__nav3d.setQuality: sin niveles de calidad todavía:", name); return false; }
+    /* Calidad: cambia el nivel real (core/quality.js) sin persistir en localStorage (determinismo). */
+    qualities: LEVELS.slice(),
+    setQuality(name) { return setQuality(name, { persist: false, reload: false }); }
   };
 })();
