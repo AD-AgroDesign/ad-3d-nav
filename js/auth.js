@@ -25,6 +25,13 @@ const SIGNED_URL_TTL = 3600;   // 1 h; los datos ya quedan en memoria del visor
 
 let _sb = null;
 
+/* ---------- Modo local (sólo desarrollo) ----------
+   ?local salta Supabase y lee data/campos.local.json (no versionado; lo genera
+   tools/gen_campos_local.py). Se activa únicamente en hosts de desarrollo:
+   en cualquier otro host (producción incluida) el parámetro se ignora. */
+const HOST_DEV = /^(localhost|127\.0\.0\.1|\[::1\]|.+\.localhost)$/i.test(location.hostname);
+const MODO_LOCAL = HOST_DEV && new URLSearchParams(location.search).has("local");
+
 /* Contrato con main.js: éste lee AD_AUTH.campo y AD_AUTH.signedUrlFor() */
 const AD_AUTH = {
   sb: null,
@@ -279,6 +286,7 @@ function entrarAlVisor(campo) {
 /* ---------- URL firmada para un archivo del bucket privado ---------- */
 async function signedUrlFor(path) {
   if (!path) throw new Error("El campo no tiene cargada la ruta de sus datos GIS.");
+  if (MODO_LOCAL) return `data/${path}`;
   const { data, error } = await _sb.storage
     .from(GIS_BUCKET)
     .createSignedUrl(path, SIGNED_URL_TTL);
@@ -288,7 +296,9 @@ async function signedUrlFor(path) {
 
 /* ---------- Cerrar sesión ---------- */
 async function doLogout() {
-  try { await _sb.auth.signOut(); } catch (e) { console.warn(e); }
+  if (!MODO_LOCAL) {
+    try { await _sb.auth.signOut(); } catch (e) { console.warn(e); }
+  }
   location.replace(location.pathname);   // limpia también el ?campo=
 }
 
@@ -315,8 +325,39 @@ document.addEventListener("keydown", e => {
   else if (estado === "state-campos" && !$("login-enter").disabled) $("login-enter").click();
 });
 
+/* ---------- Arranque en modo local: sin Supabase, sin login ---------- */
+async function arrancarLocal() {
+  try {
+    const r = await fetch("data/campos.local.json", { cache: "no-store" });
+    if (!r.ok) throw new Error(`data/campos.local.json respondió ${r.status}`);
+    AD_AUTH.campos = await r.json();
+    if (!AD_AUTH.campos.length) throw new Error("data/campos.local.json está vacío");
+  } catch (err) {
+    console.error("Modo local: no se pudo leer data/campos.local.json (¿corriste tools/gen_campos_local.py?):", err);
+    setCardState("form");
+    showError("Modo local: falta data/campos.local.json.");
+    return;
+  }
+
+  /* Marca discreta para no confundir esta sesión con una de producción */
+  const marca = document.createElement("div");
+  marca.textContent = "modo local";
+  marca.style.cssText = "position:fixed;left:6px;bottom:4px;z-index:9999;font:10px/1 sans-serif;" +
+    "letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.55);" +
+    "background:rgba(0,0,0,.35);padding:3px 6px;border-radius:3px;pointer-events:none";
+  document.body.appendChild(marca);
+
+  /* Bandera para main.js/módulos que se ejecutan diferidos: si llegan después
+     de entrarAlVisor() no se pierden el AD_BOOT. */
+  window.AD_ACCESS_READY = true;
+  const pedido = new URLSearchParams(location.search).get("campo");
+  entrarAlVisor(AD_AUTH.campos.find(c => c.id === pedido) || AD_AUTH.campos[0]);
+}
+
 /* ---------- Arranque ---------- */
-if (initSupabase()) {
+if (MODO_LOCAL) {
+  arrancarLocal();
+} else if (initSupabase()) {
   /* Si la sesión anterior sigue viva (supabase-js la guarda y la renueva sola
      en localStorage) el usuario no vuelve a escribir la contraseña. Mientras se
      resuelve, la tarjeta muestra "Verificando sesión" en vez del formulario,
