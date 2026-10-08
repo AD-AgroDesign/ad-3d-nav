@@ -221,11 +221,14 @@
 
 <script src="vendor/supabase.js"></script>
 <script src="vendor/maplibre-gl.js"></script>
-<script src="vendor/three.min.js"></script>
+<!-- Three.js r170 (vendor/three.module.js, ES module) vía importmap. vendor/three.min.js (r149 UMD)
+     queda en el repo SIN cargarse, para volver atrás rápido; se borra en el cierre (G4). -->
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.js" } }
+</script>
 <script src="js/auth.js"></script>
 <!-- Punto de entrada ES (módulos diferidos: corre después de auth.js, que deja la
-     bandera AD_ACCESS_READY si el acceso se valida antes). Three sigue siendo r149 UMD
-     (global THREE). Al publicar, subir la fecha del ?v= para saltear la caché. -->
+     bandera AD_ACCESS_READY si el acceso se valida antes). Al publicar, subir la fecha del ?v= para saltear la caché. -->
 <script type="module" src="js/app.js?v=20261008"></script>
 </body>
 </html>
