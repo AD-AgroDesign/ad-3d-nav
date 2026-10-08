@@ -222,9 +222,10 @@
 <script src="vendor/supabase.js"></script>
 <script src="vendor/maplibre-gl.js"></script>
 <script src="vendor/three.min.js"></script>
-<!-- main.js primero: define AD_BOOT, que auth.js llama al validar el acceso -->
-<script src="js/main.js"></script>
-<script src="js/debug/qa-api.js"></script>
 <script src="js/auth.js"></script>
+<!-- Punto de entrada ES (módulos diferidos: corre después de auth.js, que deja la
+     bandera AD_ACCESS_READY si el acceso se valida antes). Three sigue siendo r149 UMD
+     (global THREE). Al publicar, subir la fecha del ?v= para saltear la caché. -->
+<script type="module" src="js/app.js?v=20261008"></script>
 </body>
 </html>

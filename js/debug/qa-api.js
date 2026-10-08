@@ -1,8 +1,7 @@
 /* ============ AgroDesign 3D Navigator · API de QA (window.__nav3d) ============
 
-   Script clásico, cargado DESPUÉS de main.js. Comparte con él el ámbito léxico
-   global (state, map, vegLayer, HOME_VIEW, corridorCenterline, makeFlight…),
-   así que no hace falta tocar main.js para leer el estado.
+   Módulo ES importado por app.js. Lee el estado de los módulos de la app con
+   imports explícitos (antes, como script clásico, lo tomaba del ámbito global).
 
    Solo se expone con ?debug o ?qa en la URL. Sin esos parámetros este archivo
    no hace nada (producción: sin cambio de comportamiento).
@@ -11,6 +10,15 @@
    Con ?qa nunca arranca el tour ni la cámara solos: el splash se saltea desde
    la API y el tour/órbita solo corren si se piden (startTour/startOrbit).
    ==================================================================== */
+import { HOME_VIEW, state } from "../core/state.js";
+import { GRASS_CLASSES } from "../core/config.js";
+import { featureCentroid, mulberry32, ringAreaHa } from "../core/geo.js";
+import { map } from "../map/style.js";
+import { setScenario } from "../map/scenario.js";
+import { TUFT_GEOS, vegLayer } from "../render/host.js";
+import { RAZANTE_CAM, corridorCenterline, makeFlight } from "../tour/flight.js";
+import { startOrbit, startTour, stopOrbit, stopTour } from "../tour/tour.js";
+
 (() => {
   const _q = new URLSearchParams(location.search);
   if (!(_q.has("debug") || _q.has("qa"))) return;

@@ -279,8 +279,12 @@ function entrarAlVisor(campo) {
   $("login-password").value = "";
   $("login-email").value    = "";
 
+  /* app.js es un módulo ES (diferido): puede ejecutarse DESPUÉS de este punto, p. ej.
+     al restaurar la sesión o en modo local. Se deja la bandera y, si AD_BOOT ya
+     existe, se lo llama; si no, app.js revisa la bandera al inicializar y arranca él.
+     Uno u otro: nunca los dos (ver el cierre de app.js). */
+  window.AD_ACCESS_READY = true;
   if (typeof window.AD_BOOT === "function") window.AD_BOOT();
-  else console.error("El visor no se inicializó: falta AD_BOOT.");
 }
 
 /* ---------- URL firmada para un archivo del bucket privado ---------- */
@@ -347,9 +351,6 @@ async function arrancarLocal() {
     "background:rgba(0,0,0,.35);padding:3px 6px;border-radius:3px;pointer-events:none";
   document.body.appendChild(marca);
 
-  /* Bandera para main.js/módulos que se ejecutan diferidos: si llegan después
-     de entrarAlVisor() no se pierden el AD_BOOT. */
-  window.AD_ACCESS_READY = true;
   const pedido = new URLSearchParams(location.search).get("campo");
   entrarAlVisor(AD_AUTH.campos.find(c => c.id === pedido) || AD_AUTH.campos[0]);
 }
