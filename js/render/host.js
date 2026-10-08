@@ -1,5 +1,12 @@
+import * as THREE from "three";
 import { CROWN_PALETTE, GRASS_CLASSES, GRASS_SCALE, TRUNK_COLOR } from "../core/config.js";
 import { HOME_VIEW, state } from "../core/state.js";
+
+/* Paridad con r149 (P-5): r149 trataba los hex como valores directos y escribía el
+   frame sin conversión de salida. En r170 eso se reproduce con ColorManagement apagado
+   (Color.setHex no convierte sRGB→lineal) y outputColorSpace lineal (sin sRGB OETF).
+   El realce de color / tone mapping correcto es trabajo de A1, no de este paso. */
+THREE.ColorManagement.enabled = false;
 
 /* Geometría unitaria de una mata: 4 hojas inclinadas hacia afuera
    (base y=0, puntas y≈1). Gradiente base → punta vía colores de vértice
@@ -63,8 +70,10 @@ export const vegLayer = {
   onAdd(mapInstance, gl) {
     this.camera = new THREE.Camera();
     this.scene = new THREE.Scene();
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.55));
-    const sun = new THREE.DirectionalLight(0xfff3da, 0.85);
+    /* r155+ usa luces físicamente correctas (sin el ×π implícito del modo legacy de r149):
+       se compensa multiplicando las intensidades por π para conservar el aspecto. */
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.55 * Math.PI));
+    const sun = new THREE.DirectionalLight(0xfff3da, 0.85 * Math.PI);
     sun.position.set(-0.5, 1, -0.7);  // sol NO (sombras GeoJSON al SE)
     this.scene.add(sun);
 
@@ -86,6 +95,7 @@ export const vegLayer = {
     }
 
     this.renderer = new THREE.WebGLRenderer({ canvas: mapInstance.getCanvas(), context: gl });
+    this.renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
     this.renderer.autoClear = false;
   },
 
@@ -102,6 +112,13 @@ export const vegLayer = {
 
     const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, trees.length);
     const crowns = new THREE.InstancedMesh(crownGeo, crownMat, trees.length + nLobes);
+    /* Paridad con r149 (T2/D9): en r149 el culling usaba la esfera de la geometría base
+       (una mata/árbol) y en la práctica nunca descartaba la malla. r170 calcula la esfera
+       real de las instancias y SÍ descarta mallas enteras fuera de cuadro (cambia stats(),
+       no la imagen). Para este paso se mantiene "sin culling efectivo"; el culling por chunks
+       y las esferas correctas son trabajo de A2 (InstancedMesh.computeBoundingSphere). */
+    trunks.frustumCulled = false;
+    crowns.frustumCulled = false;
 
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
@@ -195,6 +212,7 @@ export const vegLayer = {
         for (const [geo, sub] of batches) {
           if (!sub.length) continue;
           const tufts = new THREE.InstancedMesh(geo, grassMat, sub.length);
+          tufts.frustumCulled = false;   // ver nota en buildGroup (paridad con r149)
           sub.forEach((t, i) => {
             const mc = maplibregl.MercatorCoordinate.fromLngLat([t.lon, t.lat], 0);
             eul.set(0, t.j * Math.PI * 2, 0);
