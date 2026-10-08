@@ -236,7 +236,7 @@ function poblarSelector() {
   }
 
   /* Los admin ven campos de varios clientes: se los prefija para distinguirlos.
-     Cuando el cliente y el campo se llaman igual (Carmen, Monte Hermoso) el
+     Cuando el cliente y el campo se llaman igual (El Carmen, Monte Hermoso) el
      prefijo no agrega nada, así que se omite. */
   const mostrarCliente = AD_AUTH.esAdmin() &&
     new Set(campos.map(c => c.cliente)).size > 1;

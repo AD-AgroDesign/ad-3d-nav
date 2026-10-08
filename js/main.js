@@ -353,7 +353,7 @@ const mapStyle = {
       tileSize: 256,
       // maxzoom por defecto; se ajusta por campo en loadCampos() según hasta
       // qué nivel Esri tiene imagen nativa (z18 en Monte Hermoso, z17 en
-      // Silesia/Carmen). Más allá, Esri devuelve "Map data not yet available",
+      // Silesia/El Carmen). Más allá, Esri devuelve "Map data not yet available",
       // así que reescalamos el último tile real en vez de pedir los inexistentes.
       maxzoom: 17,
       attribution: "Imagen satelital © Esri, Maxar, Earthstar Geographics | AgroDesign"
@@ -608,7 +608,7 @@ function loadCampos() {
   list.innerHTML = "";
   // El nombre del cliente sólo aporta cuando hay más de uno en la lista, que es
   // el caso de los admin; un cliente ve sus propios campos sin prefijo. Y cuando
-  // cliente y campo se llaman igual (Carmen, Monte Hermoso) tampoco se prefija
+  // cliente y campo se llaman igual (El Carmen, Monte Hermoso) tampoco se prefija
   const variosClientes = new Set(campos.map(c => c.cliente)).size > 1;
   const ddLabel = c => (variosClientes && c.cliente && c.cliente !== c.nombre)
     ? `${c.cliente} — ${c.nombre}` : c.nombre;
