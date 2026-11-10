@@ -94,7 +94,7 @@ export const host = {
         group.add(built.object3d);
         /* A1: niebla para los materiales de todos los sistemas, compuesta con lo que ya
            tengan (viento). Idempotente: si un sistema ya hizo patch(mat,{fog:true}) no se repite. */
-        for (const m of built.materials || []) shaderlib.patchExtra(m, { fog: true, foliage: true, srgbVC: !!m.vertexColors });
+        for (const m of built.materials || []) shaderlib.patchExtra(m, { fog: true, foliage: m.userData.foliage !== false, srgbVC: !!m.vertexColors });   // ORQ: opt-out de follaje por material (troncos, pedido A1)
       }
       group.scale.y = state.growth[key] || 0.0001;
       this.groups[key] = group;
