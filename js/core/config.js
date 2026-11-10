@@ -223,6 +223,7 @@ export const A3_SHADOWS = {
   margin: 1.45,                // la caja del mapa de sombras = zona × margin: se recalcula solo cuando la cámara sale del margen
   edge: 0.06,                  // franja (fracción del mapa) donde la sombra real se funde con los blobs
   cardDist: 330,               // m · dentro de esta distancia al centro de la caja los árboles proyectan con tarjetas; más lejos, con el impostor
+  cardMaxTexel: 0.6,           // m · si el texel del mapa es más grande que esto, todos proyectan con el impostor (las hojas no se resuelven)
   biasM: 0.12,                 // m · sesgo de profundidad del receptor (suelo plano: casi nada)
   soft: true,                  // 4 muestras de PCF por píxel en el suelo (false = 1 muestra)
   grass: "ultra",              // quién recibe sombra en las matas: "ultra" (solo Ultra) | "alta" (Ultra y Alta) | "off" (en este dato casi no se nota: ver handoff)

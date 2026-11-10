@@ -311,11 +311,12 @@ function updateBox(frame) {
     s.recv.rotation.set(0, ang, 0); s.recv.scale.set(h, 1, h);
   }
 
-  // cerca/lejos por celda (según la distancia al centro de la caja): tarjetas o impostor
+  // cerca/lejos por celda (según la distancia al centro de la caja): tarjetas o impostor. Con texels grandes las hojas no se resuelven: todo impostor.
+  const cardsOk = 2 * h / size <= CFG.cardMaxTexel;
   for (const s of Object.values(S)) if (s) for (const e of s.casters.list) {
     const d = Math.hypot(e.cx - box.cg.x, e.cz - box.cg.y) - e.r;
     const out = d > h * 1.5 + 40;
-    const near = !out && d < CFG.cardDist;
+    const near = !out && cardsOk && d < CFG.cardDist;
     for (const m of e.near) m.visible = near;
     e.far.visible = !out && !near;
   }
