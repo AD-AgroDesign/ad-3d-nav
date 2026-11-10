@@ -184,7 +184,7 @@ export const A4_GROUND = {
        "extrusion": el suelo sube como antes (losa con paredes de `lift` metros, escalada por el host con scale.y) */
   growth: "revelado",
   yOff: 0.04,          // m sobre la altura del suelo (heightAt)
-  maxEdge: 14,         // m · arista máxima de la malla (da la grilla donde se interpola la distancia al borde)
+  maxEdge: 40,         // m · arista máxima de la malla (grilla donde se interpola la distancia al borde; 14 m = ~1M tris en El Carmen multi)
   gain: 1.0,           // multiplicador de albedo (calibrado contra el suelo MapLibre anterior)
   noise: { fine: 0.10, mid: 0.13, coarse: 0.16 },   // amplitud de luminancia por escala (≈0,7 m / 4 m / 25 m)
   edgeAO: { width: 1.8, strength: 0.38 },           // m de la franja oscura hacia adentro y oscurecimiento máximo

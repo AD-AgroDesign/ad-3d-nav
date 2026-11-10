@@ -73,7 +73,7 @@ function ringArea2(r) {   // 2×área con signo (x,z)
 /* Triangula un polígono (anillos en metros de escena). Devuelve { P, T, rings } o null. */
 function triangulatePoly(rings) {
   if (rings.length === 0 || rings[0].length < 3) return null;
-  if (Math.abs(ringArea2(rings[0])) < 2) return null;   // < 1 m²
+  if (Math.abs(ringArea2(rings[0])) < 2) return { tiny: true };   // < 1 m²: no vale la pena
   const v2 = r => r.map(p => new THREE.Vector2(p[0], p[1]));
   const contour = v2(rings[0]);
   const holes = rings.slice(1).filter(r => r.length >= 3).map(v2);
@@ -148,7 +148,7 @@ function distToRings(P, from, rings) {
 /* ---------- construcción de la malla de suelo ---------- */
 function buildGroundGeometry(ctx, data, toLngLat, hasH) {
   const P_ = [], I_ = { walls: [], tops: [], ribbons: [] };   // P_: floats por vértice (11): x,y,z, cls,depth,edge,top, kind
-  let nv = 0, polys = 0, failed = 0;
+  let nv = 0, polys = 0, failed = 0, tiny = 0;
   const pushV = (x, y, z, cls, depth, edge, top, kind) => { P_.push(x, y, z, cls, depth, edge, top, kind); return nv++; };
   const yAt = (x, z) => (hasH ? ctx.heightAt(...toLngLat(x, z)) : 0) + A4_GROUND.yOff;
   const W = A4_GROUND.edgeAO ? A4_GROUND.edgeAO.width : 1.8;
@@ -160,6 +160,7 @@ function buildGroundGeometry(ctx, data, toLngLat, hasH) {
       const rings = poly.map(r => dedupRing(r, ctx.toScene)).filter(r => r.length >= 3);
       const tri = triangulatePoly(rings);
       if (!tri) { failed++; continue; }
+      if (tri.tiny) { tiny++; continue; }
       polys++;
       const n0 = tri.P.length;
       const T = refine(tri.P, tri.T, A4_GROUND.maxEdge);
@@ -221,7 +222,7 @@ function buildGroundGeometry(ctx, data, toLngLat, hasH) {
   const idx = [...I_.walls, ...I_.tops, ...I_.ribbons];   // orden de dibujo: paredes → tapa → franja (sin depth test)
   g.setIndex(new THREE.BufferAttribute(nv > 65535 ? new Uint32Array(idx) : new Uint16Array(idx), 1));
   g.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), 1e6);   // se dibuja siempre (frustumCulled=false igual)
-  return { geometry: g, verts: nv, tris: idx.length / 3, polys, failed };
+  return { geometry: g, verts: nv, tris: idx.length / 3, polys, failed, tiny };
 }
 
 /* ---------- material de suelo (Lambert + chunks propios sobre patch de A1) ---------- */
@@ -304,7 +305,7 @@ function buildFurrowGeometry(ctx, data) {
     for (const poly of f.geometry.coordinates) {
       const rings = poly.map(r => dedupRing(r, ctx.toScene)).filter(r => r.length >= 3);
       const tri = triangulatePoly(rings);
-      if (!tri) continue;
+      if (!tri || tri.tiny) continue;
       const { P, T } = tri;
       // momento de segundo orden área-ponderado de la malla → eje principal del lote
       const ox = P[0][0], oz = P[0][1];
@@ -367,16 +368,19 @@ function makeFurrowMaterial(ctx) {
       "  float fu = max(fwidth(vRow.x), 1e-4);\n" +
       // surcos: onda senoidal; la amplitud se funde a 0 (gris medio) cuando el período se acerca al píxel (sin moiré)
       "  float wRows = fu / uRow.x;\n" +
-      "  float amp = uRow.y * fRow * (1.0 - smoothstep(0.28, 0.65, wRows));\n" +
+      "  float amp = uRow.y * fRow * (1.0 - smoothstep(0.40, 0.90, wRows));\n" +
+      // 2.º nivel (8 surcos juntos = bandas de ~4 m): toma la posta cuando el surco real ya no se resuelve (textura, no dato)
+      "  float wBand = fu / (uRow.x * 8.0);\n" +
+      "  float ampB = uRow.y * 0.7 * fRow * smoothstep(0.30, 0.90, wRows) * (1.0 - smoothstep(0.40, 0.90, wBand));\n" +
       "  float patchy = 0.55 + 0.9 * adN(p / 9.0 + 12.3);\n" +          // rastrojo: irregularidad por manchones
       "  float speck = (adN(p / 0.35) - 0.5) * 0.10 * fRow * (1.0 - smoothstep(0.2, 0.6, fu / 0.35));\n" +
-      "  float m = 1.0 + amp * patchy * sin(6.2831853 * vRow.x / uRow.x) + speck;\n" +
+      "  float m = 1.0 + (amp * sin(6.2831853 * vRow.x / uRow.x) + ampB * sin(6.2831853 * vRow.x / (uRow.x * 8.0) + 1.7)) * patchy + speck;\n" +
       // huellas de pulverizadora: dos líneas de ancho uTram.z separadas uTram.y, cada uTram.x m
       "  float q = mod(vRow.x, uTram.x) - uTram.x * 0.5;\n" +
       "  float dd = abs(abs(q) - uTram.y * 0.5);\n" +
       "  float hw = uTram.z * 0.5;\n" +
       "  float line = 1.0 - smoothstep(hw - fu * 0.75, hw + fu * 0.75, dd);\n" +
-      "  line *= min(1.0, hw / (fu * 1.5));\n" +
+      "  line *= min(1.0, sqrt(hw / (fu * 1.5)));\n" +
       "  float broken = 0.6 + 0.8 * adN(vec2(vRow.y / 40.0, floor(vRow.x / uTram.x)) + 5.1);\n" +
       "  m -= uTram.w * fTram * line * min(broken, 1.0);\n" +
       // salida = factor/2: con blend (DST_COLOR, SRC_COLOR) el resultado es dst * factor
@@ -454,7 +458,7 @@ export default {
     group.add(fMesh);
 
     S[key] = { group, gMesh, fMesh, gMat, fMat, opacity: key === "inicial" ? 1 : 0,
-      info: { verts: gg.verts, tris: gg.tris, polys: gg.polys, failed: gg.failed, furrowTris: fg.tris, lots: fg.lots, buildMs: Math.round(performance.now() - t0) } };
+      info: { verts: gg.verts, tris: gg.tris, polys: gg.polys, failed: gg.failed, tiny: gg.tiny, furrowTris: fg.tris, lots: fg.lots, buildMs: Math.round(performance.now() - t0) } };
     applyModes();
     // materials vacío: el host no re-parcha (la niebla y el fade ya van en patch()); los surcos no usan niebla
     return { object3d: group, materials: [] };
