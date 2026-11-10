@@ -8,7 +8,7 @@
 
 import { loadCampos, loadData } from "./map/data.js";
 import { addScenarioLayers, applyGrowth, applyOpacity } from "./map/layers.js";
-import { map } from "./map/style.js";
+import { applyRasterGrade, map } from "./map/style.js";
 import { updatePanel } from "./ui/panel.js";
 import { mapStyle } from "./map/style.js";
 import { DEBUG, state } from "./core/state.js";
@@ -36,6 +36,7 @@ async function bootEscenario() {
     const patternPardo = map.loadImage("img/pastizal-pardo.jpg");
     const patternVerde = map.loadImage("img/pastizal-verde.jpg");
     loadCampos();
+    applyRasterGrade(map);   // A1: ajuste de color del satélite (loadCampos puede recrear la capa)
     await loadData();
     map.addImage("pastizal", (await pattern).data);
     map.addImage("pastizal-pardo", (await patternPardo).data);

@@ -13,6 +13,8 @@
                                                (lo escribe host.setOpacity: nadie más lo toca)
                    fade: true               → uniforme propio del material (setFade(mat, v))
    El material debe ser MeshBasic/Lambert/Phong/Standard (necesitan <fog_fragment>). */
+import * as THREE from "three";
+import { A1_FOLIAGE } from "../core/config.js";
 import { uniforms } from "./lighting.js";
 
 /* ---------- GLSL ---------- */
@@ -90,6 +92,24 @@ function applyChunks(sh, o) {
         "gl_FragColor.rgb = mix(gl_FragColor.rgb, uFogColor, adFog(distance(vAdWPos, uCamPos)));");
   }
 
+  if (o.srgbVC) {
+    // El color de vértice del pasto (base/mid/tip) es un MULTIPLICADOR pensado en espacio de pantalla
+    // (valores > 1 incluidos). Con iluminación lineal se eleva a 2,2 para que el producto con el
+    // color de instancia dé el mismo tono diseñado: lin(a)·m^2.2 = lin(a·m).
+    vs = vs.replace("#include <color_vertex>", THREE.ShaderChunk.color_vertex.replace("vColor *= color;", "vColor.rgb *= pow(color.rgb, vec3(2.2));"));
+  }
+
+  if (o.foliage) {
+    // Follaje: wrap lighting (el sol "dobla" alrededor del volumen) + translucidez barata (luz que
+    // atraviesa la hoja desde atrás, sin depender de la cámara). Solo MeshPhong (lights_phong_pars).
+    const W = A1_FOLIAGE.wrap.toFixed(3), T = A1_FOLIAGE.trans.toFixed(3);
+    fs = fs.replace("#include <lights_phong_pars_fragment>", THREE.ShaderChunk.lights_phong_pars_fragment.replace(
+      "float dotNL = saturate( dot( geometryNormal, directLight.direction ) );\n\tvec3 irradiance = dotNL * directLight.color;",
+      "float rawNL = dot( geometryNormal, directLight.direction );\n" +
+      "\tfloat dotNL = saturate( ( rawNL + " + W + " ) / ( 1.0 + " + W + " ) );\n" +
+      "\tvec3 irradiance = ( dotNL + saturate( -rawNL ) * " + T + " ) * directLight.color;"));
+  }
+
   if (o.fadeU) {
     sh.uniforms.uFade = o.fadeU;
     // Va lo primero en main(): descarta antes de gastar en iluminación. uFade>=1 → nada se descarta.
@@ -106,19 +126,19 @@ function resolveOpts(material, opts) {
   const fadeU = !opts.fade ? null
     : typeof opts.fade === "string" ? (scenarioFade[opts.fade] || (scenarioFade[opts.fade] = { value: 1 }))
     : (material.userData.uFade || (material.userData.uFade = { value: 1 }));
-  return { wind: !!opts.wind, fog: !!opts.fog, fadeU };
+  return { wind: !!opts.wind, fog: !!opts.fog, foliage: !!opts.foliage, srgbVC: !!opts.srgbVC, fadeU };
 }
 
 /* Three cachea el programa por onBeforeCompile.toString() (igual para todos los patch):
    la clave tiene que distinguir las combinaciones de chunks. */
-const keyOf = (o, prev) => (prev ? prev + "+" : "") + "ad:" + (o.wind ? "w" : "") + (o.fog ? "f" : "") + (o.fadeU ? "d" : "");
+const keyOf = (o, prev) => (prev ? prev + "+" : "") + "ad:" + (o.wind ? "w" : "") + (o.fog ? "f" : "") + (o.foliage ? "l" : "") + (o.srgbVC ? "c" : "") + (o.fadeU ? "d" : "");
 
 export function patch(material, opts = {}) {
   const o = resolveOpts(material, opts);
   material.onBeforeCompile = sh => applyChunks(sh, o);
   const key = keyOf(o);
   material.customProgramCacheKey = () => key;
-  material.userData.adChunks = { wind: o.wind, fog: o.fog, fade: !!o.fadeU };
+  material.userData.adChunks = { wind: o.wind, fog: o.fog, foliage: o.foliage, srgbVC: o.srgbVC, fade: !!o.fadeU };
   return material;
 }
 
@@ -132,13 +152,15 @@ export function patchExtra(material, opts = {}) {
   const want = { ...opts };
   if (had.fog) want.fog = false;
   if (had.fade) want.fade = false;
+  if (had.foliage) want.foliage = false;
+  if (had.srgbVC) want.srgbVC = false;
   const o = resolveOpts(material, want);
-  if (!o.fog && !o.fadeU) return material;
+  if (!o.fog && !o.fadeU && !o.foliage && !o.srgbVC) return material;
   const prev = material.onBeforeCompile, prevKey = material.customProgramCacheKey;
   const prevStr = material.userData.adChunks && prevKey ? prevKey.call(material) : "";   // sin patch previo: clave limpia
-  material.onBeforeCompile = function (sh, renderer) { if (prev) prev.call(this, sh, renderer); applyChunks(sh, { fog: o.fog, fadeU: o.fadeU }); };
+  material.onBeforeCompile = function (sh, renderer) { if (prev) prev.call(this, sh, renderer); applyChunks(sh, { fog: o.fog, foliage: o.foliage, srgbVC: o.srgbVC, fadeU: o.fadeU }); };
   const key = keyOf(o, prevStr);
   material.customProgramCacheKey = () => key;
-  material.userData.adChunks = { wind: !!had.wind, fog: !!(had.fog || o.fog), fade: !!(had.fade || o.fadeU) };
+  material.userData.adChunks = { wind: !!had.wind, fog: !!(had.fog || o.fog), foliage: !!(had.foliage || o.foliage), srgbVC: !!(had.srgbVC || o.srgbVC), fade: !!(had.fade || o.fadeU) };
   return material;
 }
