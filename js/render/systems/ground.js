@@ -20,14 +20,18 @@
        profundidad. Eso se hace desde setOpacity() (corre después de applyOpacity de layers.js).
    Dibujo: sin prueba ni escritura de profundidad (las extrusiones MapLibre invisibles escriben
        profundidad hasta 0,6–1,2 m y taparían un suelo plano); en la lista opaca con renderOrder
-       negativo (primero), así árboles y pasto, que van después, quedan encima. Con terreno 3D (A6)
-       habrá que pasar a prueba de profundidad + polygonOffset (ver handoff). */
+       negativo (primero), así árboles y pasto, que van después, quedan encima.
+   A6 (terreno 3D): con terreno activo las extrusiones MapLibre pasan a `fill` drapeado (layers.js, T14) y el
+       suelo/surcos SÍ usan prueba de profundidad (la malla del terreno ya está en el depth buffer cuando
+       dibuja esta capa) + polygonOffset, apoyados en heightAt, con normales del relieve para que reciban el sol
+       como la ladera real. Sin terreno nada cambia. */
 import * as THREE from "three";
 import { A4_FURROWS, A4_GROUND, WOODY_BASE } from "../../core/config.js";
 import { HOME_VIEW, params } from "../../core/state.js";
 import { quality } from "../../core/quality.js";
 import { map } from "../../map/style.js";
 import { chainShader } from "./chunks.js";
+import { extOpacityProp, terrain } from "../../terrain/terrain.js";   // A6: relieve
 
 /* ---------- parámetros efectivos (config + URL) ---------- */
 const DBG = params.has("qa") || params.has("debug");
@@ -149,8 +153,21 @@ function distToRings(P, from, rings) {
 function buildGroundGeometry(ctx, data, toLngLat, hasH) {
   const P_ = [], I_ = { walls: [], tops: [], ribbons: [] };   // P_: floats por vértice (11): x,y,z, cls,depth,edge,top, kind
   let nv = 0, polys = 0, failed = 0, tiny = 0;
-  const pushV = (x, y, z, cls, depth, edge, top, kind) => { P_.push(x, y, z, cls, depth, edge, top, kind); return nv++; };
   const yAt = (x, z) => (hasH ? ctx.heightAt(...toLngLat(x, z)) : 0) + A4_GROUND.yOff;
+  /* A6: normal del relieve por vértice (diferencias centrales de heightAt a ±NRM_D m; las paredes de la losa, planas) */
+  const N_ = [], NRM_D = 12;
+  const nrmAt = (x, z) => {
+    const [lo, la] = toLngLat(x, z);
+    const dLon = NRM_D / (111320 * Math.cos(la * Math.PI / 180)), dLat = NRM_D / 110574;
+    const hx = ctx.heightAt(lo + dLon, la) - ctx.heightAt(lo - dLon, la), hz = ctx.heightAt(lo, la - dLat) - ctx.heightAt(lo, la + dLat);   // +z de escena = sur
+    const nx = -hx / (2 * NRM_D), nz = hz / (2 * NRM_D), l = Math.hypot(nx, 1, nz);
+    N_.push(nx / l, 1 / l, nz / l);
+  };
+  const pushV = (x, y, z, cls, depth, edge, top, kind) => {
+    P_.push(x, y, z, cls, depth, edge, top, kind);
+    if (hasH) { if (kind === 2) N_.push(0, 1, 0); else nrmAt(x, z); }
+    return nv++;
+  };
   const W = A4_GROUND.edgeAO ? A4_GROUND.edgeAO.width : 1.8;
 
   for (const f of data.features) {
@@ -219,6 +236,7 @@ function buildGroundGeometry(ctx, data, toLngLat, hasH) {
   g.setAttribute("position", new THREE.InterleavedBufferAttribute(buf, 3, 0));
   g.setAttribute("aG", new THREE.InterleavedBufferAttribute(buf, 4, 3));   // cls, depth, edge, top
   g.setAttribute("aK", new THREE.InterleavedBufferAttribute(buf, 1, 7));   // 0 tapa, 1 franja AO, 2 pared
+  if (hasH) g.setAttribute("aNrm", new THREE.Float32BufferAttribute(N_, 3));   // A6: normales del relieve
   const idx = [...I_.walls, ...I_.tops, ...I_.ribbons];   // orden de dibujo: paredes → tapa → franja (sin depth test)
   g.setIndex(new THREE.BufferAttribute(nv > 65535 ? new Uint32Array(idx) : new Uint16Array(idx), 1));
   g.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), 1e6);   // se dibuja siempre (frustumCulled=false igual)
@@ -226,11 +244,15 @@ function buildGroundGeometry(ctx, data, toLngLat, hasH) {
 }
 
 /* ---------- material de suelo (Lambert + chunks propios sobre patch de A1) ---------- */
-function makeGroundMaterial(ctx, key) {
+function makeGroundMaterial(ctx, key, hasH) {
   const m = new THREE.MeshLambertMaterial({ color: 0xffffff });
   m.userData.foliage = false;
   m.side = THREE.FrontSide;
   m.depthTest = false; m.depthWrite = false; m.transparent = false;
+  if (hasH) {   // A6: con terreno, prueba de profundidad contra la malla de MapLibre + polygonOffset (yOff 0,04 m solo no alcanza a ras de piso: ±0,05 m de error de malla)
+    m.depthTest = true;
+    m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -4;
+  }
   // mezcla alfa en la lista OPACA (CustomBlending no se anula con transparent:false)
   m.blending = THREE.CustomBlending;
   m.blendEquation = THREE.AddEquation; m.blendSrc = THREE.SrcAlphaFactor; m.blendDst = THREE.OneMinusSrcAlphaFactor;
@@ -252,13 +274,13 @@ function makeGroundMaterial(ctx, key) {
     uSoft: { value: new THREE.Vector2(A4_GROUND.reveal.soft, A4_GROUND.reveal.jitter) }
   };
   m.userData.a4u = U;
-  chainShader(m, "a4ground", sh => {
+  chainShader(m, hasH ? "a4ground-n" : "a4ground", sh => {
     Object.assign(sh.uniforms, U);
     sh.vertexShader = sh.vertexShader
       .replace("#include <common>",
-        "#include <common>\nattribute vec4 aG;\nattribute float aK;\nuniform vec4 uCls[" + MAXC + "];\nuniform vec3 uDry[" + MAXC + "];\nuniform vec3 uGrn[" + MAXC + "];\n" +
+        "#include <common>\nattribute vec4 aG;\nattribute float aK;\n" + (hasH ? "attribute vec3 aNrm;\n" : "") + "uniform vec4 uCls[" + MAXC + "];\nuniform vec3 uDry[" + MAXC + "];\nuniform vec3 uGrn[" + MAXC + "];\n" +
         "uniform float uLiftOn;\nvarying vec3 vWp;\nvarying vec3 vDry;\nvarying vec3 vGrn;\nvarying vec4 vPar;\nvarying vec4 vInf;")
-      .replace("#include <beginnormal_vertex>", "vec3 objectNormal = vec3(0.0, 1.0, 0.0);")
+      .replace("#include <beginnormal_vertex>", hasH ? "vec3 objectNormal = aNrm;" : "vec3 objectNormal = vec3(0.0, 1.0, 0.0);")   // A6: con terreno, normal del relieve
       .replace("#include <begin_vertex>",
         "vec3 transformed = vec3(position);\n" +
         "int ci = int(aG.x + 0.5);\n" +
@@ -296,7 +318,7 @@ function makeGroundMaterial(ctx, key) {
 }
 
 /* ---------- surcos (J) ---------- */
-function buildFurrowGeometry(ctx, data) {
+function buildFurrowGeometry(ctx, data, toLngLat, hasH) {
   const pos = [], row = [], idx = [];
   let nv = 0, lots = 0, seed = 12345;
   const rnd = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
@@ -325,12 +347,14 @@ function buildFurrowGeometry(ctx, data) {
       const ax = Math.cos(th), az = Math.sin(th), nx = -az, nz = ax;
       const phase = rnd() * A4_FURROWS.spacing * 8;
       const cx = ox + mx, cz = oz + mz, base = nv;
+      // A6: con terreno, malla fina (misma arista máxima que el suelo) y cada vértice a su altura (los surcos dibujan sobre la ladera)
+      const T2 = hasH ? refine(P, T, A4_GROUND.maxEdge) : T;
       for (const p of P) {
-        pos.push(p[0], A4_GROUND.yOff, p[1]);
+        pos.push(p[0], (hasH ? ctx.heightAt(...toLngLat(p[0], p[1])) : 0) + A4_GROUND.yOff, p[1]);
         row.push((p[0] - cx) * nx + (p[1] - cz) * nz + phase, (p[0] - cx) * ax + (p[1] - cz) * az, 0);
         nv++;
       }
-      for (const [a, b, c] of T) idx.push(base + a, base + b, base + c);
+      for (const [a, b, c] of T2) idx.push(base + a, base + b, base + c);
       lots++;
     }
   }
@@ -342,7 +366,7 @@ function buildFurrowGeometry(ctx, data) {
   return { geometry: g, verts: nv, tris: idx.length / 3, lots };
 }
 
-function makeFurrowMaterial(ctx) {
+function makeFurrowMaterial(ctx, hasH) {
   const F = A4_FURROWS;
   const m = new THREE.ShaderMaterial({
     uniforms: {
@@ -387,6 +411,7 @@ function makeFurrowMaterial(ctx) {
       "  gl_FragColor = vec4(vec3(0.5 * m), 0.5);\n}"
   });
   m.depthTest = false; m.depthWrite = false; m.transparent = false; m.toneMapped = false;
+  if (hasH) { m.depthTest = true; m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -4; }   // A6: ver makeGroundMaterial
   m.side = THREE.DoubleSide;
   m.blending = THREE.CustomBlending;
   m.blendEquation = THREE.AddEquation; m.blendSrc = THREE.DstColorFactor; m.blendDst = THREE.SrcColorFactor;
@@ -409,13 +434,13 @@ function syncMapLayers(key) {
   const s = S[key]; if (!s) return;
   const o = s.opacity, p = pfx(key);
   if (active) {
-    setPaint(`${p}-herb-ext`, "fill-extrusion-opacity", LAYER_OFF.herbExt * o);
-    setPaint(`${p}-herb-pattern`, "fill-extrusion-opacity", LAYER_OFF.pattern * o);
-    setPaint(`${p}-woody-base`, "fill-extrusion-opacity", LAYER_OFF.woody * o);
+    setPaint(`${p}-herb-ext`, extOpacityProp(), LAYER_OFF.herbExt * o);   // A6: extOpacityProp() = fill-opacity con terreno (T14), fill-extrusion-opacity sin terreno
+    setPaint(`${p}-herb-pattern`, extOpacityProp(), LAYER_OFF.pattern * o);
+    setPaint(`${p}-woody-base`, extOpacityProp(), LAYER_OFF.woody * o);
   } else {
-    setPaint(`${p}-herb-ext`, "fill-extrusion-opacity", 0.9 * o);
-    setPaint(`${p}-herb-pattern`, "fill-extrusion-opacity", 0.75 * o);
-    setPaint(`${p}-woody-base`, "fill-extrusion-opacity", WOODY_BASE.opacity * o);
+    setPaint(`${p}-herb-ext`, extOpacityProp(), 0.9 * o);
+    setPaint(`${p}-herb-pattern`, extOpacityProp(), 0.75 * o);
+    setPaint(`${p}-woody-base`, extOpacityProp(), WOODY_BASE.opacity * o);
   }
 }
 
@@ -446,13 +471,13 @@ export default {
     const hasH = [[0, 0], [0.01, 0], [-0.01, 0], [0, 0.01], [0, -0.01]].some(([a, b]) => ctx.heightAt(c[0] + a, c[1] + b) !== 0);
 
     const gg = buildGroundGeometry(ctx, data, toLngLat, hasH);
-    const gMat = makeGroundMaterial(ctx, key);
+    const gMat = makeGroundMaterial(ctx, key, hasH);
     const gMesh = new THREE.Mesh(gg.geometry, gMat);
     gMesh.frustumCulled = false; gMesh.renderOrder = -10; gMesh.name = "a4-ground-" + key;
     group.add(gMesh);
 
-    const fg = buildFurrowGeometry(ctx, data);
-    const fMat = makeFurrowMaterial(ctx);
+    const fg = buildFurrowGeometry(ctx, data, toLngLat, hasH);   // A6: toLngLat/hasH para apoyar los surcos en el relieve
+    const fMat = makeFurrowMaterial(ctx, hasH);
     const fMesh = new THREE.Mesh(fg.geometry, fMat);
     fMesh.frustumCulled = false; fMesh.renderOrder = -20; fMesh.name = "a4-furrows-" + key;
     group.add(fMesh);
@@ -474,6 +499,8 @@ export default {
   setGrowth(key, t) {
     const s = S[key]; if (!s) return;
     s.gMat.userData.a4u.uGrow.value = growthMode() === "revelado" ? t : 1;
+    // A6: con terreno el host no escala el grupo en Y (ver host.js, growthU): el "lift" de la losa crece con t acá
+    if (terrain.active && growthMode() === "extrusion") s.gMat.userData.a4u.uLiftOn.value = t;
   },
 
   update(frame) {
