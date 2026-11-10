@@ -78,6 +78,36 @@ export const GRASS_LOD_BAND = 0.15;        // franja de encogimiento progresivo 
 /* E-AO: oclusión falsa por vértice (amount = oscurecimiento máx. en la base, 0..1; top = y local donde termina) */
 export const GRASS_AO = { amount: 0.28, top: 0.4 };   // matas: solo el tramo bajo; puntas y flores (y>0.4) intactas
 export const TREE_AO = { trunk: 0.35, crown: 0.28 };  // troncos: 30 % inferior; copas: mitad inferior
+/* G · Árboles nuevos (render/systems/trees.js + treegen.js). Decisión del dueño en G1 (2026-11-10):
+   nativas del espinal (tala, algarrobo, chañar), sin eucalipto. La clase (parche-le / corr-le) no
+   cambia la mezcla: el dato de árbol no la guarda y la ficha da la misma mezcla para las dos.
+     mix        proporción (suma 1); la especie de cada árbol sale de un hash determinista de su dato
+     h          rango de altura (m) al que se mapea la altura original (5-14 m) de cada árbol
+     crownK     radio de copa / altura, según el radio original del árbol
+     leaf/bark  colores en sRGB (como el resto de las paletas; el pipeline los pasa a lineal)
+     cards      tarjetas de follaje por árbol (2 tris c/u); proxyK = tamaño del impostor (fracción
+                del elipsoide de la copa); proxyFlat = factor de grosor vertical del impostor; proxyShade = oscurecimiento del impostor para empalmar con el follaje */
+export const TREE_SPECIES = {
+  tala:      { label: "Tala",      mix: 0.45, h: [5, 9],  crownK: [0.42, 0.60], leaf: 0x436f31, bark: 0x6a5a48, cards: 44, proxyK: 0.95, proxyFlat: 1, proxyShade: 0.80 },
+  algarrobo: { label: "Algarrobo", mix: 0.35, h: [6, 12], crownK: [0.50, 0.75], leaf: 0x6a8556, bark: 0x4a392b, cards: 60, proxyK: 0.92, proxyFlat: 1.7, proxyShade: 0.66 },
+  chanar:    { label: "Chañar",    mix: 0.20, h: [3, 7],  crownK: [0.42, 0.60], leaf: 0x9fac48, bark: 0x7a7552, cards: 34, proxyK: 0.85, proxyFlat: 1, proxyShade: 0.74 }
+};
+export const TREE_ALPHA_TEST = 0.4;        // corte del alfa de las tarjetas (con MSAA se suaviza con alphaToCoverage)
+export const TREE_LOD_BAND = 0.2;          // franja (fracción de treeCardDist) donde tarjetas e impostor se funden por dither
+export const TREE_IMPOSTOR_CULL = false;   // true = respeta quality.treeImpostorDist finito (Media 1500 m): en cenital/home desaparecen todos los árboles; el impostor cuesta ~32 tris, por eso por defecto nunca se omite
+export const TREE_SWAY = 0.035;            // vaivén de la copa (fracción de la altura en la punta); ≤ 1/3 del pasto
+export const TREE_BAKE = { interior: 0.18, bottom: 0.14, trunk: 0.22 };   // oclusión horneada en el color de vértice (valores sRGB)
+/* Ajuste en caliente de las especies (solo ?debug/?qa; para bocetos y pruebas):
+   ?a2={"TREE_SPECIES":{"tala":{"cards":54,"leaf":4223793}}} se mezcla sobre TREE_SPECIES antes de construir. */
+{
+  const q = new URLSearchParams(location.search);
+  if ((q.has("debug") || q.has("qa")) && q.get("a2")) {
+    try {
+      const o = JSON.parse(q.get("a2"));
+      for (const k in (o.TREE_SPECIES || {})) if (TREE_SPECIES[k]) Object.assign(TREE_SPECIES[k], o.TREE_SPECIES[k]);
+    } catch (e) { console.warn("a2: JSON inválido en ?a2"); }
+  }
+}
 /* === A2: fin === */
 
 /* === A1: inicio === */
