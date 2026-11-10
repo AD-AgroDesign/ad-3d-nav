@@ -134,7 +134,7 @@ export default {
 
         // impostor (todas las especies en la misma malla de la celda)
         eul.set(0, yaw, 0, "YXZ");
-        m4.compose(pos.set(x, g.cyU * H, z), q.setFromEuler(eul), scl.set(g.rxU * sxz * cfg.proxyK, g.ryU * H * cfg.proxyK, g.rxU * sxz * cfg.proxyK));
+        m4.compose(pos.set(x, g.cyU * H, z), q.setFromEuler(eul), scl.set(g.rxU * sxz * cfg.proxyK, g.ryU * H * cfg.proxyK * cfg.proxyFlat, g.rxU * sxz * cfg.proxyK));
         farMesh.setMatrixAt(i, m4);
         col.setHex(cfg.leaf).multiplyScalar(cfg.proxyShade * b); col.r *= 1 + c; col.b *= 1 - c;
         farMesh.setColorAt(i, col);

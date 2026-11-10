@@ -86,11 +86,11 @@ export const TREE_AO = { trunk: 0.35, crown: 0.28 };  // troncos: 30 % inferior;
      crownK     radio de copa / altura, según el radio original del árbol
      leaf/bark  colores en sRGB (como el resto de las paletas; el pipeline los pasa a lineal)
      cards      tarjetas de follaje por árbol (2 tris c/u); proxyK = tamaño del impostor (fracción
-                del elipsoide de la copa); proxyShade = oscurecimiento del impostor para empalmar con el follaje */
+                del elipsoide de la copa); proxyFlat = factor de grosor vertical del impostor; proxyShade = oscurecimiento del impostor para empalmar con el follaje */
 export const TREE_SPECIES = {
-  tala:      { label: "Tala",      mix: 0.45, h: [5, 9],  crownK: [0.42, 0.60], leaf: 0x4a7a33, bark: 0x6a5a48, cards: 44, proxyK: 0.95, proxyShade: 0.80 },
-  algarrobo: { label: "Algarrobo", mix: 0.35, h: [6, 12], crownK: [0.50, 0.75], leaf: 0x80986a, bark: 0x4a392b, cards: 46, proxyK: 0.92, proxyShade: 0.78 },
-  chanar:    { label: "Chañar",    mix: 0.20, h: [3, 7],  crownK: [0.42, 0.60], leaf: 0x9fac48, bark: 0x7a7552, cards: 32, proxyK: 0.82, proxyShade: 0.74 }
+  tala:      { label: "Tala",      mix: 0.45, h: [5, 9],  crownK: [0.42, 0.60], leaf: 0x436f31, bark: 0x6a5a48, cards: 44, proxyK: 0.95, proxyFlat: 1, proxyShade: 0.80 },
+  algarrobo: { label: "Algarrobo", mix: 0.35, h: [6, 12], crownK: [0.50, 0.75], leaf: 0x6a8556, bark: 0x4a392b, cards: 60, proxyK: 0.92, proxyFlat: 1.7, proxyShade: 0.66 },
+  chanar:    { label: "Chañar",    mix: 0.20, h: [3, 7],  crownK: [0.42, 0.60], leaf: 0x9fac48, bark: 0x7a7552, cards: 34, proxyK: 0.85, proxyFlat: 1, proxyShade: 0.74 }
 };
 export const TREE_ALPHA_TEST = 0.4;        // corte del alfa de las tarjetas (con MSAA se suaviza con alphaToCoverage)
 export const TREE_LOD_BAND = 0.2;          // franja (fracción de treeCardDist) donde tarjetas e impostor se funden por dither

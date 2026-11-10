@@ -234,7 +234,7 @@ const SHAPES = {
   /* Algarrobo: aparasolado, ancho y chato; tronco corto y torcido que se abre en 5 ramas */
   algarrobo: {
     H: 9, R: 5.4, seed: 7102,
-    crown: { c: [0, 7.2, 0], r: [5.4, 1.85, 5.4] }, shellMin: 0.55, cardW: 0.40, cardH: 0.34, flat: 0.65, minY: 4.6,
+    crown: { c: [0, 7.2, 0], r: [5.4, 1.85, 5.4] }, shellMin: 0.55, cardW: 0.46, cardH: 0.40, flat: 0.4, minY: 4.6,
     skeleton(b, r, colorAt) {
       b.tube([0, 0, 0], [0.3, 1.9, 0.1], 0.40, 0.30, 6, colorAt);
       b.tube([0.3, 1.9, 0.1], [0, 3.9, 0.2], 0.30, 0.25, 6, colorAt);
@@ -338,9 +338,9 @@ export function buildProxy() {
   const [bot, rA, rB, top] = ids;
   for (let i = 0; i < S; i++) {
     const i1 = (i + 1) % S;
-    b.idx.push(bot[0], rA[i1], rA[i]);                 // casquete inferior
-    b.idx.push(rA[i], rA[i1], rB[i], rA[i1], rB[i1], rB[i]);   // faja
-    b.idx.push(rB[i], rB[i1], top[0]);                 // casquete superior
+    b.idx.push(bot[0], rA[i], rA[i1]);                 // casquete inferior
+    b.idx.push(rA[i], rB[i], rA[i1], rA[i1], rB[i], rB[i1]);   // faja
+    b.idx.push(rB[i], top[0], rB[i1]);                 // casquete superior
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.Float32BufferAttribute(b.pos, 3));
