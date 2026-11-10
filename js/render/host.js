@@ -26,8 +26,30 @@ import { scenarioFade } from "./shaderlib.js";   // A1: uniforme de fade dither 
 import trees from "./systems/trees.js";
 import grass from "./systems/grass.js";
 import ground from "./systems/ground.js";   // A4: suelo por shader + surcos
+import { chainShader } from "./systems/chunks.js";   // A6: crecimiento por shader con terreno
+import { heightAt, terrain } from "../terrain/terrain.js";   // A6: relieve (heightAt real; terrain.active)
 
 const SCENARIOS = ["inicial", "multi"];
+
+/* A6 · Crecimiento de escenario con terreno. Sin terreno el host escala el grupo del escenario en Y
+   (group.scale.y = t): equivale a escalar sobre el suelo porque el suelo está en y = 0. Con terreno el
+   suelo de cada instancia está a su altura (y = g) y escalar el grupo hundiría los árboles en las lomas
+   durante los 1800 ms. Solución: con terreno el grupo NO se escala y cada material de instancias escala la
+   altura LOCAL de su geometría por `uA6Grow` (transformed.y *= t, antes de la matriz de instancia, que ya
+   lleva y = g). Resultado: y_mundo = g + t·(altura local), o sea crecer APOYADO en el suelo de cada instancia
+   (sin terreno g = 0 y es idéntico al scale.y de antes). Los sistemas con vértices en coordenadas de mundo
+   (suelo y surcos de A4) no lo usan: manejan su propio crecimiento (revelado / lift) en ground.js.
+   Aproximación conocida: el impostor lejano (copa de 32 tris, centrado en la copa) se achata alrededor de su
+   centro en vez de su base: dura 1,8 s y a más de 480 m (sub-píxel), lo cual no se ve. */
+const growthU = { inicial: { value: 1 }, multi: { value: 1 } };
+function patchGrowth(mat, key) {
+  chainShader(mat, "a6grow", sh => {
+    sh.uniforms.uA6Grow = growthU[key];
+    sh.vertexShader = sh.vertexShader
+      .replace("#include <common>", "#include <common>\nuniform float uA6Grow;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\ntransformed.y *= uA6Grow;");
+  });
+}
 
 /* ---------- Capa custom Three.js: árboles low-poly instanciados ---------- */
 export const host = {
@@ -78,7 +100,10 @@ export const host = {
         const mc = maplibregl.MercatorCoordinate.fromLngLat([lon, lat], 0);
         return [(mc.x - origin.x) / s, (mc.y - origin.y) / s];
       },
-      heightAt: () => 0,        // sin terreno: altura 0 (A6 lo reemplaza)
+      heightAt,                 // A6: altura del suelo en m de escena (m·exageración); 0 con terreno apagado (terrain/terrain.js)
+      // A6: lo mismo con coordenadas de escena (x este, z sur) y la inversa de toScene (para armar mallas apoyadas en el relieve: suelo, sombras)
+      toLngLat: (x, z) => { const ll = new maplibregl.MercatorCoordinate(origin.x + x * s, origin.y + z * s, 0).toLngLat(); return [ll.lng, ll.lat]; },
+      heightAtScene: (x, z) => { if (!terrain.active) return 0; const ll = new maplibregl.MercatorCoordinate(origin.x + x * s, origin.y + z * s, 0).toLngLat(); return heightAt(ll.lng, ll.lat); },
       quality: this.quality,
       shaderlib, uniforms, config,
       rng: mulberry32
@@ -95,9 +120,13 @@ export const host = {
         group.add(built.object3d);
         /* A1: niebla para los materiales de todos los sistemas, compuesta con lo que ya
            tengan (viento). Idempotente: si un sistema ya hizo patch(mat,{fog:true}) no se repite. */
-        for (const m of built.materials || []) shaderlib.patchExtra(m, { fog: true, foliage: m.userData.foliage !== false, srgbVC: !!m.vertexColors });   // ORQ: opt-out de follaje por material (troncos, pedido A1)
+        for (const m of built.materials || []) {
+          shaderlib.patchExtra(m, { fog: true, foliage: m.userData.foliage !== false, srgbVC: !!m.vertexColors });   // ORQ: opt-out de follaje por material (troncos, pedido A1)
+          if (terrain.active) patchGrowth(m, key);   // A6: crecimiento apoyado en el suelo (ver arriba)
+        }
       }
-      group.scale.y = state.growth[key] || 0.0001;
+      if (terrain.active) growthU[key].value = state.growth[key] || 0.0001;   // A6: con terreno el grupo no se escala
+      else group.scale.y = state.growth[key] || 0.0001;
       this.groups[key] = group;
       this.setOpacity(key, key === "inicial" ? 1 : 0);
       this.scene.add(group);
@@ -128,7 +157,8 @@ export const host = {
   },
 
   setGrowth(key, t) {
-    if (this.groups[key]) this.groups[key].scale.y = Math.max(t, 0.0001);
+    if (terrain.active) growthU[key].value = Math.max(t, 0.0001);   // A6: crecimiento por shader (ver growthU)
+    else if (this.groups[key]) this.groups[key].scale.y = Math.max(t, 0.0001);
     for (const sys of this.systems) if (sys.setGrowth) sys.setGrowth(key, t);
   },
 
@@ -140,10 +170,15 @@ export const host = {
   },
 
   /* PUNTO ÚNICO donde se arma la matriz de la capa (A6, terreno 3D): `matrix` es la
-     matriz de proyección de MapLibre y `this.l` pasa metros de escena a Mercator. Con
-     terreno activo, acá hay que restar la elevación de MapLibre (map.transform.elevation)
-     antes de multiplicar. Hoy no se activa nada: se devuelve exactamente lo de siempre. */
+     matriz de proyección de MapLibre y `this.l` pasa metros de escena a Mercator.
+     A6: con terreno, la matriz de las capas custom de MapLibre 4.7.1 NO trae la traslación −elevación que sí
+     usan la malla del terreno y el resto de sus capas, así que todo lo dibujado por Three quedaría E metros
+     más arriba (E = elevación del centro de la vista: 40 m en Nikunihué, 76 en Chapadmalal). Se resta acá,
+     en CADA frame (E cambia al mover el centro). La Y de escena es la altura absoluta × exageración
+     (= heightAt), no hace falta restar la altura del centro del campo. Sin terreno E = 0 y la matriz es la de siempre. */
   sceneMatrix(matrix) {
+    const E = terrain.active ? (this.map.transform.elevation || 0) : 0;
+    this.l.elements[14] = -E * this.scale;   // traslación Z (mercator) de this.l: -E·metros→mercator
     return new THREE.Matrix4().fromArray(matrix).multiply(this.l);
   },
 
