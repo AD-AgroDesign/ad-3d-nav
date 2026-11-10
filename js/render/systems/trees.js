@@ -2,8 +2,8 @@
    Dueño en la Ola 1-2: A2. Código movido desde vegLayer.buildGroup() sin cambios de
    geometría, colores, semillas ni orden de construcción (§4). Contrato: §6.3. */
 import * as THREE from "three";
-import { CHUNK_CELL_TREES, CROWN_PALETTE, TRUNK_COLOR } from "../../core/config.js";
-import { partitionCells } from "./chunks.js";
+import { CHUNK_CELL_TREES, CROWN_PALETTE, TREE_AO, TRUNK_COLOR } from "../../core/config.js";
+import { applyAO, partitionCells } from "./chunks.js";
 
 const built = {};   // scenarioKey → { trunkMat, crownMat, trunks, crowns }
 
@@ -18,8 +18,12 @@ export default {
     trunkGeo.translate(0, 0.5, 0); // base del tronco en y=0
     const crownGeo = new THREE.IcosahedronGeometry(1, 1);
 
-    const trunkMat = new THREE.MeshPhongMaterial({ color: 0xffffff, flatShading: true, shininess: 0, transparent: true });
-    const crownMat = new THREE.MeshPhongMaterial({ color: 0xffffff, flatShading: true, shininess: 0, transparent: true });
+    const trunkMat = new THREE.MeshPhongMaterial({ color: 0xffffff, flatShading: true, shininess: 0 });
+    const crownMat = new THREE.MeshPhongMaterial({ color: 0xffffff, flatShading: true, shininess: 0 });
+    /* Cross-fade por fade dither (materiales opacos) + niebla; luego E-AO (siempre al final) */
+    for (const mat of [trunkMat, crownMat]) ctx.shaderlib.patch(mat, { fog: true, fade: scenarioKey });
+    applyAO(trunkMat, TREE_AO.trunk, 0, 0.3);      // 30 % inferior del tronco (y local 0..1)
+    applyAO(crownMat, TREE_AO.crown, -0.9, 0.2);   // mitad inferior de la copa (esfera unitaria, y -1..1)
 
     /* Chunking (T2): una InstancedMesh de troncos y otra de copas por celda de CHUNK_CELL_TREES m.
        Cada una con su boundingSphere real (computeBoundingSphere de r170) → Three descarta por
@@ -96,12 +100,7 @@ export default {
     return { object3d: group, materials: [trunkMat, crownMat] };
   },
 
-  setOpacity(scenarioKey, o) {
-    const b = built[scenarioKey];
-    if (!b) return;
-    b.trunkMat.opacity = o;
-    b.crownMat.opacity = o;
-  },
+  setOpacity() {},   // el fade lo hace el dither (shaderlib.scenarioFade, escrito por host.setOpacity)
 
   setGrowth() {},   // el crecimiento lo aplica el host con scale.y del grupo del escenario
 

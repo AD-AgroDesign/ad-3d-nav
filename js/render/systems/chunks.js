@@ -27,7 +27,8 @@
    en Y (tope compMax), para que a lo lejos se conserve la masa de color del pasto en vez de
    verse el suelo pelado; en keep=1 (cerca) el factor es 1: la densidad y forma cercanas no cambian.
    Coordinación con A1 (shaderlib): este módulo usa nombres propios (uA2Cam, uA2Lod, aRank) y
-   se engancha DESPUÉS de shaderlib.patch(); solo exige que `#include <common>` y
+   se engancha DESPUÉS de shaderlib.patch() (chainShader compone onBeforeCompile y
+   customProgramCacheKey; propuesta a A1 en handoffs/a2-fade.md); solo exige que `#include <common>` y
    `#include <project_vertex>` sigan presentes en el vertex shader. */
 import * as THREE from "three";
 import { mulberry32 } from "../../core/geo.js";
@@ -82,17 +83,47 @@ const LOD_GLSL = `{
 }
 `;
 
-export function applyLod(material, camUniform, lodUniform) {
+/* Encadena una modificación de shader (`fn(sh)`) SOBRE el onBeforeCompile del material y
+   compone la clave de caché de programa (`tag`) con la que ya tenga, de forma perezosa:
+   la clave resultante es siempre "<clave previa>+<tag>", sin importar el orden en que se
+   encadenen varias (LOD, AO) ni si shaderlib.patchExtra() se aplicó antes o después.
+   Si alguien llama patch() DESPUÉS, reemplaza onBeforeCompile y clave: encadenar acá siempre
+   al final del build (ver grass.js/trees.js). */
+export function chainShader(material, tag, fn) {
   const prev = material.onBeforeCompile;
+  const prevKey = material.customProgramCacheKey;
   material.onBeforeCompile = function (sh, renderer) {
     if (prev) prev.call(this, sh, renderer);
+    fn(sh);
+  };
+  material.customProgramCacheKey = function () {
+    const k = prevKey ? prevKey.call(this) : "";
+    return (k ? k + "+" : "") + tag;
+  };
+  return material;
+}
+
+export function applyLod(material, camUniform, lodUniform) {
+  return chainShader(material, "a2lod", sh => {
     sh.uniforms.uA2Cam = camUniform;
     sh.uniforms.uA2Lod = lodUniform;
     sh.vertexShader = sh.vertexShader
       .replace("#include <common>", "#include <common>\nattribute float aRank;\nuniform vec3 uA2Cam;\nuniform vec4 uA2Lod;")
       .replace("#include <project_vertex>", LOD_GLSL + "#include <project_vertex>");
-  };
-  return material;
+  });
+}
+
+/* Oclusión falsa por vértice (E-AO): oscurece el color de vértice según la altura LOCAL
+   (position.y de la geometría base, antes de escalar): factor = mix(1-amount, 1, smoothstep(y0, y1, y)).
+   Solo toca el tramo bajo; lo que queda por encima de y1 no cambia. Requiere vColor (vertexColors
+   o instanceColor, ambos presentes en trees/grass). */
+export function applyAO(material, amount, y0, y1) {
+  const f = v => v.toFixed(3);
+  return chainShader(material, "a2ao" + f(amount) + f(y0) + f(y1), sh => {
+    sh.vertexShader = sh.vertexShader.replace("#include <color_vertex>",
+      "#include <color_vertex>\n#if defined(USE_COLOR) || defined(USE_INSTANCING_COLOR)\n" +
+      "  vColor.rgb *= mix(" + f(1 - amount) + ", 1.0, smoothstep(" + f(y0) + ", " + f(y1) + ", position.y));\n#endif");
+  });
 }
 
 /* Registro de celdas con LOD. add() guarda la esfera envolvente (ya calculada) de la malla. */
