@@ -150,13 +150,14 @@ const S = {};              // scenarioKey → { group, recv, blobs, mats, caster
 let ctxRef = null, renderer = null;
 let rt = null, rtSize = 0;
 let dirty = true;
+let grassPatched = false;   // el material del pasto ya recibe sombra (se decide al crear el renderer)
 const shadowScene = new THREE.Scene();
 const shadowCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 100);
 const box = { on: false, hq: 0, h: 0, cg: new THREE.Vector2(), right: new THREE.Vector2(1, 0), hs: new THREE.Vector2(0, 1), sun: new THREE.Vector3(), size: 0 };
 const pass = { renders: 0, calls: 0, tris: 0, cells: 0, near: 0, far: 0, ms: null, lastKey: "" };
 
 const mapOn = () => ENABLED && !FORCE_BLOBS && quality.shadows > 0 && !!rt;
-const grassOn = () => mapOn() && (CFG.grass === "ultra" ? quality.shadows >= 4096 : CFG.grass === "alta" ? quality.shadows >= 2048 : false);
+const grassOn = () => mapOn() && grassPatched && (CFG.grass === "ultra" ? quality.shadows >= 4096 : CFG.grass === "alta" ? quality.shadows >= 2048 : false);
 
 function ensureTarget() {
   const size = ENABLED && !FORCE_BLOBS ? (quality.shadows | 0) : 0;
@@ -353,7 +354,7 @@ export default {
       const seen = new Set();
       scene.traverse(o => {
         const m = o.isInstancedMesh && o.material;
-        if (m && m.userData && m.userData.adChunks && m.userData.adChunks.wind && !seen.has(m)) { seen.add(m); patchGrassReceive(m); }
+        if (m && m.userData && m.userData.adChunks && m.userData.adChunks.wind && !seen.has(m)) { seen.add(m); patchGrassReceive(m); grassPatched = true; }
       });
     }
   },

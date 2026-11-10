@@ -225,7 +225,7 @@ export const A3_SHADOWS = {
   cardDist: 330,               // m · dentro de esta distancia al centro de la caja los árboles proyectan con tarjetas; más lejos, con el impostor
   biasM: 0.12,                 // m · sesgo de profundidad del receptor (suelo plano: casi nada)
   soft: true,                  // 4 muestras de PCF por píxel en el suelo (false = 1 muestra)
-  grass: "alta",               // quién recibe sombra en las matas: "ultra" (solo Ultra) | "alta" (Ultra y Alta) | "off"
+  grass: "ultra",              // quién recibe sombra en las matas: "ultra" (solo Ultra) | "alta" (Ultra y Alta) | "off" (en este dato casi no se nota: ver handoff)
   blob: { strength: 0.80, centerK: 0.62, capOff: 3.2, capLen: 3.6 }   // intensidad, altura relativa del centro de copa, topes de desplazamiento (× altura) y largo (× radio)
 };
 /* Ajuste en caliente (solo ?debug/?qa): ?a3={"strength":0.5,"zoneK":0.9} se mezcla sobre A3_SHADOWS. */
