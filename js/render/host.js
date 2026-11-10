@@ -26,31 +26,10 @@ import { scenarioFade } from "./shaderlib.js";   // A1: uniforme de fade dither 
 import trees from "./systems/trees.js";
 import grass from "./systems/grass.js";
 import ground from "./systems/ground.js";   // A4: suelo por shader + surcos
-import { chainShader } from "./systems/chunks.js";   // A6: crecimiento por shader con terreno
-import { heightAt, terrain } from "../terrain/terrain.js";   // A6: relieve (heightAt real; terrain.active)
+import { growthU, heightAt, patchGrowth, terrain } from "../terrain/terrain.js";   // A6: relieve (heightAt real; terrain.active)
 import shadows from "./systems/shadows.js";   // A3: sombras de árboles (pase propio + receptor + blobs)
 
 const SCENARIOS = ["inicial", "multi"];
-
-/* A6 · Crecimiento de escenario con terreno. Sin terreno el host escala el grupo del escenario en Y
-   (group.scale.y = t): equivale a escalar sobre el suelo porque el suelo está en y = 0. Con terreno el
-   suelo de cada instancia está a su altura (y = g) y escalar el grupo hundiría los árboles en las lomas
-   durante los 1800 ms. Solución: con terreno el grupo NO se escala y cada material de instancias escala la
-   altura LOCAL de su geometría por `uA6Grow` (transformed.y *= t, antes de la matriz de instancia, que ya
-   lleva y = g). Resultado: y_mundo = g + t·(altura local), o sea crecer APOYADO en el suelo de cada instancia
-   (sin terreno g = 0 y es idéntico al scale.y de antes). Los sistemas con vértices en coordenadas de mundo
-   (suelo y surcos de A4) no lo usan: manejan su propio crecimiento (revelado / lift) en ground.js.
-   Aproximación conocida: el impostor lejano (copa de 32 tris, centrado en la copa) se achata alrededor de su
-   centro en vez de su base: dura 1,8 s y a más de 480 m (sub-píxel), lo cual no se ve. */
-const growthU = { inicial: { value: 1 }, multi: { value: 1 } };
-function patchGrowth(mat, key) {
-  chainShader(mat, "a6grow", sh => {
-    sh.uniforms.uA6Grow = growthU[key];
-    sh.vertexShader = sh.vertexShader
-      .replace("#include <common>", "#include <common>\nuniform float uA6Grow;")
-      .replace("#include <begin_vertex>", "#include <begin_vertex>\ntransformed.y *= uA6Grow;");
-  });
-}
 
 /* ---------- Capa custom Three.js: árboles low-poly instanciados ---------- */
 export const host = {

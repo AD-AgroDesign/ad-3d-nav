@@ -15,6 +15,7 @@
 import { A1_CAMPOS, A1_SUN, A6_TERRAIN as C } from "../core/config.js";
 import { pointInPolygon, ringBBox } from "../core/geo.js";
 import { params, state } from "../core/state.js";
+import { chainShader } from "../render/systems/chunks.js";
 import { loadHeightfield } from "./heightfield.js";
 
 const DBG = params.has("debug") || params.has("qa");
@@ -39,6 +40,27 @@ export function heightAt(lon, lat) {
 /* Nombre de la propiedad de opacidad de las capas "ex-extrusión" (herb-ext, woody-base): con terreno activo son
    `fill` drapeados (T14), sin terreno siguen siendo fill-extrusion. Lo usan layers.js y ground.js. */
 export const extOpacityProp = () => (terrain.active ? "fill-opacity" : "fill-extrusion-opacity");
+
+/* A6 · Crecimiento de escenario con terreno. Sin terreno el host escala el grupo del escenario en Y
+   (group.scale.y = t): equivale a escalar sobre el suelo porque el suelo está en y = 0. Con terreno el
+   suelo de cada instancia está a su altura (y = g) y escalar el grupo hundiría los árboles en las lomas
+   durante los 1800 ms. Solución: con terreno el grupo NO se escala y cada material de instancias escala la
+   altura LOCAL de su geometría por `uA6Grow` (transformed.y *= t, antes de la matriz de instancia, que ya
+   lleva y = g). Resultado: y_mundo = g + t·(altura local), o sea crecer APOYADO en el suelo de cada instancia
+   (sin terreno g = 0 y es idéntico al scale.y de antes). Los sistemas con vértices en coordenadas de mundo
+   (suelo y surcos de A4) no lo usan: manejan su propio crecimiento (revelado / lift) en ground.js.
+   Aproximación conocida: el impostor lejano (copa de 32 tris, centrado en la copa) se achata alrededor de su
+   centro en vez de su base: dura 1,8 s y a más de 480 m (sub-píxel), lo cual no se ve. */
+export const growthU = { inicial: { value: 1 }, multi: { value: 1 } };
+export function patchGrowth(mat, key) {
+  chainShader(mat, "a6grow", sh => {
+    sh.uniforms.uA6Grow = growthU[key];
+    sh.vertexShader = sh.vertexShader
+      .replace("#include <common>", "#include <common>\nuniform float uA6Grow;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\ntransformed.y *= uA6Grow;");
+  });
+}
+
 
 /* ---------- decisión de activación ---------- */
 function decidir(stats) {
