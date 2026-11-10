@@ -26,6 +26,7 @@ import { scenarioFade } from "./shaderlib.js";   // A1: uniforme de fade dither 
 import trees from "./systems/trees.js";
 import grass from "./systems/grass.js";
 import ground from "./systems/ground.js";   // A4: suelo por shader + surcos
+import shadows from "./systems/shadows.js";   // A3: sombras de árboles (pase propio + receptor + blobs)
 
 const SCENARIOS = ["inicial", "multi"];
 
@@ -117,6 +118,9 @@ export const host = {
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, premul);
     applyRenderSettings(this.renderer);   // A1 1.3: salida sRGB + tone mapping (lighting.js)
     this.renderer.autoClear = false;
+    /* A3: los sistemas que lo piden (sombras: render target del pase, receptor del pasto) reciben renderer y escena
+       una vez creado el renderer y ya construidos todos los grupos. */
+    for (const sys of this.systems) if (sys.onRenderer) sys.onRenderer(this.renderer, this.scene);
   },
 
   setOpacity(key, o) {
@@ -188,3 +192,4 @@ on("quality", q => host.setQuality(q));
 host.register(trees);
 host.register(grass);
 host.register(ground);   // A4
+host.register(shadows);   // A3

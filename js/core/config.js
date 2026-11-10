@@ -207,3 +207,32 @@ export const A4_FURROWS = {
   classes: ["agri", "zona1", "zona2", "zona3"]
 };
 /* === A4: fin === */
+
+/* === A3: inicio === */
+/* Sombras reales de los árboles (render/systems/shadows.js). Diales y método: handoffs/a3-sombras.md.
+   Pase propio de profundidad (cámara ortográfica ajustada a la zona útil, snapping al texel) +
+   receptor multiplicativo sobre el suelo + blobs instanciados para lo lejano. */
+export const A3_SHADOWS = {
+  enabled: true,               // false = todo apagado (vuelven las manchas-sombra GeoJSON de MapLibre). También ?sombras=0
+  hideMapLibre: true,          // apaga las capas *-tree-shadows (el dato GeoJSON no se toca)
+  tint: [0.40, 0.48, 0.58],    // multiplicador RGB del color bajo sombra (en espacio de pantalla): azulado-verdoso
+  strength: 0.80,              // 0..1 · cuánto del tinte se aplica en sombra plena (factor final ≈ 0,52/0,58/0,66 sobre lo que haya debajo)
+  zoneK: 1.1,                  // lado de la zona útil = distancia cámara-objetivo × zoneK (~330 m en el rasante, ~1,4 km a z15)
+  zoneMin: 160, zoneMax: 2400, // m · lado mínimo y máximo de la zona
+  zoneStep: 1.25,              // el tamaño de la caja se cuantiza en pasos geométricos (evita que cambie de tamaño todo el tiempo)
+  margin: 1.45,                // la caja del mapa de sombras = zona × margin: se recalcula solo cuando la cámara sale del margen
+  edge: 0.06,                  // franja (fracción del mapa) donde la sombra real se funde con los blobs
+  cardDist: 330,               // m · dentro de esta distancia al centro de la caja los árboles proyectan con tarjetas; más lejos, con el impostor
+  biasM: 0.12,                 // m · sesgo de profundidad del receptor (suelo plano: casi nada)
+  soft: true,                  // 4 muestras de PCF por píxel en el suelo (false = 1 muestra)
+  grass: "alta",               // quién recibe sombra en las matas: "ultra" (solo Ultra) | "alta" (Ultra y Alta) | "off"
+  blob: { strength: 0.80, centerK: 0.62, capOff: 3.2, capLen: 3.6 }   // intensidad, altura relativa del centro de copa, topes de desplazamiento (× altura) y largo (× radio)
+};
+/* Ajuste en caliente (solo ?debug/?qa): ?a3={"strength":0.5,"zoneK":0.9} se mezcla sobre A3_SHADOWS. */
+{
+  const q = new URLSearchParams(location.search);
+  if ((q.has("debug") || q.has("qa")) && q.get("a3")) {
+    try { Object.assign(A3_SHADOWS, JSON.parse(q.get("a3"))); } catch (e) { console.warn("a3: JSON inválido en ?a3"); }
+  }
+}
+/* === A3: fin === */
