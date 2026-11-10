@@ -25,6 +25,7 @@ import * as shaderlib from "./shaderlib.js";
 import { scenarioFade } from "./shaderlib.js";   // A1: uniforme de fade dither por escenario
 import trees from "./systems/trees.js";
 import grass from "./systems/grass.js";
+import ground from "./systems/ground.js";   // A4: suelo por shader + surcos
 
 const SCENARIOS = ["inicial", "multi"];
 
@@ -186,3 +187,4 @@ export const host = {
 on("quality", q => host.setQuality(q));
 host.register(trees);
 host.register(grass);
+host.register(ground);   // A4
