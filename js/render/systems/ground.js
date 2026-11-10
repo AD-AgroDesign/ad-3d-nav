@@ -239,7 +239,8 @@ function makeGroundMaterial(ctx, key) {
   const dry = [], grn = [], cls = [];
   for (let i = 0; i < MAXC; i++) {
     const c = A4_GROUND.classes[CLASS_LIST[i]];
-    dry.push(new THREE.Color(c ? c.dry : "#000000")); grn.push(new THREE.Color(c ? c.green : "#000000"));
+    const tn = c && c.tune ? c.tune : [1, 1, 1];
+    dry.push(new THREE.Color(c ? c.dry : "#000000").multiply(new THREE.Color(...tn))); grn.push(new THREE.Color(c ? c.green : "#000000").multiply(new THREE.Color(...tn)));
     cls.push(new THREE.Vector4(c ? c.alpha : 1, c ? c.lift : 0, 0, 0));
   }
   const U = {

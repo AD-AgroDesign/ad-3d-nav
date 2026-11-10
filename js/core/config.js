@@ -160,11 +160,11 @@ export const A4_GROUND = {
   edgeAO: { width: 1.8, strength: 0.38 },           // m de la franja oscura hacia adentro y oscurecimiento máximo
   reveal: { soft: 0.10, jitter: 0.10 },             // suavidad del frente de revelado y ruido del frente
   classes: {
-    "corr-herb":   { color: "#6b5d38", dry: "#75653a", green: "#655d38", alpha: 1.0,  lift: 0.6 },
-    "parche-herb": { color: "#4d5c33", dry: "#565e34", green: "#485c34", alpha: 1.0,  lift: 0.6 },
-    "bajo":        { color: "#6f8a72", dry: "#788a70", green: "#6b8a76", alpha: 1.0,  lift: 0.6 },
-    "parche-le":   { color: "#2e5026", dry: "#34502a", green: "#2b5028", alpha: 0.45, lift: 1.2 },
-    "corr-le":     { color: "#2e5026", dry: "#34502a", green: "#2b5028", alpha: 0.45, lift: 1.2 }
+    "corr-herb":   { color: "#6b5d38", dry: "#75653a", green: "#655d38", alpha: 1.0,  lift: 0.6, tune: [0.54, 0.62, 1.02] },
+    "parche-herb": { color: "#4d5c33", dry: "#565e34", green: "#485c34", alpha: 1.0,  lift: 0.6, tune: [0.61, 0.75, 1.06] },
+    "bajo":        { color: "#6f8a72", dry: "#788a70", green: "#6b8a76", alpha: 1.0,  lift: 0.6, tune: [0.62, 0.75, 0.52] },
+    "parche-le":   { color: "#2e5026", dry: "#34502a", green: "#2b5028", alpha: 0.45, lift: 1.2, tune: [1.0, 1.08, 1.28] },
+    "corr-le":     { color: "#2e5026", dry: "#34502a", green: "#2b5028", alpha: 0.45, lift: 1.2, tune: [1.04, 1.10, 1.26] }
   }
 };
 export const A4_FURROWS = {
