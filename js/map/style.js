@@ -1,5 +1,5 @@
 import { HOME_VIEW } from "../core/state.js";
-import { resolveQuality } from "../core/quality.js";
+import { msaaEnabled, resolveQuality } from "../core/quality.js";
 import { A1_RASTER, A1_SKY } from "../core/config.js";   // A1: colores del cielo (también los usa la niebla)
 
 /* A1 (1.3, D): ajuste de color del satélite (raster-*) para que ráster y 3D parezcan la misma foto.
@@ -65,9 +65,9 @@ export const map = new maplibregl.Map({
   maxZoom: 17.8,
   attributionControl: { compact: true },
   /* A1 (1.3, A): antialias y pixelRatio según el nivel de calidad. Se fijan al crear el contexto
-     (T3): cambiar de nivel recarga la página (quality.js CONTEXT_PARAMS_ACTIVE). msaa "gpu" (Media):
-     sí, salvo que la GPU sea de gama baja, y esa ya resuelve el nivel Baja en detectLevel(). */
-  antialias: !!QUALITY.msaa && new URLSearchParams(location.search).get("aa") !== "0",   // ?aa=0: solo para comparar capturas
+     (T3): cambiar de nivel recarga la página (quality.js CONTEXT_PARAMS_ACTIVE). msaa "gpu" (Alta, Media):
+     sí, salvo GPU integrada o de gama baja (msaaEnabled en quality.js; ORQ 2026-11-10). */
+  antialias: msaaEnabled(QUALITY) && new URLSearchParams(location.search).get("aa") !== "0",   // ?aa=0: solo para comparar capturas
   pixelRatio: Math.min(window.devicePixelRatio || 1, QUALITY.pixelRatioCap)
 });
 map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");

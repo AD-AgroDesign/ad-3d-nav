@@ -21,7 +21,7 @@ export const LABELS = { ultra: "Ultra", alta: "Alta", media: "Media", baja: "Baj
      idleFps         tope del lazo de animación en reposo (0 = apagado) */
 export const LEVEL_PARAMS = {
   ultra: { msaa: true,  pixelRatioCap: 2,    grassDensity: 1,       grassLodDist: 1400, treeCardDist: 900, treeImpostorDist: Infinity, shadows: 4096, soil: "completo",   fauna: 1,   water: "shader", idleFps: 30 },
-  alta:  { msaa: true,  pixelRatioCap: 1.5,  grassDensity: 1,       grassLodDist: 1000, treeCardDist: 600, treeImpostorDist: Infinity, shadows: 2048, soil: "completo",   fauna: 1,   water: "shader", idleFps: 30 },
+  alta:  { msaa: "gpu", pixelRatioCap: 1.5,  grassDensity: 1,       grassLodDist: 1000, treeCardDist: 600, treeImpostorDist: Infinity, shadows: 2048, soil: "completo",   fauna: 1,   water: "shader", idleFps: 30 },
   media: { msaa: "gpu", pixelRatioCap: 1.25, grassDensity: "movil", grassLodDist: 600,  treeCardDist: 300, treeImpostorDist: 1500,     shadows: 1024, soil: "sin-surcos", fauna: 0.5, water: "shader", idleFps: 20 },
   baja:  { msaa: false, pixelRatioCap: 1,    grassDensity: 0.5,     grassLodDist: 400,  treeCardDist: 0,   treeImpostorDist: 0,        shadows: 0,    soil: "apagado",    fauna: 0,   water: "plano",  idleFps: 0 }
 };
@@ -48,10 +48,24 @@ function gpuRenderer() {
   } catch (e) { return ""; }
 }
 
+/* GPUs integradas de notebook (decisión de Mike, 2026-11-10): en la Intel HD 520 el MSAA cuesta
+   ~1,8× el frame (El Carmen multi 54 → 30 fps). Con msaa "gpu" (Alta y Media) se apaga en estas y
+   en las de gama baja; Ultra lo fuerza siempre. */
+const GPU_INTEGRADA = /Intel.*(HD|UHD|Iris)|Radeon\(TM\) (Vega \d+ )?Graphics|AMD Radeon Graphics/i;
+let _gpu = null;
+const gpuName = () => (_gpu === null ? (_gpu = gpuRenderer()) : _gpu);
+
+/* Resuelve el valor msaa de un nivel (true/false/"gpu") a un booleano. */
+export function msaaEnabled(q) {
+  if (q.msaa !== "gpu") return !!q.msaa;
+  const g = gpuName();
+  return !(GPU_BAJA.test(g) || GPU_INTEGRADA.test(g));
+}
+
 /* Detección inicial: IS_MOBILE, deviceMemory, hardwareConcurrency y GPU. */
 export function detectLevel() {
   const mem = navigator.deviceMemory, cores = navigator.hardwareConcurrency;
-  if (GPU_BAJA.test(gpuRenderer())) return "baja";
+  if (GPU_BAJA.test(gpuName())) return "baja";
   if ((mem && mem <= 2) || (cores && cores <= 2)) return "baja";
   if (IS_MOBILE) return "media";
   if (mem && mem <= 4) return "media";
