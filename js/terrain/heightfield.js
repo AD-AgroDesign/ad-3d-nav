@@ -38,7 +38,8 @@ export function pixelToLonLat(px, py, z) {
 }
 
 async function decodeTile(url) {
-  const res = await fetch(url, { mode: "cors" });
+  // timeout: un tile colgado no debe frenar el arranque del visor (initTerrain cae a "sin terreno" si algo falla)
+  const res = await fetch(url, { mode: "cors", signal: AbortSignal.timeout(12000) });
   if (!res.ok) throw new Error("terrarium " + res.status + " " + url);
   const blob = await res.blob();
   // sin conversión de color ni premultiplicado: los canales son datos, no color
