@@ -14,7 +14,7 @@
 
    Para A3 (sombras): ver `casters(scenarioKey)` abajo. */
 import * as THREE from "three";
-import { CHUNK_CELL_TREES, TREE_ALPHA_TEST, TREE_LOD_BAND, TREE_SPECIES, TREE_SWAY } from "../../core/config.js";
+import { CHUNK_CELL_TREES, TREE_ALPHA_TEST, TREE_IMPOSTOR_CULL, TREE_LOD_BAND, TREE_SPECIES, TREE_SWAY } from "../../core/config.js";
 import { chainShader, partitionCells } from "./chunks.js";
 import { buildAtlas, buildProxy, buildSpecies } from "./treegen.js";
 
@@ -27,7 +27,7 @@ function setLodFromQuality(q) {
   const c = q.treeCardDist || 0;
   const band = TREE_LOD_BAND;
   let ie = q.treeImpostorDist;
-  if (!ie || !isFinite(ie)) ie = 1e9;              // Infinity y 0 (Baja: solo impostor) = sin límite
+  if (!TREE_IMPOSTOR_CULL || !ie || !isFinite(ie)) ie = 1e9;              // Infinity y 0 (Baja: solo impostor) = sin límite
   lodU.value.set(c > 0 ? c * (1 - band) : -2, c > 0 ? c : -1, ie >= 1e9 ? 1e9 - 1 : ie * 0.9, ie);
 }
 
