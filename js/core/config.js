@@ -96,6 +96,17 @@ export const TREE_ALPHA_TEST = 0.4;        // corte del alfa de las tarjetas (co
 export const TREE_LOD_BAND = 0.2;          // franja (fracción de treeCardDist) donde tarjetas e impostor se funden por dither
 export const TREE_SWAY = 0.035;            // vaivén de la copa (fracción de la altura en la punta); ≤ 1/3 del pasto
 export const TREE_BAKE = { interior: 0.18, bottom: 0.14, trunk: 0.22 };   // oclusión horneada en el color de vértice (valores sRGB)
+/* Ajuste en caliente de las especies (solo ?debug/?qa; para bocetos y pruebas):
+   ?a2={"TREE_SPECIES":{"tala":{"cards":54,"leaf":4223793}}} se mezcla sobre TREE_SPECIES antes de construir. */
+{
+  const q = new URLSearchParams(location.search);
+  if ((q.has("debug") || q.has("qa")) && q.get("a2")) {
+    try {
+      const o = JSON.parse(q.get("a2"));
+      for (const k in (o.TREE_SPECIES || {})) if (TREE_SPECIES[k]) Object.assign(TREE_SPECIES[k], o.TREE_SPECIES[k]);
+    } catch (e) { console.warn("a2: JSON inválido en ?a2"); }
+  }
+}
 /* === A2: fin === */
 
 /* === A1: inicio === */
