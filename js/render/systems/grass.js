@@ -115,7 +115,7 @@ export default {
         if (TUFT_GEOS[cls + "/alt"]) batches.push([cls + "/alt", TUFT_GEOS[cls + "/alt"], list.filter(t => t.v)]);
         batches.forEach(([label, geo, sub]) => {
           if (!sub.length) return;
-          const withXZ = sub.map(t => ({ t, xz: ctx.toScene(t.lon, t.lat) }));
+          const withXZ = sub.map(t => ({ t, xz: ctx.toScene(t.lon, t.lat), gy: ctx.heightAt(t.lon, t.lat) }));   // A6: gy = altura del suelo (0 sin terreno)
           const cells = partitionCells(withXZ, CHUNK_CELL_GRASS, o => o.xz);
           for (const cell of cells.values()) {
             shuffleDet(cell.items, cellSeed(cell.ix, cell.iz, labelSalt(label)));
@@ -123,11 +123,11 @@ export default {
             const cg = geo.clone();             // geometría propia de la celda (lleva aRank)
             addRank(cg, n);
             const tufts = new THREE.InstancedMesh(cg, grassMat, n);
-            cell.items.forEach(({ t, xz }, i) => {
+            cell.items.forEach(({ t, xz, gy }, i) => {
               const [x, z] = xz;
               eul.set(0, t.j * Math.PI * 2, 0);
               m.compose(
-                pos.set(x, 0, z),
+                pos.set(x, gy, z),
                 q.setFromEuler(eul),
                 scl.set(t.h * 0.9 * GRASS_SCALE, t.h * GRASS_SCALE, t.h * 0.9 * GRASS_SCALE)
               );
