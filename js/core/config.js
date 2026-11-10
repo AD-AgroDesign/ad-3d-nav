@@ -129,7 +129,7 @@ export const A1_CAMPOS = {
    barata (luz que atraviesa el follaje desde atrás). 0 = Lambert puro. */
 export const A1_FOLIAGE = { wrap: 0.35, trans: 0.25 };
 /* Satélite (raster-*): lo lleva a la misma "foto" que el 3D. */
-export const A1_RASTER = { saturation: 0.12, contrast: 0.06, brightnessMin: 0, brightnessMax: 1, hueRotate: 0 };
+export const A1_RASTER = { saturation: 0.12, contrast: 0.06, brightnessMin: 0, brightnessMax: 1, hueRotate: 3 };
 /* Ajuste fino en caliente (solo ?debug/?qa): ?a1={"A1_RENDER":{"exposure":1.2}} mezcla sobre los diales. */
 {
   const q = new URLSearchParams(location.search);
