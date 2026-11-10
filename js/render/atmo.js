@@ -14,6 +14,7 @@ import { updateCamera } from "../core/camera.js";
 import { fog, uniforms, updateFog } from "./lighting.js";
 import { GLSL_ADFOG, GLSL_FOG_UNIFORMS } from "./shaderlib.js";
 import { host } from "./host.js";
+import { terrain } from "../terrain/terrain.js";   // A6: con terreno la niebla la aplica MapLibre sobre la malla
 
 const VS = "attribute vec2 a;\nvarying vec2 vN;\nvoid main() { vN = a; gl_Position = vec4(a, 0.0, 1.0); }\n";
 const FS = "precision highp float;\nvarying vec2 vN;\n" +
@@ -65,6 +66,7 @@ export const atmo = {
 
   render(gl, matrix) {
     if (!host.origin) return;                  // el host todavía no hizo onAdd (primer frame)
+    if (terrain.active) return;                // A6: con terreno la niebla es la de MapLibre (por profundidad real); este quad supone suelo plano y partiría el horizonte
     const H = this.map.getCanvas().clientHeight;
     /* Esta capa dibuja ANTES que la de vegetación: calcula la cámara y la niebla de este frame
        acá (host.render repite el cálculo para sus uniforms; es idempotente y barato). */

@@ -3,10 +3,28 @@ import { state } from "../core/state.js";
 import { setupInteractivity } from "./interact.js";
 import { map } from "./style.js";
 import { host } from "../render/host.js";
+import { terrain } from "../terrain/terrain.js";   // A6: con terreno las extrusiones pasan a fill drapeado (T14)
 
 export const clsFilter = (...classes) => ["in", ["get", "_cls"], ["literal", classes]];
 
+/* A6 (T14): las capas que antes eran fill-extrusion (herb-ext, herb-pattern, woody-base) solo sirven de clic (T9) o
+   de respaldo visual (calidad Baja, sin suelo de A4). Con terreno activo una extrusión plana se corta en las
+   pendientes, así que se reemplazan por `fill` drapeado con los MISMOS ids (popups y hover siguen igual).
+   Devuelve la definición de la capa según haya terreno o no; `color`/`pattern` son expresiones de estilo. */
+function extLayer(id, src, filter, { color, pattern }) {
+  if (!terrain.active) {
+    return { id, type: "fill-extrusion", source: src, filter,
+      paint: { ...(pattern ? { "fill-extrusion-pattern": pattern } : { "fill-extrusion-color": color }), "fill-extrusion-height": 0, "fill-extrusion-opacity": 0 } };
+  }
+  return { id, type: "fill", source: src, filter,
+    paint: { ...(pattern ? { "fill-pattern": pattern } : { "fill-color": color }), "fill-opacity": 0 } };
+}
+
 export function addScenarioLayers() {
+  // A6: con terreno, SCENARIO_LAYERS apunta a la propiedad de opacidad de `fill` (se muta una vez, antes de usarla)
+  if (terrain.active) {
+    for (const k in SCENARIO_LAYERS) for (const l of SCENARIO_LAYERS[k]) if (l.prop === "fill-extrusion-opacity") l.prop = "fill-opacity";
+  }
   map.addSource("ini", { type: "geojson", data: state.data.inicial });
   map.addSource("multi", { type: "geojson", data: state.data.multi });
   map.addSource("ini-shadows", { type: "geojson", data: state.veg.inicial.shadows });
@@ -76,35 +94,19 @@ export function addScenarioLayers() {
     });
 
     // Pastizal: color base + textura uniforme de grano fino
-    map.addLayer({
-      id: `${p}-herb-ext`, type: "fill-extrusion", source: src,
-      filter: clsFilter(...HERB_LIKE_CLASSES),
-      paint: {
-        "fill-extrusion-color": ["match", ["get", "_cls"], "corr-herb", "#6b5d38", "bajo", "#6f8a72", "parche-herb", "#4d5c33", "#6d8050"],
-        "fill-extrusion-height": 0,
-        "fill-extrusion-opacity": 0
-      }
-    });
-    map.addLayer({
-      id: `${p}-herb-pattern`, type: "fill-extrusion", source: src,
-      filter: clsFilter(...HERB_LIKE_CLASSES),
-      paint: {
-        // corredores herbáceos en pardo (pasto seco) y parches herbáceos
-        // en verde oscuro; el resto con el pastizal estándar
-        "fill-extrusion-pattern": ["match", ["get", "_cls"],
-          "corr-herb", "pastizal-pardo",
-          "parche-herb", "pastizal-verde",
-          "pastizal"],
-        "fill-extrusion-height": 0,
-        "fill-extrusion-opacity": 0
-      }
-    });
+    map.addLayer(extLayer(`${p}-herb-ext`, src, clsFilter(...HERB_LIKE_CLASSES), {
+      color: ["match", ["get", "_cls"], "corr-herb", "#6b5d38", "bajo", "#6f8a72", "parche-herb", "#4d5c33", "#6d8050"]
+    }));
+    map.addLayer(extLayer(`${p}-herb-pattern`, src, clsFilter(...HERB_LIKE_CLASSES), {
+      // corredores herbáceos en pardo (pasto seco) y parches herbáceos
+      // en verde oscuro; el resto con el pastizal estándar
+      pattern: ["match", ["get", "_cls"],
+        "corr-herb", "pastizal-pardo",
+        "parche-herb", "pastizal-verde",
+        "pastizal"]
+    }));
 
-    map.addLayer({
-      id: `${p}-woody-base`, type: "fill-extrusion", source: src,
-      filter: clsFilter("parche-le", "corr-le"),
-      paint: { "fill-extrusion-color": WOODY_BASE.color, "fill-extrusion-height": 0, "fill-extrusion-opacity": 0 }
-    });
+    map.addLayer(extLayer(`${p}-woody-base`, src, clsFilter("parche-le", "corr-le"), { color: WOODY_BASE.color }));
     map.addLayer({
       id: `${p}-tree-shadows`, type: "fill", source: `${p}-shadows`,
       paint: { "fill-color": "#0c1c08", "fill-opacity": 0 }
@@ -144,9 +146,11 @@ export const SCENARIO_LAYERS = {
 export function applyGrowth(key, t) {
   state.growth[key] = t;
   const p = key === "inicial" ? "ini" : "multi";
-  map.setPaintProperty(`${p}-woody-base`, "fill-extrusion-height", WOODY_BASE.height * t);
-  map.setPaintProperty(`${p}-herb-ext`, "fill-extrusion-height", HERB_HEIGHT * t);
-  map.setPaintProperty(`${p}-herb-pattern`, "fill-extrusion-height", (HERB_HEIGHT + 0.05) * t);
+  if (!terrain.active) {   // A6: con terreno son fill (sin altura): el crecimiento lo hace el 3D de Three
+    map.setPaintProperty(`${p}-woody-base`, "fill-extrusion-height", WOODY_BASE.height * t);
+    map.setPaintProperty(`${p}-herb-ext`, "fill-extrusion-height", HERB_HEIGHT * t);
+    map.setPaintProperty(`${p}-herb-pattern`, "fill-extrusion-height", (HERB_HEIGHT + 0.05) * t);
+  }
   host.setGrowth(key, t);
 }
 

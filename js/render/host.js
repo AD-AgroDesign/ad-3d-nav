@@ -26,6 +26,7 @@ import { scenarioFade } from "./shaderlib.js";   // A1: uniforme de fade dither 
 import trees from "./systems/trees.js";
 import grass from "./systems/grass.js";
 import ground from "./systems/ground.js";   // A4: suelo por shader + surcos
+import { growthU, heightAt, patchGrowth, terrain } from "../terrain/terrain.js";   // A6: relieve (heightAt real; terrain.active)
 import shadows from "./systems/shadows.js";   // A3: sombras de árboles (pase propio + receptor + blobs)
 
 const SCENARIOS = ["inicial", "multi"];
@@ -79,7 +80,10 @@ export const host = {
         const mc = maplibregl.MercatorCoordinate.fromLngLat([lon, lat], 0);
         return [(mc.x - origin.x) / s, (mc.y - origin.y) / s];
       },
-      heightAt: () => 0,        // sin terreno: altura 0 (A6 lo reemplaza)
+      heightAt,                 // A6: altura del suelo en m de escena (m·exageración); 0 con terreno apagado (terrain/terrain.js)
+      // A6: lo mismo con coordenadas de escena (x este, z sur) y la inversa de toScene (para armar mallas apoyadas en el relieve: suelo, sombras)
+      toLngLat: (x, z) => { const ll = new maplibregl.MercatorCoordinate(origin.x + x * s, origin.y + z * s, 0).toLngLat(); return [ll.lng, ll.lat]; },
+      heightAtScene: (x, z) => { if (!terrain.active) return 0; const ll = new maplibregl.MercatorCoordinate(origin.x + x * s, origin.y + z * s, 0).toLngLat(); return heightAt(ll.lng, ll.lat); },
       quality: this.quality,
       shaderlib, uniforms, config,
       rng: mulberry32
@@ -96,9 +100,13 @@ export const host = {
         group.add(built.object3d);
         /* A1: niebla para los materiales de todos los sistemas, compuesta con lo que ya
            tengan (viento). Idempotente: si un sistema ya hizo patch(mat,{fog:true}) no se repite. */
-        for (const m of built.materials || []) shaderlib.patchExtra(m, { fog: true, foliage: m.userData.foliage !== false, srgbVC: !!m.vertexColors });   // ORQ: opt-out de follaje por material (troncos, pedido A1)
+        for (const m of built.materials || []) {
+          shaderlib.patchExtra(m, { fog: true, foliage: m.userData.foliage !== false, srgbVC: !!m.vertexColors });   // ORQ: opt-out de follaje por material (troncos, pedido A1)
+          if (terrain.active) patchGrowth(m, key);   // A6: crecimiento apoyado en el suelo (ver arriba)
+        }
       }
-      group.scale.y = state.growth[key] || 0.0001;
+      if (terrain.active) growthU[key].value = state.growth[key] || 0.0001;   // A6: con terreno el grupo no se escala
+      else group.scale.y = state.growth[key] || 0.0001;
       this.groups[key] = group;
       this.setOpacity(key, key === "inicial" ? 1 : 0);
       this.scene.add(group);
@@ -132,7 +140,8 @@ export const host = {
   },
 
   setGrowth(key, t) {
-    if (this.groups[key]) this.groups[key].scale.y = Math.max(t, 0.0001);
+    if (terrain.active) growthU[key].value = Math.max(t, 0.0001);   // A6: crecimiento por shader (ver growthU)
+    else if (this.groups[key]) this.groups[key].scale.y = Math.max(t, 0.0001);
     for (const sys of this.systems) if (sys.setGrowth) sys.setGrowth(key, t);
   },
 
@@ -144,10 +153,15 @@ export const host = {
   },
 
   /* PUNTO ÚNICO donde se arma la matriz de la capa (A6, terreno 3D): `matrix` es la
-     matriz de proyección de MapLibre y `this.l` pasa metros de escena a Mercator. Con
-     terreno activo, acá hay que restar la elevación de MapLibre (map.transform.elevation)
-     antes de multiplicar. Hoy no se activa nada: se devuelve exactamente lo de siempre. */
+     matriz de proyección de MapLibre y `this.l` pasa metros de escena a Mercator.
+     A6: con terreno, la matriz de las capas custom de MapLibre 4.7.1 NO trae la traslación −elevación que sí
+     usan la malla del terreno y el resto de sus capas, así que todo lo dibujado por Three quedaría E metros
+     más arriba (E = elevación del centro de la vista: 40 m en Nikunihué, 76 en Chapadmalal). Se resta acá,
+     en CADA frame (E cambia al mover el centro). La Y de escena es la altura absoluta × exageración
+     (= heightAt), no hace falta restar la altura del centro del campo. Sin terreno E = 0 y la matriz es la de siempre. */
   sceneMatrix(matrix) {
+    const E = terrain.active ? (this.map.transform.elevation || 0) : 0;
+    this.l.elements[14] = -E * this.scale;   // traslación Z (mercator) de this.l: -E·metros→mercator
     return new THREE.Matrix4().fromArray(matrix).multiply(this.l);
   },
 

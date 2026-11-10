@@ -208,6 +208,39 @@ export const A4_FURROWS = {
 };
 /* === A4: fin === */
 
+/* === A6: inicio === */
+/* Terreno 3D real y sombreado de relieve: terrain/terrain.js + terrain/heightfield.js (A6-2).
+   Diales y calibración: handoffs/a6-terreno.md. Fuente DEM: tiles "terrarium" de AWS (Mapzen/Tilezen
+   Terrain Tiles, dataset abierto; en la zona sale de SRTM de 30 m). Autorizada por el dueño 2026-11-10. */
+export const A6_TERRAIN = {
+  enabled: true,            // interruptor general del terreno 3D (el hillshade tiene el suyo, abajo)
+  demUrl: "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",
+  demZoom: 13,              // z13: ~0,5 MB por campo, error de malla ±0,05 m a zoom ≥ 15,6 (spike A6-1). Mismo valor en la fuente raster-dem y en heightAt
+  exaggeration: 1.0,        // factor vertical del relieve (heightAt devuelve m·exag). 1 = fiel; también por campo (abajo) y con ?exag= (solo ?debug/?qa)
+  /* Activación automática (calibrada con los 8 campos, spike A6-1): sobre una grilla de 30 m del DEM, con
+     mediana 3×3 y pendiente con línea de base de `baselineM`, dentro de los polígonos del campo.
+     Terreno ON si desvioResidual > X m (desvío tras restar el plano de mejor ajuste) o pendienteP95 > Y %. */
+  auto: { desvioResidual: 2.7, pendienteP95: 2.5, baselineM: 240 },
+  /* Override por campo (id de campo): { terreno: true|false, exag: n }. Tiene menos prioridad que el campo
+     `terreno` de campos.local.json / la tabla `campos`, y que ?terreno=0|1 en la URL (la más fuerte). */
+  campos: {
+    // nikunihue: { terreno: true },   // ver pregunta 2 del handoff: la regla automática lo deja llano
+  },
+  /* Sombreado de relieve (hillshade MapLibre), sutil y en TODOS los campos. La luz sale del azimut del sol de
+     A1 (A1_CAMPOS[campo].sunAzimuth, o A1_SUN.defaultAzimuth). */
+  hillshade: {
+    enabled: true,
+    exaggeration: 0.4,      // 0..1: intensidad (0,5 es el default de MapLibre; 0,28 era imperceptible, dE<0,7; 0,6 ya moteaba el llano con el ruido del SRTM)
+    shadow: "#26301a", highlight: "#fff6e0", accent: "#26301a"
+  },
+  /* Con terreno MapLibre aplica su PROPIA niebla sobre la malla (por profundidad real), así que la capa atmo-fog de A1
+     (que supone suelo plano) se apaga en los campos con terreno y se ajusta la niebla de MapLibre para que se parezca
+     (fog-ground-blend: 0 = la niebla arranca en el centro de la vista, 1 = recién en el horizonte). */
+  sky: { fogGroundBlend: 0.3, horizonFogBlend: 0.5 },
+  attribution: "Relieve: Terrain Tiles Mapzen/Tilezen en AWS (SRTM NASA/USGS, GMTED USGS)"
+};
+/* === A6: fin === */
+
 /* === A3: inicio === */
 /* Sombras reales de los árboles (render/systems/shadows.js). Diales y método: handoffs/a3-sombras.md.
    Pase propio de profundidad (cámara ortográfica ajustada a la zona útil, snapping al texel) +

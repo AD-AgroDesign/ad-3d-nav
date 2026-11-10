@@ -15,6 +15,7 @@ import * as THREE from "three";
 const FOV = 0.6435011087932844;                     // transform._fov por defecto de MapLibre 4.7.1
 const info = {};                                    // último resultado (objeto reutilizado)
 const _inv = new THREE.Matrix4();
+const _m = new THREE.Matrix4();   // A6: matriz mercator→clip con la elevación del terreno restada
 const _v = new THREE.Vector4();
 
 /* Posición de la cámara en coordenadas Mercator { x, y, z } (z = altitud en unidades mercator). */
@@ -42,7 +43,10 @@ export function cameraMercPublic(map) {
 
 /* Calcula y devuelve (objeto compartido, se pisa en cada llamada):
      camPosScene     [x, y, z] en metros de escena (lo que va a uCamPos)
-     altitudeM       altura de la cámara sobre el suelo (m)
+     altitudeM       altura de la cámara sobre el suelo (m). A6: con terreno es la altura sobre el suelo del centro de la
+                     vista (altitud absoluta − map.transform.elevation); sin terreno es la altitud de siempre
+     elevM           A6: map.transform.elevation (m, ya con la exageración); 0 sin terreno. camPosScene[1] es ABSOLUTA
+                     (la Y de escena es la altura sobre el nivel del mar × exageración, ver host.sceneMatrix)
      ctdPx / ctdM    distancia cámara-objetivo (cameraToCenterDistance) en px y en metros
      pxPerMeter      píxeles por metro en el centro de pantalla
      horizonPx       px sobre el centro de pantalla donde MapLibre pone la línea del sky
@@ -55,7 +59,11 @@ export function updateCamera(map, origin, scale, matrix) {
   const cam = cameraMerc(map);
   info.camMerc = cam;
   info.camPosScene = [(cam.x - origin.x) / scale, cam.z / scale, (cam.y - origin.y) / scale];
-  info.altitudeM = cam.z / scale;
+  /* A6: con terreno, MapLibre pone la cámara a (altura sobre el centro) + elevación del centro; la Y de escena
+     es absoluta, así que la altura sobre el suelo se obtiene restando esa elevación (0 sin terreno). */
+  const E = (map.transform && map.transform.elevation) || 0;
+  info.elevM = E;
+  info.altitudeM = cam.z / scale - E;
 
   const H = map.getCanvas().clientHeight;
   const t = map.transform;
@@ -66,7 +74,11 @@ export function updateCamera(map, origin, scale, matrix) {
   info.horizonPx = Math.tan(Math.PI / 2 - map.getPitch() * Math.PI / 180) * info.ctdPx * 0.85;
 
   if (matrix) {
-    _inv.fromArray(matrix).invert();
+    /* A6: los rayos se calculan en el mismo marco que camPosScene (alturas absolutas): la matriz de la capa
+       custom no trae la traslación −elevación (ver host.sceneMatrix), se la agrega acá. Sin terreno E = 0. */
+    _m.fromArray(matrix);
+    if (E) _m.multiply(_inv.makeTranslation(0, 0, -E * scale));
+    _inv.copy(_m).invert();
     info.invViewProj = _inv;
     const dirOf = (x, y) => {
       _v.set(x, y, 1, 1).applyMatrix4(_inv);

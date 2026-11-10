@@ -110,7 +110,7 @@ export default {
        "no-follaje" de A1 (userData.foliage=false) no se puede separar del tronco; ver handoff. */
 
     /* Chunking (T2): celdas de CHUNK_CELL_TREES m, cada InstancedMesh con su boundingSphere real */
-    const withXZ = trees.map(t => ({ t, xz: ctx.toScene(t.lon, t.lat), sp: pickSpecies(t) }));
+    const withXZ = trees.map(t => ({ t, xz: ctx.toScene(t.lon, t.lat), sp: pickSpecies(t), gy: ctx.heightAt(t.lon, t.lat) }));   // A6: gy = altura del suelo (0 sin terreno)
     const cells = partitionCells(withXZ, CHUNK_CELL_TREES, o => o.xz);
     const out = [];
     const counts = {};
@@ -123,7 +123,7 @@ export default {
       const farMesh = new THREE.InstancedMesh(proxyGeo, farMat, cell.items.length);
       const perSp = {};
       cell.items.forEach((o, i) => {
-        const { t, xz: [x, z], sp } = o;
+        const { t, xz: [x, z], sp, gy } = o;
         const cfg = TREE_SPECIES[sp], g = speciesGeo[sp];
         const u = Math.min(1, Math.max(0, (t.h - 5) / 9)), kv = Math.min(1, Math.max(0, (t.r / t.h - 0.32) / 0.2));
         const H = cfg.h[0] + (cfg.h[1] - cfg.h[0]) * u;
@@ -134,13 +134,13 @@ export default {
 
         // impostor (todas las especies en la misma malla de la celda)
         eul.set(0, yaw, 0, "YXZ");
-        m4.compose(pos.set(x, g.cyU * H, z), q.setFromEuler(eul), scl.set(g.rxU * sxz * cfg.proxyK, g.ryU * H * cfg.proxyK * cfg.proxyFlat, g.rxU * sxz * cfg.proxyK));
+        m4.compose(pos.set(x, gy + g.cyU * H, z), q.setFromEuler(eul), scl.set(g.rxU * sxz * cfg.proxyK, g.ryU * H * cfg.proxyK * cfg.proxyFlat, g.rxU * sxz * cfg.proxyK));
         farMesh.setMatrixAt(i, m4);
         col.setHex(cfg.leaf).multiplyScalar(cfg.proxyShade * b); col.r *= 1 + c; col.b *= 1 - c;
         farMesh.setColorAt(i, col);
 
         // árbol cercano
-        (perSp[sp] || (perSp[sp] = [])).push({ x, z, H, sxz, yaw, tx, tz, b, c });
+        (perSp[sp] || (perSp[sp] = [])).push({ x, gy, z, H, sxz, yaw, tx, tz, b, c });
         nTrees++;
       });
       farMesh.instanceMatrix.needsUpdate = true;
@@ -155,7 +155,7 @@ export default {
         const mesh = new THREE.InstancedMesh(speciesGeo[sp].geometry, nearMat, list.length);
         list.forEach((a, i) => {
           eul.set(a.tx, a.yaw, a.tz, "YXZ");
-          m4.compose(pos.set(a.x, 0, a.z), q.setFromEuler(eul), scl.set(a.sxz, a.H, a.sxz));
+          m4.compose(pos.set(a.x, a.gy, a.z), q.setFromEuler(eul), scl.set(a.sxz, a.H, a.sxz));
           mesh.setMatrixAt(i, m4);
           col.setRGB(a.b * (1 + a.c), a.b, a.b * (1 - a.c));
           mesh.setColorAt(i, col);

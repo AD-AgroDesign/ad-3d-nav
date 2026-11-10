@@ -75,7 +75,7 @@ export function addRank(geometry, n) {
 }
 
 const LOD_GLSL = `{
-  vec3 lodP = vec3(instanceMatrix[3].x, 0.0, instanceMatrix[3].z);
+  vec3 lodP = vec3(instanceMatrix[3].x, instanceMatrix[3].y, instanceMatrix[3].z);   // A6: y = altura del suelo (con terreno; sin terreno es 0, igual que antes)
   float lodKeep = 1.0 - smoothstep(uA2Lod.x, uA2Lod.y, distance(uA2Cam, lodP));
   float lodS = clamp((lodKeep * (1.0 + uA2Lod.z) - aRank) / uA2Lod.z, 0.0, 1.0);
   float lodC = min(uA2Lod.w, inversesqrt(max(lodKeep, 1e-3)));

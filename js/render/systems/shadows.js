@@ -20,7 +20,10 @@
       Se desvanecen hacia adentro de la zona de sombra real. En calidad Baja son lo único.
 
    El sol sale de lighting.js (uniforms.uSunDir; azimut por campo medido contra el satélite, T13).
-   Las alturas salen de las matrices de instancia de trees.js (cuando A6 sume ctx.heightAt se heredan). */
+   Las alturas salen de las matrices de instancia de trees.js (con terreno ya traen y = heightAt).
+   A6 (terreno): el receptor deja de ser un plano a y=0: es una grilla cuyas alturas salen de ctx.heightAtScene (se
+   recalcula con cada caja nueva), con prueba de profundidad + polygonOffset; el crecimiento de los casters y de los blobs
+   usa el uniforme de crecimiento de A6 (growthU) en vez de scale.y (el host no escala el grupo con terreno). */
 import * as THREE from "three";
 import { A3_SHADOWS as CFG } from "../../core/config.js";
 import { quality } from "../../core/quality.js";
@@ -30,6 +33,7 @@ import { uniforms } from "../lighting.js";
 import { GLSL_ADFOG, GLSL_FOG_UNIFORMS, scenarioFade } from "../shaderlib.js";
 import { chainShader } from "./chunks.js";
 import trees from "./trees.js";
+import { growthU, patchGrowth, terrain } from "../../terrain/terrain.js";   // A6: receptor y casters sobre el relieve
 
 const URL = new URLSearchParams(location.search);
 const MODE = URL.get("sombras");                       // ?sombras=0 apaga todo · ?sombras=blobs solo blobs
@@ -92,11 +96,12 @@ const RECV_FS =
 
 /* Blobs: decal elíptico por árbol. instanceMatrix = traslación (base del árbol) + escala (R, H, R). */
 const BLOB_VS =
-  "uniform vec4 uA3Sun;\nuniform vec4 uA3Zone;\nuniform vec4 uA3Axes;\nuniform vec4 uA3Blob;\n" +
+  "uniform vec4 uA3Sun;\nuniform vec4 uA3Zone;\nuniform vec4 uA3Axes;\nuniform vec4 uA3Blob;\nuniform vec2 uA3G;\n" +
   "varying vec2 vUv;\nvarying float vK;\nvarying vec3 vW;\n" +
   "void main() {\n" +
+  "  float gy = uA3G.y > 0.5 ? uA3G.x : modelMatrix[1][1];\n" +
   "  float R = length(instanceMatrix[0].xyz);\n" +
-  "  float H = length(instanceMatrix[1].xyz) * modelMatrix[1][1];\n" +   // el crecimiento (scale.y del grupo) acorta la sombra
+  "  float H = length(instanceMatrix[1].xyz) * gy;\n" +   // el crecimiento (scale.y del grupo) acorta la sombra
   "  vec3 base = instanceMatrix[3].xyz;\n" +
   "  float off = min(uA3Blob.y * H / uA3Sun.z, uA3Blob.z * H);\n" +    // centro de la copa proyectado al suelo: H/tan(elev), con tope
   "  float halfLen = min(R / uA3Sun.w, uA3Blob.w * R);\n" +            // círculo de la copa visto desde el sol: R/sen(elev), con tope
@@ -111,7 +116,7 @@ const BLOB_VS =
   "    float m = max(abs(dot(d, uA3Axes.xy)), abs(dot(d, uA3Axes.zw))) / uA3Zone.z;\n" +
   "    k = smoothstep(1.0 - 2.0 * uA3Zone.w, 1.0, m);\n" +
   "  }\n" +
-  "  vK = k * step(0.02, modelMatrix[1][1]);\n" +
+  "  vK = k * step(0.02, gy);\n" +
   "  gl_Position = projectionMatrix * viewMatrix * w;\n" +
   "}\n";
 const BLOB_FS =
@@ -179,9 +184,10 @@ function ensureTarget() {
    solo profundidad. Las celdas se eligen cerca/lejos según la caja; el frustum de la cámara de sombra las descarta. */
 function buildCasters(key, casters) {
   const group = new THREE.Group();
-  group.scale.y = Math.max(state.growth[key] || 0.0001, 0.0001);   // igual que el grupo del escenario (host.js)
+  if (!terrain.active) group.scale.y = Math.max(state.growth[key] || 0.0001, 0.0001);   // igual que el grupo del escenario (host.js)
   const depthNear = new THREE.MeshBasicMaterial({ map: casters.atlas, alphaTest: casters.alphaTest, side: THREE.DoubleSide, colorWrite: false });
   const depthFar = new THREE.MeshBasicMaterial({ colorWrite: false });
+  if (terrain.active) { patchGrowth(depthNear, key); patchGrowth(depthFar, key); }   // A6: crecimiento apoyado en el suelo (mismo uniforme que el host)
   const list = [];
   for (const c of casters.cells) {
     const e = { cx: c.cx, cz: c.cz, r: c.r, near: [], far: null };
@@ -233,7 +239,7 @@ function patchGrassReceive(m) {
     sh.uniforms.uA3Map = U.uA3Map; sh.uniforms.uA3VP = U.uA3VP; sh.uniforms.uA3P = U.uA3P; sh.uniforms.uA3Tint = U.uA3Tint; sh.uniforms.uA3On = U.uA3On;
     sh.vertexShader = sh.vertexShader
       .replace("#include <common>", "#include <common>\nvarying vec3 vA3W;")
-      .replace("#include <project_vertex>", "#include <project_vertex>\n  vA3W = (modelMatrix * vec4(instanceMatrix[3].x, 0.0, instanceMatrix[3].z, 1.0)).xyz;");   // base de la mata
+      .replace("#include <project_vertex>", "#include <project_vertex>\n  vA3W = (modelMatrix * vec4(instanceMatrix[3].x, instanceMatrix[3].y, instanceMatrix[3].z, 1.0)).xyz;");   // base de la mata (A6: y = altura del suelo)
     const rx = "if (uA3On > 0.5) gl_FragColor.rgb *= mix(vec3(1.0), uA3Tint, a3Shadow(vA3W, false) * uA3P.w);\n  ";
     const fogTag = "gl_FragColor.rgb = mix(gl_FragColor.rgb, uFogColor";
     sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nvarying vec3 vA3W;\nuniform float uA3On;\n" + GLSL_LOOKUP);
@@ -242,6 +248,21 @@ function patchGrassReceive(m) {
       ? sh.fragmentShader.replace(fogTag, rx + fogTag)
       : sh.fragmentShader.replace("#include <dithering_fragment>", rx + "#include <dithering_fragment>");
   });
+}
+
+/* ---------- A6: receptor sobre el relieve ---------- */
+const GRID = 96;   // segmentos por lado de la grilla del receptor (2h/96: ~12 m con h = 600 m, del orden del píxel del DEM)
+/* Pone la altura de cada vértice de la grilla (espacio local: x,z en [-1,1]; mundo = centro + R(ang)·(h·local)). */
+function fitReceiver(recv, h, ang) {
+  const pos = recv.geometry.attributes.position, c = recv.position, ca = Math.cos(ang), sa = Math.sin(ang);
+  for (let i = 0; i < pos.count; i++) {
+    const lx = pos.getX(i) * h, lz = pos.getZ(i) * h;
+    // rotación Y de Three: x' = x·cos + z·sin ; z' = -x·sin + z·cos
+    const wx = c.x + lx * ca + lz * sa, wz = c.z - lx * sa + lz * ca;
+    pos.setY(i, ctxRef.heightAtScene(wx, wz) + 0.03);
+  }
+  pos.needsUpdate = true;
+  recv.geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e6);
 }
 
 /* ---------- caja del mapa de sombras ---------- */
@@ -283,7 +304,7 @@ function updateBox(frame) {
 
   // snapping al texel en el espacio de la luz: el centro salta de a texels enteros → las sombras no "nadan"
   const texX = 2 * h / size, texY = 2 * h * sinEl / size;
-  _c.set(cx, 0, cz);
+  _c.set(cx, terrain.active ? ctxRef.heightAtScene(cx, cz) : 0, cz);   // A6: el centro de la caja a la altura del suelo (con terreno el suelo no está en y = 0)
   const px = _c.dot(_right), py = _c.dot(_upL);
   const dpx = Math.round(px / texX) * texX - px, dpy = Math.round(py / texY) * texY - py;
   _c.addScaledVector(_right, dpx).addScaledVector(_upL, dpy);   // centro de la cámara (3D, no necesariamente en el suelo)
@@ -307,8 +328,9 @@ function updateBox(frame) {
   const ang = Math.atan2(-rg[1], rg[0]);
   for (const s of Object.values(S)) {
     if (!s) continue;
-    s.recv.position.set(box.cg.x, 0.02, box.cg.y);
+    s.recv.position.set(box.cg.x, terrain.active ? 0 : 0.02, box.cg.y);
     s.recv.rotation.set(0, ang, 0); s.recv.scale.set(h, 1, h);
+    if (terrain.active) fitReceiver(s.recv, h, ang);   // A6
   }
 
   // cerca/lejos por celda (según la distancia al centro de la caja): tarjetas o impostor. Con texels grandes las hojas no se resuelven: todo impostor.
@@ -366,7 +388,9 @@ export default {
     if (!ENABLED) { S[key] = null; return { object3d: group, materials: [] }; }
     const casters = trees.casters(key);
     const recvMat = multiplyMaterial(RECV_VS, RECV_FS, { uFade: scenarioFade[key] }, { SOFT_PCF: CFG.soft ? "true" : "false" });
-    const recv = new THREE.Mesh(new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2), recvMat);
+    // A6: con terreno el receptor es una grilla (alturas por caja, ver updateBox) con depth test; sin terreno el plano de siempre
+    const recv = new THREE.Mesh(terrain.active ? new THREE.PlaneGeometry(2, 2, GRID, GRID).rotateX(-Math.PI / 2) : new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2), recvMat);
+    if (terrain.active) { recvMat.depthTest = true; recvMat.polygonOffset = true; recvMat.polygonOffsetFactor = -2; recvMat.polygonOffsetUnits = -4; }
     recv.renderOrder = -9; recv.frustumCulled = false; recv.visible = false;
     group.add(recv);
     let blobs = null, cs = { group: new THREE.Group(), list: [], mats: [] };
@@ -374,7 +398,9 @@ export default {
       cs = buildCasters(key, casters);
       blobs = buildBlobs(casters);
       if (blobs) {
-        blobs.material = multiplyMaterial(BLOB_VS, BLOB_FS, { uFade: scenarioFade[key] });
+        blobs.material = multiplyMaterial(BLOB_VS, BLOB_FS, { uFade: scenarioFade[key], uA3G: { value: terrain.active ? new THREE.Vector2(0, 1) : new THREE.Vector2(1, 0) } });
+        if (terrain.active) { blobs.material.depthTest = true; blobs.material.polygonOffset = true; blobs.material.polygonOffsetFactor = -2; blobs.material.polygonOffsetUnits = -4; }
+        blobs.userData.g = key;
         group.add(blobs);
       }
     }
@@ -394,6 +420,7 @@ export default {
   setGrowth(key, t) {
     const s = S[key]; if (!s) return;
     const g = Math.max(t, 0.0001);
+    if (terrain.active) { if (s.blobs) s.blobs.material.uniforms.uA3G.value.x = g; dirty = true; return; }   // A6: crecimiento por shader (growthU lo escribe el host)
     if (s.casters.group.scale.y !== g) { s.casters.group.scale.y = g; dirty = true; }
   },
 

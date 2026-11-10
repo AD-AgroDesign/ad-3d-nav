@@ -12,6 +12,7 @@ import { applyRasterGrade, map } from "./map/style.js";
 import { updatePanel } from "./ui/panel.js";
 import { mapStyle } from "./map/style.js";
 import { DEBUG, state } from "./core/state.js";
+import { initTerrain } from "./terrain/terrain.js";   // A6: relieve (DEM terrarium), hillshade y terreno 3D automático
 import "./render/atmo.js";   // A1: capa atmo-fog (se registra sola en host.registerBeforeLayer, antes de addScenarioLayers)
 import "./ui/controls.js";
 import "./debug/fps.js";
@@ -38,6 +39,7 @@ async function bootEscenario() {
     loadCampos();
     applyRasterGrade(map);   // A1: ajuste de color del satélite (loadCampos puede recrear la capa)
     await loadData();
+    await initTerrain(map, state.bbox, state.data.inicial);   // A6: ANTES de las capas y del host (heightAt, fuente raster-dem, hillshade, setTerrain)
     map.addImage("pastizal", (await pattern).data);
     map.addImage("pastizal-pardo", (await patternPardo).data);
     map.addImage("pastizal-verde", (await patternVerde).data);
