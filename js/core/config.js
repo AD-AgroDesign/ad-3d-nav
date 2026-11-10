@@ -127,7 +127,7 @@ export const A1_CAMPOS = {
 };
 /* Follaje: wrap lighting (cuánto "dobla" la luz del sol alrededor del volumen) y translucidez
    barata (luz que atraviesa el follaje desde atrás). 0 = Lambert puro. */
-export const A1_FOLIAGE = { wrap: 0.35, trans: 0.25, floor: 0.25 };   // floor: levantado de sombras de copas (suma albedo·floor en la cara sin sol; 0 = nada)
+export const A1_FOLIAGE = { wrap: 0.35, trans: 0.25, lumMin: 0.09, shadow: 0 };   // copas oscuras (G1): lumMin = piso de luminancia del albedo (lineal), shadow = levantado de la cara sin sol; 0 = nada
 /* Satélite (raster-*): lo lleva a la misma "foto" que el 3D. */
 export const A1_RASTER = { saturation: 0.12, contrast: 0.06, brightnessMin: 0, brightnessMax: 1, hueRotate: 3 };
 /* Ajuste fino en caliente (solo ?debug/?qa): ?a1={"A1_RENDER":{"exposure":1.2}} mezcla sobre los diales. */
