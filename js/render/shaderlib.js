@@ -110,6 +110,22 @@ function applyChunks(sh, o) {
       "\tvec3 irradiance = ( dotNL + saturate( -rawNL ) * " + T + " ) * directLight.color;"));
   }
 
+  if (o.floor) {
+    // Copas oscuras (ajuste G1): AgX hunde a casi negro los verdes mas oscuros de la paleta.
+    //  - lumMin: piso de luminancia del ALBEDO (lineal). Escala el color completo (tono y saturacion intactos) solo si el
+    //    albedo es mas oscuro que lumMin; las copas de tono medio/claro no cambian.
+    //  - shadow: levantado de la cara sin sol (suma albedo·shadow donde la luz saliente < 0,5·albedo; se apaga hacia la cara
+    //    iluminada, asi las facetas conservan el volumen).
+    const L = o.floor.lumMin.toFixed(4), S = o.floor.shadow.toFixed(3);
+    fs = fs.replace("#include <color_fragment>",
+      "#include <color_fragment>\n" +
+      "{ float adLa = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722)); diffuseColor.rgb *= max(1.0, " + L + " / max(adLa, 1e-4)); }");
+    if (o.floor.shadow > 0) fs = fs.replace("#include <opaque_fragment>",
+      "{ float adLo = dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722)), adLa = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));\n" +
+      "  outgoingLight += diffuseColor.rgb * " + S + " * (1.0 - smoothstep(0.0, max(0.5 * adLa, 1e-4), adLo)); }\n" +
+      "#include <opaque_fragment>");
+  }
+
   if (o.fadeU) {
     sh.uniforms.uFade = o.fadeU;
     // Va lo primero en main(): descarta antes de gastar en iluminación. uFade>=1 → nada se descarta.
@@ -126,12 +142,14 @@ function resolveOpts(material, opts) {
   const fadeU = !opts.fade ? null
     : typeof opts.fade === "string" ? (scenarioFade[opts.fade] || (scenarioFade[opts.fade] = { value: 1 }))
     : (material.userData.uFade || (material.userData.uFade = { value: 1 }));
-  return { wind: !!opts.wind, fog: !!opts.fog, foliage: !!opts.foliage, srgbVC: !!opts.srgbVC, fadeU };
+  // piso de sombra solo en copas: follaje sin color de vértice (el pasto lleva vertexColors) y sin opt-out
+  const floor = opts.foliage && !material.vertexColors && (A1_FOLIAGE.lumMin > 0 || A1_FOLIAGE.shadow > 0) && opts.foliageFloor !== false && material.userData.foliageFloor !== false ? { lumMin: A1_FOLIAGE.lumMin || 0, shadow: A1_FOLIAGE.shadow || 0 } : null;
+  return { wind: !!opts.wind, fog: !!opts.fog, foliage: !!opts.foliage, srgbVC: !!opts.srgbVC, floor, fadeU };
 }
 
 /* Three cachea el programa por onBeforeCompile.toString() (igual para todos los patch):
    la clave tiene que distinguir las combinaciones de chunks. */
-const keyOf = (o, prev) => (prev ? prev + "+" : "") + "ad:" + (o.wind ? "w" : "") + (o.fog ? "f" : "") + (o.foliage ? "l" : "") + (o.srgbVC ? "c" : "") + (o.fadeU ? "d" : "");
+const keyOf = (o, prev) => (prev ? prev + "+" : "") + "ad:" + (o.wind ? "w" : "") + (o.fog ? "f" : "") + (o.foliage ? "l" : "") + (o.srgbVC ? "c" : "") + (o.floor ? "k" + o.floor.lumMin + "_" + o.floor.shadow : "") + (o.fadeU ? "d" : "");
 
 export function patch(material, opts = {}) {
   const o = resolveOpts(material, opts);
@@ -158,7 +176,7 @@ export function patchExtra(material, opts = {}) {
   if (!o.fog && !o.fadeU && !o.foliage && !o.srgbVC) return material;
   const prev = material.onBeforeCompile, prevKey = material.customProgramCacheKey;
   const prevStr = material.userData.adChunks && prevKey ? prevKey.call(material) : "";   // sin patch previo: clave limpia
-  material.onBeforeCompile = function (sh, renderer) { if (prev) prev.call(this, sh, renderer); applyChunks(sh, { fog: o.fog, foliage: o.foliage, srgbVC: o.srgbVC, fadeU: o.fadeU }); };
+  material.onBeforeCompile = function (sh, renderer) { if (prev) prev.call(this, sh, renderer); applyChunks(sh, { fog: o.fog, foliage: o.foliage, srgbVC: o.srgbVC, floor: o.floor, fadeU: o.fadeU }); };
   const key = keyOf(o, prevStr);
   material.customProgramCacheKey = () => key;
   material.userData.adChunks = { wind: !!had.wind, fog: !!(had.fog || o.fog), foliage: !!(had.foliage || o.foliage), srgbVC: !!(had.srgbVC || o.srgbVC), fade: !!(had.fade || o.fadeU) };
