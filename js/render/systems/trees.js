@@ -1,11 +1,88 @@
-/* ============ Sistema de render: árboles (troncos + copas instanciados) ============
-   Dueño en la Ola 1-2: A2. Código movido desde vegLayer.buildGroup() sin cambios de
-   geometría, colores, semillas ni orden de construcción (§4). Contrato: §6.3. */
-import * as THREE from "three";
-import { CHUNK_CELL_TREES, CROWN_PALETTE, TREE_AO, TRUNK_COLOR } from "../../core/config.js";
-import { applyAO, partitionCells } from "./chunks.js";
+/* ============ Sistema de render: árboles nativos del espinal (G, Ola 2) ============
+   Dueño: A2. Decisión G1 (2026-11-10): tala, algarrobo y chañar (sin eucalipto). Contrato: §6.3.
 
-const built = {};   // scenarioKey → { trunkMat, crownMat, trunks, crowns }
+   Cada árbol conserva su posición, su cantidad y su semilla (data.js no cambia): lo que cambia es
+   la forma. Dos representaciones por árbol, según la distancia a la cámara (§6.4):
+     - CERCA: tronco + ramas + copa de tarjetas de follaje con atlas procedural (treegen.js), una
+       InstancedMesh por especie y celda (tronco y follaje comparten geometría y material).
+       alphaTest + alphaToCoverage (con MSAA); normales esféricas; vaivén sutil con uTime.
+     - LEJOS (impostor): copa simplificada de 32 tris (elipsoide), UNA InstancedMesh por celda para
+       las tres especies (color por instancia). Se funde con las tarjetas por dither (screen-door)
+       en una franja de TREE_LOD_BAND × treeCardDist: sin "pop".
+   Distancias por nivel (core/quality.js): treeCardDist / treeImpostorDist. Alta 600/∞, Media 300/1500,
+   Baja solo impostor (treeCardDist 0; treeImpostorDist 0 se interpreta como sin límite).
+
+   Para A3 (sombras): ver `casters(scenarioKey)` abajo. */
+import * as THREE from "three";
+import { CHUNK_CELL_TREES, TREE_ALPHA_TEST, TREE_LOD_BAND, TREE_SPECIES, TREE_SWAY } from "../../core/config.js";
+import { chainShader, partitionCells } from "./chunks.js";
+import { buildAtlas, buildProxy, buildSpecies } from "./treegen.js";
+
+const built = {};   // scenarioKey → { cells, nearMat, farMat, counts, n }
+const SPECIES = Object.keys(TREE_SPECIES);
+
+/* Uniforms compartidos: (cardStart, cardEnd, impStart, impEnd) en metros */
+const lodU = { value: new THREE.Vector4(480, 600, 1e9 - 1, 1e9) };
+function setLodFromQuality(q) {
+  const c = q.treeCardDist || 0;
+  const band = TREE_LOD_BAND;
+  let ie = q.treeImpostorDist;
+  if (!ie || !isFinite(ie)) ie = 1e9;              // Infinity y 0 (Baja: solo impostor) = sin límite
+  lodU.value.set(c > 0 ? c * (1 - band) : -2, c > 0 ? c : -1, ie >= 1e9 ? 1e9 - 1 : ie * 0.9, ie);
+}
+
+/* Hash determinista [0,1) de un árbol (para especie, tamaño, giro y tinte; el dato no cambia) */
+const frac = x => x - Math.floor(x);
+const hash = (t, k) => frac(Math.sin(t.r * 127.1 + t.h * 311.7 + t.j * 74.7 + k * 19.19) * 43758.5453);
+function pickSpecies(t) {
+  const x = hash(t, 0);
+  let acc = 0;
+  for (const s of SPECIES) { acc += TREE_SPECIES[s].mix; if (x < acc) return s; }
+  return SPECIES[SPECIES.length - 1];
+}
+
+/* Shader común (se encadena DESPUÉS de patch()): vaivén de copa, LOD por distancia con dither y,
+   en las tarjetas, normal SIN invertir por cara (las normales esféricas valen para ambos lados). */
+function treeShader(mat, kind, sway) {
+  return chainShader(mat, "a2tree-" + kind + (sway ? "s" : ""), sh => {
+    sh.uniforms.uA2TCam = mat.userData.camU;
+    sh.uniforms.uA2TLod = lodU;
+    sh.uniforms.uTime = mat.userData.timeU;
+    sh.vertexShader = sh.vertexShader
+      .replace("#include <common>", "#include <common>\nuniform vec3 uA2TCam;\nuniform vec4 uA2TLod;\nuniform float uTime;\nvarying vec2 vA2TVis;")
+      .replace("#include <begin_vertex>",
+        "#include <begin_vertex>\n" +
+        "{\n  vec3 tip = instanceMatrix[3].xyz;\n  float d = distance(uA2TCam, tip);\n" +
+        (kind === "near"
+          ? "  vA2TVis = vec2(1.0 - smoothstep(uA2TLod.x, uA2TLod.y, d), 1.0);\n"
+          : "  vA2TVis = vec2(smoothstep(uA2TLod.x, uA2TLod.y, d), 1.0 - smoothstep(uA2TLod.z, uA2TLod.w, d));\n") +
+        (sway
+          ? "  float tph = dot(tip.xz, vec2(37.0, 73.0));\n  float yn = max(position.y, 0.0);\n  float sw = yn * yn * " + TREE_SWAY.toFixed(4) + ";\n" +
+            "  transformed.x += sin(uTime * 0.9 + tph) * sw;\n  transformed.z += cos(uTime * 0.7 + tph * 1.7) * sw * 0.7;\n"
+          : "") +
+        "}");
+    const discardCode = kind === "near"
+      ? "  if (vA2TVis.x < 1.0 && ign >= vA2TVis.x) discard;\n"
+      : "  if ((vA2TVis.x < 1.0 && ign < 1.0 - vA2TVis.x) || (vA2TVis.y < 1.0 && ign >= vA2TVis.y)) discard;\n";
+    sh.fragmentShader = sh.fragmentShader
+      .replace("#include <common>", "#include <common>\nvarying vec2 vA2TVis;")
+      .replace("void main() {", "void main() {\n  float ign = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));\n" + discardCode);
+    if (kind === "near") {
+      sh.fragmentShader = sh.fragmentShader.replace("#include <normal_fragment_begin>",
+        THREE.ShaderChunk.normal_fragment_begin.replace("normal *= faceDirection;", ""));
+    }
+  });
+}
+
+let speciesGeo = null, proxyGeo = null;
+function geometries() {
+  if (!speciesGeo) {
+    speciesGeo = {};
+    for (const s of SPECIES) speciesGeo[s] = buildSpecies(s, TREE_SPECIES[s]);
+    proxyGeo = buildProxy();
+  }
+  return { speciesGeo, proxyGeo };
+}
 
 export default {
   id: "trees",
@@ -13,100 +90,134 @@ export default {
   build(ctx, scenarioKey, data, veg) {
     const trees = veg.trees;
     const group = new THREE.Group();
+    const { speciesGeo, proxyGeo } = geometries();
+    const atlas = buildAtlas();
+    setLodFromQuality(ctx.quality);
 
-    const trunkGeo = new THREE.CylinderGeometry(0.7, 1, 1, 5);
-    trunkGeo.translate(0, 0.5, 0); // base del tronco en y=0
-    const crownGeo = new THREE.IcosahedronGeometry(1, 1);
+    /* Material de las tarjetas + tronco (una sola pasada, opaco). userData: uniforms para el shader. */
+    const nearMat = new THREE.MeshPhongMaterial({
+      map: atlas, vertexColors: true, side: THREE.DoubleSide, shininess: 0, specular: 0x000000,
+      alphaTest: TREE_ALPHA_TEST, alphaToCoverage: !!ctx.quality.msaa
+    });
+    const farMat = new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 0, specular: 0x000000 });
+    for (const m of [nearMat, farMat]) {
+      m.userData.camU = ctx.uniforms.uCamPos; m.userData.timeU = ctx.uniforms.uTime;
+      ctx.shaderlib.patch(m, { fog: true, fade: scenarioKey });     // niebla + cross-fade de escenario (dither)
+    }
+    treeShader(nearMat, "near", true);
+    treeShader(farMat, "far", false);
+    /* Tronco y follaje comparten material (una sola malla por especie/celda → menos draws): el
+       "no-follaje" de A1 (userData.foliage=false) no se puede separar del tronco; ver handoff. */
 
-    const trunkMat = new THREE.MeshPhongMaterial({ color: 0xffffff, flatShading: true, shininess: 0 });
-    const crownMat = new THREE.MeshPhongMaterial({ color: 0xffffff, flatShading: true, shininess: 0 });
-    /* Cross-fade por fade dither (materiales opacos) + niebla; luego E-AO (siempre al final) */
-    for (const mat of [trunkMat, crownMat]) ctx.shaderlib.patch(mat, { fog: true, fade: scenarioKey });
-    applyAO(trunkMat, TREE_AO.trunk, 0, 0.3);      // 30 % inferior del tronco (y local 0..1)
-    applyAO(crownMat, TREE_AO.crown, -0.9, 0.2);   // mitad inferior de la copa (esfera unitaria, y -1..1)
-
-    /* Chunking (T2): una InstancedMesh de troncos y otra de copas por celda de CHUNK_CELL_TREES m.
-       Cada una con su boundingSphere real (computeBoundingSphere de r170) → Three descarta por
-       frustum las celdas fuera de cuadro. Mismas posiciones, colores y escalas que antes. */
-    const withXZ = trees.map(t => ({ t, xz: ctx.toScene(t.lon, t.lat) }));
+    /* Chunking (T2): celdas de CHUNK_CELL_TREES m, cada InstancedMesh con su boundingSphere real */
+    const withXZ = trees.map(t => ({ t, xz: ctx.toScene(t.lon, t.lat), sp: pickSpecies(t) }));
     const cells = partitionCells(withXZ, CHUNK_CELL_TREES, o => o.xz);
-    const trunkMeshes = [], crownMeshes = [];
-    let nTrunks = 0, nCrowns = 0;
-
-    const m = new THREE.Matrix4();
-    const q = new THREE.Quaternion();
-    const eul = new THREE.Euler();
-    const col = new THREE.Color();
+    const out = [];
+    const counts = {};
+    let nTrees = 0;
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), eul = new THREE.Euler(), col = new THREE.Color();
+    const pos = new THREE.Vector3(), scl = new THREE.Vector3();
 
     for (const cell of cells.values()) {
-      const list = cell.items;
-      const lobes = list.reduce((s, o) => s + (o.t.lobe ? 1 : 0), 0);
-      const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, list.length);
-      const crowns = new THREE.InstancedMesh(crownGeo, crownMat, list.length + lobes);
-      let ci = 0;
-      list.forEach(({ t, xz }, i) => {
-        // posición exacta en Mercator -> metros de escena (X este, Z sur)
-        const [x, z] = xz;
-        const trunkH = t.h * 0.32;
-        const trunkR = 0.12 + t.h * 0.035;
+      const entry = { near: [], far: null, cx: 0, cy: 0, cz: 0, r: 0 };
+      const farMesh = new THREE.InstancedMesh(proxyGeo, farMat, cell.items.length);
+      const perSp = {};
+      cell.items.forEach((o, i) => {
+        const { t, xz: [x, z], sp } = o;
+        const cfg = TREE_SPECIES[sp], g = speciesGeo[sp];
+        const u = Math.min(1, Math.max(0, (t.h - 5) / 9)), kv = Math.min(1, Math.max(0, (t.r / t.h - 0.32) / 0.2));
+        const H = cfg.h[0] + (cfg.h[1] - cfg.h[0]) * u;
+        const k = (cfg.crownK[0] + (cfg.crownK[1] - cfg.crownK[0]) * kv) * (t.lobe ? 1.1 : 1);
+        const sxz = H * k / g.R0u;                         // ancho (la geometría tiene altura 1)
+        const yaw = hash(t, 1) * Math.PI * 2, tx = (hash(t, 2) - 0.5) * 0.12, tz = (hash(t, 3) - 0.5) * 0.12;
+        const b = 1 + (hash(t, 4) - 0.5) * 0.2, c = (hash(t, 5) - 0.5) * 0.08;
 
-        m.compose(
-          new THREE.Vector3(x, 0, z),
-          q.identity(),
-          new THREE.Vector3(trunkR, trunkH, trunkR)
-        );
-        trunks.setMatrixAt(i, m);
-        col.setHex(TRUNK_COLOR).offsetHSL(0, 0, (t.j - 0.5) * 0.08);
-        trunks.setColorAt(i, col);
+        // impostor (todas las especies en la misma malla de la celda)
+        eul.set(0, yaw, 0, "YXZ");
+        m4.compose(pos.set(x, g.cyU * H, z), q.setFromEuler(eul), scl.set(g.rxU * sxz * cfg.proxyK, g.ryU * H * cfg.proxyK, g.rxU * sxz * cfg.proxyK));
+        farMesh.setMatrixAt(i, m4);
+        col.setHex(cfg.leaf).multiplyScalar(cfg.proxyShade * b); col.r *= 1 + c; col.b *= 1 - c;
+        farMesh.setColorAt(i, col);
 
-        const sy = t.h * 0.42;
-        const cy = trunkH + sy * 0.82;
-        eul.set(0, t.j * Math.PI * 2, 0);
-        m.compose(
-          new THREE.Vector3(x, cy, z),
-          q.setFromEuler(eul),
-          new THREE.Vector3(t.r, sy, t.r * (0.9 + t.j * 0.2))
-        );
-        crowns.setMatrixAt(ci, m);
-        col.setHex(CROWN_PALETTE[t.c]).offsetHSL(0, 0, (t.j - 0.5) * 0.07);
-        crowns.setColorAt(ci, col);
-        ci++;
-
-        if (t.lobe) {
-          const lr = t.r * 0.6;
-          m.compose(
-            new THREE.Vector3(x + (t.j - 0.5) * t.r * 1.4, cy + sy * 0.35, z + (((t.j * 7) % 1) - 0.5) * t.r * 1.4),
-            q.identity(),
-            new THREE.Vector3(lr, lr * 0.9, lr)
-          );
-          crowns.setMatrixAt(ci, m);
-          col.setHex(CROWN_PALETTE[(t.c + 1) % CROWN_PALETTE.length]).offsetHSL(0, 0, (t.j - 0.5) * 0.07);
-          crowns.setColorAt(ci, col);
-          ci++;
-        }
+        // árbol cercano
+        (perSp[sp] || (perSp[sp] = [])).push({ x, z, H, sxz, yaw, tx, tz, b, c });
+        nTrees++;
       });
-      trunks.instanceMatrix.needsUpdate = true;
-      crowns.instanceMatrix.needsUpdate = true;
-      if (trunks.instanceColor) trunks.instanceColor.needsUpdate = true;
-      if (crowns.instanceColor) crowns.instanceColor.needsUpdate = true;
-      trunks.computeBoundingSphere();
-      crowns.computeBoundingSphere();
-      trunkMeshes.push(trunks); crownMeshes.push(crowns);
-      nTrunks += trunks.count; nCrowns += crowns.count;
+      farMesh.instanceMatrix.needsUpdate = true;
+      if (farMesh.instanceColor) farMesh.instanceColor.needsUpdate = true;
+      farMesh.computeBoundingSphere();
+      entry.far = farMesh;
+      group.add(farMesh);
+
+      for (const sp of SPECIES) {
+        const list = perSp[sp];
+        if (!list) continue;
+        const mesh = new THREE.InstancedMesh(speciesGeo[sp].geometry, nearMat, list.length);
+        list.forEach((a, i) => {
+          eul.set(a.tx, a.yaw, a.tz, "YXZ");
+          m4.compose(pos.set(a.x, 0, a.z), q.setFromEuler(eul), scl.set(a.sxz, a.H, a.sxz));
+          mesh.setMatrixAt(i, m4);
+          col.setRGB(a.b * (1 + a.c), a.b, a.b * (1 - a.c));
+          mesh.setColorAt(i, col);
+        });
+        mesh.instanceMatrix.needsUpdate = true;
+        mesh.instanceColor.needsUpdate = true;
+        mesh.computeBoundingSphere();
+        mesh.boundingSphere.radius += 0.6;               // holgura por el vaivén
+        mesh.userData.species = sp;
+        entry.near.push(mesh);
+        group.add(mesh);
+        counts[sp] = (counts[sp] || 0) + list.length;
+      }
+      const bs = farMesh.boundingSphere;
+      entry.cx = bs.center.x; entry.cy = bs.center.y; entry.cz = bs.center.z; entry.r = bs.radius + 6;
+      out.push(entry);
     }
 
-    group.add(...trunkMeshes, ...crownMeshes);
-    built[scenarioKey] = { trunkMat, crownMat, nTrunks, nCrowns, chunks: trunkMeshes.length };
-    return { object3d: group, materials: [trunkMat, crownMat] };
+    built[scenarioKey] = { cells: out, group, nearMat, farMat, counts, n: nTrees, atlas };
+    return { object3d: group, materials: [nearMat, farMat] };
   },
 
   setOpacity() {},   // el fade lo hace el dither (shaderlib.scenarioFade, escrito por host.setOpacity)
+  setGrowth() {},    // el crecimiento lo aplica el host con scale.y del grupo del escenario
 
-  setGrowth() {},   // el crecimiento lo aplica el host con scale.y del grupo del escenario
+  /* LOD por celda: decide qué mallas se dibujan (el fundido fino es por instancia, en el shader) */
+  update(frame) {
+    setLodFromQuality(frame.quality);
+    const c = frame.camPosScene, L = lodU.value;
+    for (const b of Object.values(built)) {
+      if (!b.group.visible) continue;
+      let near = 0, far = 0;
+      for (const e of b.cells) {
+        const d = Math.hypot(c.x - e.cx, c.y - e.cy, c.z - e.cz), dmin = d - e.r, dmax = d + e.r;
+        const nv = L.y > 0 && dmin < L.y, fv = dmax > L.x && dmin < L.w;
+        for (const m of e.near) m.visible = nv;
+        e.far.visible = fv;
+        if (nv) near++; if (fv) far++;
+      }
+      b.nearCells = near; b.farCells = far;
+    }
+  },
 
-  /* Instancias dibujables (para __nav3d.stats) */
+  onQuality(q) { setLodFromQuality(q); },
+
+  /* Para A3 (pase de sombras): geometría y materiales de los árboles de un escenario, por celda.
+     near[] = InstancedMesh por especie (tarjetas alphaTest con `map` = atlas + tronco; hacen falta un
+     customDepthMaterial con el mismo map/alphaTest y DoubleSide); far[] = impostores (opacos).
+     Cada celda: { cx, cy, cz, r (esfera), near, far }. No implementa el pase. */
+  casters(scenarioKey) {
+    const b = built[scenarioKey];
+    return b ? { cells: b.cells, nearMat: b.nearMat, farMat: b.farMat, atlas: b.atlas, alphaTest: TREE_ALPHA_TEST } : null;
+  },
+
+  dispose() {
+    for (const b of Object.values(built)) { b.nearMat.dispose(); b.farMat.dispose(); }
+  },
+
   stats(scenarioKey) {
     const b = built[scenarioKey];
-    return b ? { trunks: b.nTrunks, crowns: b.nCrowns, treeChunks: b.chunks } : { trunks: 0, crowns: 0, treeChunks: 0 };
+    return b
+      ? { trees: b.n, treeSpecies: b.counts, treeChunks: b.cells.length, treeNearCells: b.nearCells ?? null, treeFarCells: b.farCells ?? null }
+      : { trees: 0, treeSpecies: {}, treeChunks: 0 };
   }
 };
