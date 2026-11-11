@@ -126,7 +126,8 @@ export const TREE_BAKE = { interior: 0.18, bottom: 0.14, trunk: 0.22 };   // ocl
    del cielo sin costura. Si un preset de hora cambia uno, cambia los dos a la vez. */
 export const A1_SKY = {
   skyColor: "#87b9e0",
-  horizonColor: "#dfe9d8"
+  horizonColor: "#dfe9d8",
+  fogColor: "#e6ecdc"      // `fog-color` del sky de MapLibre (solo se ve con terreno activo, A6)
 };
 export const A1_FOG = {
   color: A1_SKY.horizonColor,
@@ -170,13 +171,41 @@ export const A1_CAMPOS = {
 export const A1_FOLIAGE = { wrap: 0.35, trans: 0.25, lumMin: 0.09, shadow: 0 };   // copas oscuras (G1): lumMin = piso de luminancia del albedo (lineal), shadow = levantado de la cara sin sol; 0 = nada
 /* Satélite (raster-*): lo lleva a la misma "foto" que el 3D. */
 export const A1_RASTER = { saturation: 0.12, contrast: 0.06, brightnessMin: 0, brightnessMax: 1, hueRotate: 3 };
+/* ---- 3.1: modos de hora (A1) ----
+   `mediodia` NO se define acá: sale de los diales de arriba (A1_SUN, A1_LIGHT, A1_SKY, A1_RASTER, A1_RENDER, A3_SHADOWS) para que
+   siga siendo exactamente la escena aprobada. Los otros modos son valores absolutos (colores sRGB hex) y se interpolan 1,5 s.
+     sunElev / sunAz  elevación (°) y desplazamiento del azimut respecto del medido por campo (T13: el tope es ±35°)
+     sunColor, sunInt luz directa · hemiSky/hemiSkyInt cielo del hemisferio · gTint/gInt multiplicador del color de suelo del campo
+     skyColor, horizonColor, fogColor  `sky` de MapLibre (horizonColor = color de la niebla Three y de la capa atmo-fog)
+     fogK             escala del inicio de la niebla (< 1 = más densa)
+     expK             multiplicador de la exposición del tone mapping
+     tint             multiplicador de color del suelo (pasada multiplicativa de la capa atmo-fog; "#ffffff" = nada)
+     rSat, rCon, rBMin, rBMax, rHue   ajuste del ráster satelital (raster-*)
+     shStr, shTint    intensidad y tinte de las sombras de los árboles (A3) */
+export const A1_HORAS = {
+  duracionMs: 1500,
+  dorada: {
+    label: "Hora dorada", sunElev: 18, sunAz: -20, sunColor: "#ffa850", sunInt: 3.4,
+    hemiSky: "#8fa0c8", hemiSkyInt: 0.4, gTint: "#ffbb78", gInt: 0.45,
+    skyColor: "#79aedb", horizonColor: "#f0dcb8", fogColor: "#f1ddbd", fogK: 0.85, expK: 1.0,
+    tint: "#ffdcae", rSat: 0.24, rCon: 0.16, rBMin: 0, rBMax: 0.96, rHue: -4,
+    shStr: 0.85, shTint: [0.42, 0.46, 0.58]
+  },
+  atardecer: {
+    label: "Atardecer", sunElev: 8, sunAz: -35, sunColor: "#ff8a45", sunInt: 3.2,
+    hemiSky: "#a99bb4", hemiSkyInt: 0.5, gTint: "#ff9c6a", gInt: 0.4,
+    skyColor: "#6e84b4", horizonColor: "#f2b690", fogColor: "#efb08c", fogK: 0.6, expK: 1.1,
+    tint: "#ffc79f", rSat: 0.25, rCon: 0.14, rBMin: 0, rBMax: 0.82, rHue: -6,
+    shStr: 0.9, shTint: [0.46, 0.44, 0.58]
+  }
+};
 /* Ajuste fino en caliente (solo ?debug/?qa): ?a1={"A1_RENDER":{"exposure":1.2}} mezcla sobre los diales. */
 {
   const q = new URLSearchParams(location.search);
   if ((q.has("debug") || q.has("qa")) && q.get("a1")) {
     try {
       const o = JSON.parse(q.get("a1"));
-      const T = { A1_RENDER, A1_LIGHT, A1_SUN, A1_FOLIAGE, A1_RASTER, A1_FOG, A1_SKY, A1_CAMPOS };
+      const T = { A1_RENDER, A1_LIGHT, A1_SUN, A1_FOLIAGE, A1_RASTER, A1_FOG, A1_SKY, A1_CAMPOS, A1_HORAS };
       for (const k in o) if (T[k]) Object.assign(T[k], o[k]);
     } catch (e) { console.warn("a1: JSON inválido en ?a1"); }
   }

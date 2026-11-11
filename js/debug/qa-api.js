@@ -17,7 +17,7 @@ import { setScenario } from "../map/scenario.js";
 import { getCamera } from "../core/camera.js";
 import { LEVELS, setQuality } from "../core/quality.js";
 import { host } from "../render/host.js";
-import { uniforms } from "../render/lighting.js";
+import { PRESET_NAMES, atm, presetName, setPreset, uniforms } from "../render/lighting.js";
 import { RAZANTE_CAM, corridorCenterline, makeFlight } from "../tour/flight.js";
 import { startOrbit, startTour, stopOrbit, stopTour } from "../tour/tour.js";
 
@@ -224,9 +224,16 @@ import { startOrbit, startTour, stopOrbit, stopTour } from "../tour/tour.js";
                pxPerMeter: cam.pxPerMeter, horizonPx: cam.horizonPx, centerScene: cs, distToCenter: dist,
                pitch: map.getPitch(), zoom: map.getZoom(), rays: cam.rays };
     },
-    /* Presets de hora: todavía no existen (A1, Ola 3). Stub documentado: devuelve false. */
-    presets: [],
-    setPreset(name) { console.warn("__nav3d.setPreset: sin presets todavía:", name); return false; },
+    /* Modos de hora (A1, 3.1): "mediodia" | "dorada" | "atardecer". setPreset(name, {instant = true, duration}) devuelve una
+       promesa que resuelve tras la transición y el repintado (por defecto INSTANTÁNEO: determinista para capturas;
+       { instant: false } prueba la transición animada de 1,5 s). `preset()` informa el vigente y su estado interpolado. */
+    presets: PRESET_NAMES.slice(),
+    async setPreset(name, opts = {}) {
+      const ok = await setPreset(name, { instant: opts.instant !== false, duration: opts.duration });
+      if (ok) await waitIdle();
+      return ok;
+    },
+    preset() { return { name: presetName, state: JSON.parse(JSON.stringify(atm)) }; },
     /* Calidad: cambia el nivel real (core/quality.js) sin persistir en localStorage (determinismo). */
     qualities: LEVELS.slice(),
     setQuality(name) { return setQuality(name, { persist: false, reload: false }); }
