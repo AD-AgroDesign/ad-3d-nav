@@ -299,6 +299,8 @@ export const A5_FAUNA = {
     flockSize: [8, 25],        // individuos por bandada
     anchorCell: 300,           // m · celda para buscar parches leñosos (centros de gravedad de los árboles)
     anchorMinTrees: 8,         // árboles mínimos en una celda para que sea un parche donde anidan
+    corrNear: 350, corrBonus: 3,  // parches a < corrNear m de un corredor herbáceo valen ×corrBonus al elegir dónde van las bandadas (se ven desde el rasante)
+    corrNear: 350, corrBonus: 3,  // parches a < corrNear m de un corredor herbáceo valen ×corrBonus al elegir dónde van las bandadas (se ven desde el rasante)
     anchorSep: 380,            // m · separación mínima entre recorridos de bandadas distintas
     orbit: [90, 190],          // m · radio del recorrido alrededor del parche (se suma la dispersión del parche)
     alt: [25, 56],             // m sobre el suelo · el piso se calcula también contra el árbol más alto (treeClear)
@@ -315,9 +317,9 @@ export const A5_FAUNA = {
     tuftsPerButterfly: { "corr-herb": 26, "parche-herb": 300 },   // 1 polinizador cada N matas (en multi)
     max: 16000,                // tope por escenario (solo se dibujan las celdas a < visDist de la cámara)
     inicial: 0,                // fracción de multi en el escenario inicial (casi ninguno: 0 = ninguno)
-    cell: 200,                 // m · celda de instanciado (una InstancedMesh por celda)
-    visDist: [230, 330],       // m · se achican a 0 entre estas distancias a la cámara (y solo se dibujan las celdas dentro)
-    farBoost: 1.8,             // entre 60 y 190 m de la cámara crecen hasta ×1,8 (a 150 m una de 2,2 m mide ~17 px)
+    cell: 320,                 // m · celda de instanciado (una InstancedMesh por celda)
+    visDist: [290, 400],       // m · se achican a 0 entre estas distancias a la cámara (y solo se dibujan las celdas dentro)
+    farBoost: 2.2,             // entre 60 y 260 m de la cámara crecen hasta ×2,2 (a 250 m una de 2,2 m mide ~20 px)
     span: 2.2,                 // m · envergadura (escala estilizada)
     alt: [2.4, 6.0],           // m · sobre el suelo: 0,5-2,5 m reales × GRASS_SCALE a medias (las matas miden 2-4,7 m: si vuelan más bajo quedan tapadas)
     wander: [7, 16],           // m · radio de vuelo errático alrededor de la mata

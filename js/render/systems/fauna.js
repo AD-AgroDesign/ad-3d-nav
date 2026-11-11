@@ -130,8 +130,20 @@ function buildPath(ctx, ctrl, M) {
 }
 
 /* Parches leñosos: centros de gravedad de los árboles por celda, ordenados por cantidad y con separación mínima. */
-function findAnchors(treesXZ) {
+function findAnchors(treesXZ, corrXZ) {
   const cells = partitionCells(treesXZ, CB.anchorCell, o => o.xz);
+  /* distancia al corredor herbáceo más cercano (grilla de 150 m sobre una muestra de matas de corr-herb) */
+  const G = 150, grid = new Map();
+  for (const [x, z] of corrXZ) { const k = Math.floor(x / G) + "," + Math.floor(z / G); (grid.get(k) || grid.set(k, []).get(k)).push([x, z]); }
+  const nearCorr = (x, z) => {
+    let best = Infinity;
+    const ix = Math.floor(x / G), iz = Math.floor(z / G);
+    for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) {
+      const l = grid.get((ix + dx) + "," + (iz + dz)); if (!l) continue;
+      for (const [cx, cz] of l) best = Math.min(best, Math.hypot(cx - x, cz - z));
+    }
+    return best;
+  };
   const list = [];
   for (const c of cells.values()) {
     if (c.items.length < CB.anchorMinTrees) continue;
@@ -140,9 +152,11 @@ function findAnchors(treesXZ) {
     cx /= c.items.length; cz /= c.items.length;
     let r2 = 0;
     for (const o of c.items) r2 += (o.xz[0] - cx) ** 2 + (o.xz[1] - cz) ** 2;
-    list.push({ x: cx, z: cz, n: c.items.length, spread: Math.sqrt(r2 / c.items.length), key: c.key });
+    const dc = nearCorr(cx, cz);
+    list.push({ x: cx, z: cz, n: c.items.length, spread: Math.sqrt(r2 / c.items.length), key: c.key, dCorr: dc,
+                score: c.items.length * (dc < CB.corrNear ? CB.corrBonus : 1) });
   }
-  list.sort((a, b) => b.n - a.n || (a.key < b.key ? -1 : 1));
+  list.sort((a, b) => b.score - a.score || (a.key < b.key ? -1 : 1));
   const out = [];
   for (const a of list) if (out.every(b => Math.hypot(a.x - b.x, a.z - b.z) >= CB.anchorSep)) out.push(a);
   return out;
@@ -157,10 +171,12 @@ function birdTarget(key) {
   return Math.min(Math.round(multi * C.ratioInicial), Math.round(nI / CB.treesPerBird * 0.8));
 }
 
-function buildFlocks(ctx, key, trees) {
+function buildFlocks(ctx, key, trees, grass) {
   const rng = ctx.rng(C.seed + (key === "multi" ? 2 : 1));
   const withXZ = trees.map(t => ({ xz: ctx.toScene(t.lon, t.lat) }));
-  const anchors = findAnchors(withXZ);
+  const corr = (grass && grass["corr-herb"]) || [], corrXZ = [];
+  for (let i = 0; i < corr.length; i += 40) corrXZ.push(ctx.toScene(corr[i].lon, corr[i].lat));
+  const anchors = findAnchors(withXZ, corrXZ);
   const target = birdTarget(key);
   const flocks = [];
   if (!anchors.length || target <= 0) return flocks;
@@ -251,7 +267,7 @@ attribute vec4 aS1;        // (fase de x, fase de z, fase de altura, fase de ale
 attribute vec4 aS2;        // (amplitud x, amplitud z, tamaño/frecuencia, altura) en 0..1
 uniform float uTime;
 uniform vec3 uCamPos;
-uniform vec3 uA5Vis;       // (cerca, lejos, crecimiento lejano): se achican a 0 entre cerca y lejos; entre 60 y 190 m crecen hasta ×z (se siguen leyendo)
+uniform vec3 uA5Vis;       // (cerca, lejos, crecimiento lejano): se achican a 0 entre cerca y lejos; entre 60 y 260 m crecen hasta ×z (se siguen leyendo)
 uniform vec3 uA5B;         // (envergadura m, alt mínima m, alt máxima m)
 uniform vec2 uA5Wan;       // radio de vuelo errático (mín, máx) m
 uniform float uA5Grow;     // crecimiento del escenario (0..1): la fauna aparece con la vegetación
@@ -274,7 +290,7 @@ vec3 transformed = vec3(position);
   vec3 lp = vec3(sx * ax * cos(a), ax * sin(a), position.z);
   float cy = cos(yaw), sy = sin(yaw);
   float dc = distance(uCamPos, home);
-  float sc = uA5B.x * (0.8 + 0.5 * aS2.z) * mix(1.0, uA5Vis.z, smoothstep(60.0, 190.0, dc)) * (1.0 - smoothstep(uA5Vis.x, uA5Vis.y, dc)) * smoothstep(0.35, 1.0, uA5Grow);
+  float sc = uA5B.x * (0.8 + 0.5 * aS2.z) * mix(1.0, uA5Vis.z, smoothstep(60.0, 260.0, dc)) * (1.0 - smoothstep(uA5Vis.x, uA5Vis.y, dc)) * smoothstep(0.35, 1.0, uA5Grow);
   transformed = vec3(lp.x * cy + lp.z * sy, lp.y, -lp.x * sy + lp.z * cy) * sc + vec3(off.x, alt, off.y);
 }
 `;
@@ -306,7 +322,7 @@ function idleTick() {
   if (document.hidden || !anyVisible || !timeMoving || !mapRef) return;       // update() lo vuelve a armar cuando corresponda
   const fps = quality.idleFps;
   if (!fps || quality.fauna <= 0) return;
-  if (performance.now() - lastRenderTs >= 1000 / fps * 0.95) mapRef.triggerRepaint();
+  if (performance.now() - lastRenderTs >= 1000 / fps * 0.5) mapRef.triggerRepaint();   // con el mapa en movimiento los frames llegan cada ~16 ms y esto no dispara
   idleTimer = setTimeout(idleTick, 1000 / fps);
 }
 function armIdle() {
@@ -329,6 +345,11 @@ export default {
 
   build(ctx, key, data, veg) {
     hostCtx = ctx;
+    /* MapLibre 4.7: cada repintado forzado en reposo dispara una cadena de 5-8 frames por el fundido de colocación de
+       símbolos (_placementDirty, fadeDuration 300 ms) aunque el estilo no tenga símbolos: 10 repintados/s daban 34 fps.
+       Se apaga acá (propiedad privada, sin efecto visual: no hay capas de símbolos) hasta que P lo ponga en las opciones
+       del Map (`fadeDuration: 0`, ver handoff). */
+    if (mapRef && mapRef._fadeDuration) mapRef._fadeDuration = 0;
     const group = new THREE.Group();
     const info = { group, birds: null, flocks: [], bfly: [], grow: { value: 1 }, total: 0, nB: 0 };
     built[key] = info;
@@ -336,7 +357,7 @@ export default {
     const materials = [];
 
     /* ---- aves ---- */
-    const flocks = buildFlocks(ctx, key, (veg && veg.trees) || []);
+    const flocks = buildFlocks(ctx, key, (veg && veg.trees) || [], veg && veg.grass);
     info.flocks = flocks;
     const slots = [];                           // orden round-robin entre bandadas: un prefijo es un raleo uniforme (Media = 50 %)
     for (let k = 0; k < CB.flockSize[1]; k++) for (const fl of flocks) if (k < fl.birds.length) slots.push([fl, fl.birds[k]]);
