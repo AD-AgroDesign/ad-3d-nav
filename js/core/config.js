@@ -174,35 +174,39 @@ export const A1_RASTER = { saturation: 0.12, contrast: 0.06, brightnessMin: 0, b
 /* === A1: fin === */
 
 /* === A4: inicio === */
-/* Suelo por shader (I) y surcos de cultivo (J): render/systems/ground.js. Diales: handoffs/a4-suelo.md.
+/* Suelo por shader (I) y surcos de cultivo (J): render/systems/ground.js. Diales: handoffs/a4-suelo.md y a4-g2.md.
    Colores base = §4 (pardo del corredor herbáceo, verde de los parches): NO se cambian. `dry`/`green` son
-   variantes de pasto seco/verde de la MISMA tonalidad (±6° de matiz) que se mezclan con ruido fbm. */
+   variantes de pasto seco/verde de la MISMA tonalidad (±6° de matiz) que se mezclan con ruido fbm.
+   Crecimiento: G2 (2026-11-11) eligió "revelado" (el suelo aparece desde el eje del polígono hacia los bordes,
+   máscara por distancia al borde + tiempo). La variante "extrusión" (losa con paredes) se retiró en a4-g2: queda en
+   el historial (commit 9d7ed10 de realismo-a4-suelo). */
 export const A4_GROUND = {
   enabled: true,
-  /* Crecimiento al cambiar de escenario (se elige en G2, D-3). También con ?crecimiento=extrusion|revelado.
-       "revelado":  el suelo aparece desde el eje del polígono hacia los bordes (máscara por distancia al borde + tiempo)
-       "extrusion": el suelo sube como antes (losa con paredes de `lift` metros, escalada por el host con scale.y) */
-  growth: "revelado",
   yOff: 0.04,          // m sobre la altura del suelo (heightAt)
-  maxEdge: 40,         // m · arista máxima de la malla (grilla donde se interpola la distancia al borde; 14 m = ~1M tris en El Carmen multi)
+  maxEdgeFlat: 300,    // m · arista máx. de la malla SIN terreno (la profundidad del revelado va en textura horneada: ~10x menos triángulos)
+  maxEdge: 40,         // m · arista máx. CON terreno (la altura se pide por vértice, hay que refinar)
   gain: 1.0,           // multiplicador de albedo (calibrado contra el suelo MapLibre anterior)
   noise: { fine: 0.10, mid: 0.13, coarse: 0.16 },   // amplitud de luminancia por escala (≈0,7 m / 4 m / 25 m)
   edgeAO: { width: 1.8, strength: 0.38 },           // m de la franja oscura hacia adentro y oscurecimiento máximo
   reveal: { soft: 0.10, jitter: 0.10 },             // suavidad del frente de revelado y ruido del frente
   classes: {
-    "corr-herb":   { color: "#6b5d38", dry: "#75653a", green: "#655d38", alpha: 1.0,  lift: 0.6, tune: [0.54, 0.62, 1.02] },
-    "parche-herb": { color: "#4d5c33", dry: "#565e34", green: "#485c34", alpha: 1.0,  lift: 0.6, tune: [0.61, 0.75, 1.06] },
-    "bajo":        { color: "#6f8a72", dry: "#788a70", green: "#6b8a76", alpha: 1.0,  lift: 0.6, tune: [0.62, 0.75, 0.52] },
-    "parche-le":   { color: "#2e5026", dry: "#34502a", green: "#2b5028", alpha: 0.45, lift: 1.2, tune: [1.0, 1.08, 1.28] },
-    "corr-le":     { color: "#2e5026", dry: "#34502a", green: "#2b5028", alpha: 0.45, lift: 1.2, tune: [1.04, 1.10, 1.26] }
+    "corr-herb":   { color: "#6b5d38", dry: "#75653a", green: "#655d38", alpha: 1.0,  tune: [0.54, 0.62, 1.02] },
+    "parche-herb": { color: "#4d5c33", dry: "#565e34", green: "#485c34", alpha: 1.0,  tune: [0.61, 0.75, 1.06] },
+    "bajo":        { color: "#6f8a72", dry: "#788a70", green: "#6b8a76", alpha: 1.0,  tune: [0.62, 0.75, 0.52] },
+    "parche-le":   { color: "#2e5026", dry: "#34502a", green: "#2b5028", alpha: 0.45, tune: [1.0, 1.08, 1.28] },
+    "corr-le":     { color: "#2e5026", dry: "#34502a", green: "#2b5028", alpha: 0.45, tune: [1.04, 1.10, 1.26] }
   }
 };
 export const A4_FURROWS = {
   enabled: true,                 // interruptor general (?surcos=0|1). Detalle inventado, no dato: decisión del dueño (D-3)
   spacing: 0.52,                 // m entre surcos (soja/maíz)
   rowAmp: 0.10,                  // modulación de luminancia (±) de los surcos
+  bandAmp: 0.045,                // luminancia (±) de las bandas de 8 surcos que toman la posta a media distancia
+  /* Antialias por derivadas: w = huella del píxel en períodos. El surco se funde (w en [lo,hi]) antes de acercarse al
+     límite de Nyquist (w=0,5); las bandas (período ×8) igual con su propio w. Subir hi = surcos más lejos pero más moiré. */
+  rowW: [0.10, 0.30], bandW: [0.05, 0.16],
   tramPeriod: 28, tramGauge: 2.8, tramWidth: 0.5, tramAmp: 0.16,   // huellas de pulverizadora
-  rowFade: [350, 900],           // m · surcos: intensidad completa hasta [0], nula desde [1]
+  rowFade: [350, 900],           // m · tope por distancia de los surcos (la frecuencia en pantalla suele apagarlos antes)
   tramFade: [700, 1500],         // m · huellas
   classes: ["agri", "zona1", "zona2", "zona3"]
 };
