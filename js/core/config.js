@@ -220,6 +220,33 @@ export const A4_FURROWS = {
   tramFade: [700, 1500],         // m · huellas
   classes: ["agri", "zona1", "zona2", "zona3"]
 };
+/* Agua (M, Ola 3): render/systems/water.js. Base = #3f7fb5 (leyenda, §4): NO se cambia; somero/profundo son variantes
+   de la misma tonalidad. Todo lo demás (ondulación, fresnel, destello, orilla) es textura de render, no dato. */
+export const A4_WATER = {
+  enabled: true,
+  yOff: 0.03,                // m sobre la altura del suelo (heightAt); menor que A4_GROUND.yOff: con terreno el suelo leñoso queda encima
+  shoreCell: 1.0,            // m · celda del mapa de distancia a la orilla (R8; sube sola si el agua se extiende > 2 km)
+  maxEdge: 60,               // m · arista máx. de la malla (astillas del earcut de 3 km dan huecos de precisión en la GPU)
+  maxEdgeRelief: 10,         // m · idem CON terreno (la altura se pide por vértice)
+  color: "#3f7fb5",          // agua de profundidad media (leyenda)
+  shallow: "#76a9bf",        // orilla: más clara y verdosa (se ve el fondo)
+  deep: "#2c6290",           // centro del cauce
+  rim: "#9ecbe8",            // reborde claro en la orilla (el mismo de la línea de MapLibre que reemplaza)
+  alpha: [0.50, 0.86],       // opacidad somero → profundo (el satélite se transparenta en la orilla)
+  shoreWidth: 3.2,           // m · de la orilla al "profundo"
+  edgeSoft: 0.7,             // m · borde suave contra el suelo
+  rimStrength: 0.30,         // intensidad del reborde claro
+  waveScale: [8, 21],        // m · período de las dos capas de ondas (rotadas y con deriva distinta: sin repetición visible)
+  drift: [0.030, 0.012, -0.016, 0.022],   // textura/s de cada capa (xy capa 1, xy capa 2)
+  waveSlope: 0.22,           // pendiente máxima de las normales animadas
+  waveFade: [220, 800],      // m · las ondas se aplanan con la distancia (sin parpadeo; el fresnel hace el resto)
+  f0: 0.02,                  // reflectancia a incidencia normal (agua)
+  gain: 0.82,                // calibración del cuerpo del agua (paridad de leyenda contra el agua anterior: ΔE de la media)
+  reflection: 0.55,          // intensidad del cielo reflejado (cielo de MapLibre aproximado: zenit → horizonte/niebla)
+  spec: [300, 0.8],          // brillo del destello del sol: exponente, intensidad
+  lineOpacity: 0,            // opacidad de la línea `*-agua-line` de MapLibre cuando el shader está activo (0 = apagada)
+  idleMaxDist: 1000          // m · más lejos que esto no hace falta animar en reposo (lazo acotado, T7)
+};
 /* === A4: fin === */
 
 /* === A6: inicio === */

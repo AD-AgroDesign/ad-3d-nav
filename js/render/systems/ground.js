@@ -590,3 +590,6 @@ export default {
 
   stats(key) { return S[key] ? { suelo: S[key].info } : {}; }
 };
+
+/* A4 (water.js reutiliza la triangulación del suelo) */
+export { dedupRing, triangulatePoly };
