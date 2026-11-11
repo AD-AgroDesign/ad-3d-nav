@@ -1,21 +1,29 @@
 import { HOME_VIEW } from "../core/state.js";
 import { msaaEnabled, resolveQuality } from "../core/quality.js";
-import { A1_RASTER, A1_SKY } from "../core/config.js";   // A1: colores del cielo (también los usa la niebla)
+import { atm, lights, onAtmosphere, setRepaint } from "../render/lighting.js";   // A1 (3.1): modo de hora vigente (cielo y ráster los pone este archivo)
 
 /* A1 (1.3, D): ajuste de color del satélite (raster-*) para que ráster y 3D parezcan la misma foto.
-   Valores base en config.js A1_RASTER (los presets de hora los interpolan en la Ola 3). */
-export function rasterPaint(r = A1_RASTER) {
+   Valores base en config.js A1_RASTER (mediodía); los modos de hora (3.1, lighting.js) los interpolan y vienen en `atm`. */
+const _rgbCss = c => "#" + c.map(v => Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16).padStart(2, "0")).join("");
+const _noTr = { duration: 0, delay: 0 };   // sin transición propia de MapLibre (300 ms por defecto): la animación de la hora la hace lighting.js
+export function rasterPaint(r = atm) {
   return {
-    "raster-saturation": r.saturation, "raster-contrast": r.contrast,
-    "raster-brightness-min": r.brightnessMin, "raster-brightness-max": r.brightnessMax,
-    "raster-hue-rotate": r.hueRotate
+    "raster-saturation": r.rSat, "raster-contrast": r.rCon,
+    "raster-brightness-min": r.rBMin, "raster-brightness-max": r.rBMax,
+    "raster-hue-rotate": r.rHue
+  };
+}
+/* Cielo de MapLibre según el modo de hora (el horizon-color es también el color de la niebla Three y de atmo-fog). */
+export function skyPaint(r = atm) {
+  return {
+    "sky-color": _rgbCss(r.skyCol), "horizon-color": _rgbCss(r.horCol), "fog-color": _rgbCss(r.fogCol)
   };
 }
 /* map/data.js reconstruye la capa "satellite" (sin paint) cuando cambia el maxzoom del campo:
    se re-aplica el ajuste después (app.js lo llama tras loadCampos). */
-export function applyRasterGrade(m, r = A1_RASTER) {
+export function applyRasterGrade(m, r = atm) {
   if (!m.getLayer("satellite")) return;
-  for (const [k, v] of Object.entries(rasterPaint(r))) m.setPaintProperty("satellite", k, v);
+  for (const [k, v] of Object.entries(rasterPaint(r))) { m.setPaintProperty("satellite", k + "-transition", _noTr); m.setPaintProperty("satellite", k, v); }
 }
 
 /* ---------- Estilo base del mapa (sin terreno: llanura, evita
@@ -38,9 +46,7 @@ export const mapStyle = {
   },
   layers: [{ id: "satellite", type: "raster", source: "esri", paint: rasterPaint() }],
   sky: {
-    "sky-color": A1_SKY.skyColor,
-    "horizon-color": A1_SKY.horizonColor,   // = color de la niebla (config.js A1_FOG)
-    "fog-color": "#e6ecdc",
+    ...skyPaint(),   // sky-color / horizon-color (= color de la niebla) / fog-color según el modo de hora (?hora=; mediodía = los de siempre)
     "sky-horizon-blend": 0.6,
     "horizon-fog-blend": 0.65,
     "fog-ground-blend": 0.85
@@ -73,6 +79,23 @@ export const map = new maplibregl.Map({
   antialias: msaaEnabled(QUALITY) && new URLSearchParams(location.search).get("aa") !== "0",   // ?aa=0: solo para comparar capturas
   pixelRatio: Math.min(window.devicePixelRatio || 1, QUALITY.pixelRatioCap)
 });
+/* A1 (3.1): cada paso de la transición de hora vuelca el cielo, el ráster y el hillshade al mapa. */
+let _lastAz = null;
+onAtmosphere(s => {
+  applyRasterGrade(map, s);
+  const cur = map.getSky && map.getSky();
+  if (cur) {
+    /* El spec del sky no admite "*-transition" en el JSON: se las saca a la propiedad por dentro (maplibre-gl 4.7.1 está vendorizado,
+       el campo es estable) para que el cielo siga EXACTO a la niebla Three durante la transición, sin el desfasaje de 300 ms. */
+    const tr = map.style && map.style.sky && map.style.sky._transitionable;
+    if (tr && !tr._adNoTr) { for (const k of ["sky-color", "horizon-color", "fog-color"]) tr.setTransition(k, _noTr); tr._adNoTr = true; }
+    map.setSky({ ...cur, ...skyPaint(s) });   // conserva lo que agregue el terreno (fog-ground-blend, etc.)
+  }   // conserva lo que agregue el terreno (fog-ground-blend, etc.)
+  const hs = map.getLayer("hillshade");               // A6: el relieve se sombrea con la luz del modo vigente
+  const az = ((lights.azimuth % 360) + 360) % 360;   // el spec pide 0..359
+  if (hs && az !== _lastAz) { map.setPaintProperty("hillshade", "hillshade-illumination-direction", az); _lastAz = az; }
+});
+setRepaint(() => map.triggerRepaint());
 map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
 map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-left");
 map.touchZoomRotate.enableRotation();

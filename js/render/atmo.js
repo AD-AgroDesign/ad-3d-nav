@@ -11,23 +11,27 @@
    Un draw call, 4 vértices. Calidad Baja: no dibuja (lighting.fog.enabled). */
 import { A1_FOG } from "../core/config.js";
 import { updateCamera } from "../core/camera.js";
-import { fog, uniforms, updateFog } from "./lighting.js";
+import { atm, fog, uniforms, updateFog } from "./lighting.js";
 import { GLSL_ADFOG, GLSL_FOG_UNIFORMS } from "./shaderlib.js";
 import { host } from "./host.js";
 import { terrain } from "../terrain/terrain.js";   // A6: con terreno la niebla la aplica MapLibre sobre la malla
 
 const VS = "attribute vec2 a;\nvarying vec2 vN;\nvoid main() { vN = a; gl_Position = vec4(a, 0.0, 1.0); }\n";
 const FS = "precision highp float;\nvarying vec2 vN;\n" +
-  "uniform vec3 uD0, uDx, uDy;\nuniform float uCamH;\nuniform float uHorNdc;\n" +
+  "uniform vec3 uD0, uDx, uDy;\nuniform float uCamH;\nuniform float uHorNdc;\nuniform vec3 uTint;\nuniform float uTintMode;\n" +
   GLSL_FOG_UNIFORMS + GLSL_ADFOG +
   `void main() {
   vec3 dir = uD0 + vN.x * uDx + vN.y * uDy;                  // rayo en metros (este, norte, arriba)
   if (vN.y > uHorNdc || dir.z >= -1e-4 * length(dir)) discard;   // sobre la línea del sky (+ solape)
+  if (uTintMode > 0.5) { gl_FragColor = vec4(uTint, 1.0); return; }   // pasada de color (modo de hora): multiplica lo que hay debajo
   float d = (-uCamH / dir.z) * length(dir);                  // distancia real al suelo (plano z=0)
   float f = adFog(d);
   gl_FragColor = vec4(uFogColor * f, f);                     // alfa premultiplicado
 }
 `;
+
+const _q = new URLSearchParams(location.search);
+const NOTINT = (_q.has("qa") || _q.has("debug")) && _q.has("notint");   // solo diagnóstico: mide el costo de la pasada de color
 
 export const atmo = {
   id: "atmo-fog",
@@ -49,7 +53,7 @@ export const atmo = {
     if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) console.error("atmo-fog:", gl.getProgramInfoLog(prog));
     this.loc = gl.getAttribLocation(prog, "a");
     this.u = {};
-    for (const n of ["uD0", "uDx", "uDy", "uCamH", "uHorNdc", "uFogColor", "uFogNear", "uFogFar", "uFogMax"])
+    for (const n of ["uD0", "uDx", "uDy", "uCamH", "uHorNdc", "uFogColor", "uFogNear", "uFogFar", "uFogMax", "uTint", "uTintMode"])
       this.u[n] = gl.getUniformLocation(prog, n);
     this.buf = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buf);
@@ -66,31 +70,43 @@ export const atmo = {
 
   render(gl, matrix) {
     if (!host.origin) return;                  // el host todavía no hizo onAdd (primer frame)
-    if (terrain.active) return;                // A6: con terreno la niebla es la de MapLibre (por profundidad real); este quad supone suelo plano y partiría el horizonte
+    const T = atm.tint, tinted = !NOTINT && (T[0] < 0.999 || T[1] < 0.999 || T[2] < 0.999);   // mediodía = sin pasada de color (costo 0)
+    const wantFog = !terrain.active;           // A6: con terreno la niebla es la de MapLibre (por profundidad real); este quad supone suelo plano y partiría el horizonte
+    if (!tinted && !wantFog) return;
     const H = this.map.getCanvas().clientHeight;
     /* Esta capa dibuja ANTES que la de vegetación: calcula la cámara y la niebla de este frame
        acá (host.render repite el cálculo para sus uniforms; es idempotente y barato). */
     const cam = updateCamera(this.map, host.origin, host.scale, matrix);
     updateFog(cam, H);
-    if (!fog.enabled || fog.far >= 1e8) return;
+    const doFog = wantFog && fog.enabled && fog.far < 1e8;
+    if (!tinted && !doFog) return;
     const r = cam.rays, u = this.u;
     gl.useProgram(this.prog);
     gl.uniform3f(u.uD0, r.d0[0], r.d0[1], r.d0[2]);
     gl.uniform3f(u.uDx, r.dx[0], r.dx[1], r.dx[2]);
     gl.uniform3f(u.uDy, r.dy[0], r.dy[1], r.dy[2]);
     gl.uniform1f(u.uCamH, cam.altitudeM);
-    gl.uniform1f(u.uHorNdc, fog.hNdc + A1_FOG.skyOverlapPx / (H / 2));
-    const c = uniforms.uFogColor.value;
-    gl.uniform3f(u.uFogColor, c.r, c.g, c.b);
-    gl.uniform1f(u.uFogNear, uniforms.uFogNear.value);
-    gl.uniform1f(u.uFogFar, uniforms.uFogFar.value);
-    gl.uniform1f(u.uFogMax, uniforms.uFogMax.value);
+    gl.uniform1f(u.uHorNdc, (cam.horizonPx / (H / 2)) + A1_FOG.skyOverlapPx / (H / 2));
     if (this.vao) gl.bindVertexArray(this.vao);
     else { gl.bindBuffer(gl.ARRAY_BUFFER, this.buf); gl.enableVertexAttribArray(this.loc); gl.vertexAttribPointer(this.loc, 2, gl.FLOAT, false, 0, 0); }
     gl.disable(gl.DEPTH_TEST);
     gl.enable(gl.BLEND);
-    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    if (tinted) {   // pasada de color: multiplica el suelo (satélite ya ajustado) por el tinte del modo de hora; no toca el alfa
+      gl.uniform1f(u.uTintMode, 1);
+      gl.uniform3f(u.uTint, T[0], T[1], T[2]);
+      gl.blendFuncSeparate(gl.DST_COLOR, gl.ZERO, gl.ZERO, gl.ONE);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    }
+    if (doFog) {
+      gl.uniform1f(u.uTintMode, 0);
+      const c = uniforms.uFogColor.value;
+      gl.uniform3f(u.uFogColor, c.r, c.g, c.b);
+      gl.uniform1f(u.uFogNear, uniforms.uFogNear.value);
+      gl.uniform1f(u.uFogFar, uniforms.uFogFar.value);
+      gl.uniform1f(u.uFogMax, uniforms.uFogMax.value);
+      gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    }
     if (this.vao) gl.bindVertexArray(null); else gl.disableVertexAttribArray(this.loc);
   },
 

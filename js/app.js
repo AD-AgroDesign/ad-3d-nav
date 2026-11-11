@@ -15,6 +15,7 @@ import { DEBUG, state } from "./core/state.js";
 import { initTerrain } from "./terrain/terrain.js";   // A6: relieve (DEM terrarium), hillshade y terreno 3D automático
 import "./render/atmo.js";   // A1: capa atmo-fog (se registra sola en host.registerBeforeLayer, antes de addScenarioLayers)
 import "./ui/controls.js";
+import "./ui/presets-ui.js";   // A1 (3.1): botones de modo de hora
 import "./debug/fps.js";
 import "./debug/qa-api.js";
 

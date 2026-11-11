@@ -4,8 +4,8 @@
    para todo lo que todavía nadie consume (§6.3). Los materiales los toman por
    referencia (shaderlib.patch), así que cambiar `.value` los actualiza a todos. */
 import * as THREE from "three";
-import { A1_CAMPOS, A1_FOG, A1_LIGHT, A1_RENDER, A1_SUN } from "../core/config.js";
-import { on } from "../core/events.js";
+import { A1_CAMPOS, A1_FOG, A1_HORAS, A1_LIGHT, A1_RASTER, A1_RENDER, A1_SKY, A1_SUN, A3_SHADOWS } from "../core/config.js";
+import { emit, on } from "../core/events.js";
 import { quality } from "../core/quality.js";
 
 /* Color (1.3): ColorManagement ENCENDIDO. Las paletas del proyecto están definidas "a ojo" en
@@ -31,6 +31,7 @@ export const uniforms = {
   uSunColor:  { value: new THREE.Color(0xfff3da) },
   uHemiSky:   { value: new THREE.Color(0xffffff) },
   uHemiGround:{ value: new THREE.Color(0xffffff) },
+  uSunInt:    { value: A1_LIGHT.sunInt },           // intensidad de la luz directa (el color de uSunColor NO la trae; ver "Modos de hora")
   uFogColor:  { value: rawColor(A1_FOG.color) },           // = horizon-color del sky; valor sRGB CRUDO (se mezcla ya en espacio de salida)
   uFogNear:   { value: 1e9 },                      // se recalculan cada frame en updateFog(); 1e9 = sin niebla
   uFogFar:    { value: 1e9 },
@@ -48,13 +49,16 @@ const _tm = new URLSearchParams(location.search);
 
 /* Color de salida + tone mapping del renderer (host.js lo llama al crearlo). Con ?debug/?qa se
    puede probar otro con ?tm=aces|agx|neutral|none&exp=1.2. */
+let _renderer = null, _baseExposure = A1_RENDER.exposure;
 export function applyRenderSettings(renderer) {
+  _renderer = renderer;
   const dbg = _tm.has("debug") || _tm.has("qa");
   const name = (dbg && _tm.get("tm")) || A1_RENDER.toneMapping;
   const exp = dbg && _tm.get("exp") ? parseFloat(_tm.get("exp")) : A1_RENDER.exposure;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = TONE[name] ?? THREE.NoToneMapping;
-  renderer.toneMappingExposure = exp;
+  renderer.toneMappingExposure = _baseExposure = exp;
+  renderer.toneMappingExposure = _baseExposure * atm.expK;   // modo de hora vigente
 }
 
 export function setSun(azimuthDeg, elevationDeg) {
@@ -65,20 +69,24 @@ export function setSun(azimuthDeg, elevationDeg) {
 }
 
 /* Azimut y color de suelo del campo (config.js A1_CAMPOS; default regional si no se midió). */
+let _baseAz = A1_SUN.defaultAzimuth, _groundHex = A1_LIGHT.hemiGround;
 export function applyCampoLighting(campoId) {
   const c = A1_CAMPOS[campoId] || {};
-  setSun(c.sunAzimuth ?? A1_SUN.defaultAzimuth, A1_SUN.elevation);
-  if (lights.hemi) lights.hemi.groundColor.set(c.groundColor || A1_LIGHT.hemiGround).multiplyScalar(A1_LIGHT.hemiGroundInt);
+  _baseAz = c.sunAzimuth ?? A1_SUN.defaultAzimuth;
+  _groundHex = c.groundColor || A1_LIGHT.hemiGround;
+  applyAtmosphere();
 }
 
 export function createLights(scene) {
   const hemi = lights.hemi = new THREE.HemisphereLight(A1_LIGHT.hemiSky, A1_LIGHT.hemiGround, 1);
-  hemi.color.multiplyScalar(A1_LIGHT.hemiSkyInt);
-  hemi.groundColor.multiplyScalar(A1_LIGHT.hemiGroundInt);
   const sun = lights.sun = new THREE.DirectionalLight(A1_LIGHT.sunColor, A1_LIGHT.sunInt);
   scene.add(hemi, sun);
+  _scene = scene;
+  /* OJO (contrato con A2/A4/A5): estos tres objetos Color y uSunDir se MUTAN en el lugar en cada paso de una
+     transición de hora; nunca se reemplazan. Un shader que tome uniforms.uSunColor/uHemiSky/uHemiGround/uSunDir/uSunInt
+     por referencia ve siempre el modo vigente. */
   uniforms.uSunColor.value = sun.color; uniforms.uHemiSky.value = hemi.color; uniforms.uHemiGround.value = hemi.groundColor;
-  setSun(A1_SUN.defaultAzimuth, A1_SUN.elevation);
+  applyAtmosphere();
   return { sun, hemi };
 }
 
@@ -106,7 +114,8 @@ export function updateFog(cam, H) {
   const dx = r.d0[0] + hNdc * r.dy[0], dy = r.d0[1] + hNdc * r.dy[1], dz = r.d0[2] + hNdc * r.dy[2];
   const dHor = dz < -1e-6 ? (-cam.altitudeM / dz) * Math.hypot(dx, dy, dz) : 1e9;   // sin tope si el rayo no baja
   const far = dHor * A1_FOG.farFrac;
-  const near = Math.min(Math.max(A1_FOG.near, A1_FOG.nearK * cam.ctdM), far * A1_FOG.nearMaxFrac);
+  const k = atm.fogK;   // modo de hora: < 1 = niebla más densa (empieza más cerca)
+  const near = Math.min(Math.max(A1_FOG.near * k, A1_FOG.nearK * k * cam.ctdM), far * A1_FOG.nearMaxFrac);
   fog.near = near; fog.far = far; fog.dHor = dHor; fog.hNdc = hNdc;
   uniforms.uFogNear.value = near; uniforms.uFogFar.value = far;
   return fog;
@@ -119,3 +128,118 @@ export function shadowOffsetM(h) {
   const len = h / Math.tan(lights.elevation * Math.PI / 180), az = lights.azimuth * Math.PI / 180;
   return [-Math.sin(az) * len, -Math.cos(az) * len];
 }
+
+/* ============ Modos de hora (Ola 3 · 3.1) ============
+   Mediodía (el actual, por defecto) · hora dorada · atardecer. Un modo es un conjunto de parámetros (A1_HORAS en config.js;
+   el mediodía sale de los diales de siempre, así que no cambia nada). `atm` es el estado VIGENTE, ya interpolado; applyAtmosphere()
+   lo vuelca a todo lo que depende de la hora:
+     · sol (azimut = el medido por campo + sunAz, T13; elevación), color e intensidad (lights.sun, uSunDir/uSunColor/uSunInt)
+     · hemisférica (cielo y suelo del campo), exposición del tone mapping
+     · niebla: uFogColor (= horizon-color del sky) y escala del inicio (fogK, updateFog)
+     · sombras de A3: dirección y largo salen solos de uSunDir; la intensidad y el tinte se escriben en sus uniforms
+     · lo que vive en MapLibre (sky, ráster satelital, hillshade) lo vuelca map/style.js, que se engancha con onAtmosphere()
+   La transición (1,5 s, smoothstep) corre con SU PROPIO rAF y solo mientras dura: en reposo no hay lazo (T7). dt con clamp (T5). */
+export const PRESET_NAMES = ["mediodia", "dorada", "atardecer"];
+const _rgb = hex => { const n = parseInt(String(hex).replace("#", ""), 16); return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255]; };
+
+const _SKY0 = { ...A1_SKY };   // el mediodía = los colores de config ANTES de que applyAtmosphere() empiece a reescribir A1_SKY
+const _hex = c => "#" + c.map(v => Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16).padStart(2, "0")).join("");
+
+/* Estado normalizado de un modo (colores como [r,g,b] sRGB 0..1; todo lo demás, números). */
+export function presetDef(name) {
+  if (name === "mediodia" || !A1_HORAS[name]) {
+    return {
+      sunElev: A1_SUN.elevation, sunAz: 0, sunCol: _rgb(A1_LIGHT.sunColor), sunInt: A1_LIGHT.sunInt,
+      hemiSky: _rgb(A1_LIGHT.hemiSky), hemiSkyInt: A1_LIGHT.hemiSkyInt, gTint: [1, 1, 1], gInt: A1_LIGHT.hemiGroundInt,
+      skyCol: _rgb(_SKY0.skyColor), horCol: _rgb(_SKY0.horizonColor), fogCol: _rgb(_SKY0.fogColor), fogK: 1, expK: 1,
+      tint: [1, 1, 1], rSat: A1_RASTER.saturation, rCon: A1_RASTER.contrast, rBMin: A1_RASTER.brightnessMin, rBMax: A1_RASTER.brightnessMax, rHue: A1_RASTER.hueRotate,
+      shStr: A3_SHADOWS.strength, shTint: A3_SHADOWS.tint.slice()
+    };
+  }
+  const h = A1_HORAS[name];
+  return {
+    sunElev: h.sunElev, sunAz: h.sunAz, sunCol: _rgb(h.sunColor), sunInt: h.sunInt,
+    hemiSky: _rgb(h.hemiSky), hemiSkyInt: h.hemiSkyInt, gTint: _rgb(h.gTint), gInt: h.gInt,
+    skyCol: _rgb(h.skyColor), horCol: _rgb(h.horizonColor), fogCol: _rgb(h.fogColor), fogK: h.fogK, expK: h.expK,
+    tint: _rgb(h.tint), rSat: h.rSat, rCon: h.rCon, rBMin: h.rBMin, rBMax: h.rBMax, rHue: h.rHue, shStr: h.shStr, shTint: h.shTint.slice()
+  };
+}
+export function presetLabel(name) { return (A1_HORAS[name] && A1_HORAS[name].label) || "Mediodía"; }
+
+/* Modo inicial: ?hora=dorada|atardecer|mediodia (sin animación). */
+const _horaQ = _tm.get("hora");
+export let presetName = PRESET_NAMES.includes(_horaQ) ? _horaQ : "mediodia";
+export const atm = presetDef(presetName);   // estado vigente (objeto único y mutable; lo leen style.js y los sistemas)
+
+const _atmListeners = [];
+/* Registra un callback que recibe `atm` en cada paso (style.js lo usa para el ráster y el cielo de MapLibre). */
+export function onAtmosphere(fn) { _atmListeners.push(fn); }
+
+let _scene = null, _shU = null;
+const _tmpC = new THREE.Color();
+/* Uniforms de las sombras de A3 (uA3P.w = intensidad, uA3Tint = tinte): se toman de su receptor en la escena. Hasta que
+   shadows.js los exporte (pedido a A3), se buscan una vez recorriendo la escena. */
+function shadowUniforms() {
+  if (_shU || !_scene) return _shU;
+  _scene.traverse(o => { if (!_shU && o.material && o.material.uniforms && o.material.uniforms.uA3P && o.material.uniforms.uA3Tint) _shU = o.material.uniforms; });
+  return _shU;
+}
+
+export function applyAtmosphere() {
+  const s = atm;
+  setSun(_baseAz + s.sunAz, s.sunElev);
+  uniforms.uSunInt.value = s.sunInt;
+  if (lights.sun) { lights.sun.color.setRGB(s.sunCol[0], s.sunCol[1], s.sunCol[2], THREE.SRGBColorSpace); lights.sun.intensity = s.sunInt; }
+  if (lights.hemi) {
+    lights.hemi.color.setRGB(s.hemiSky[0], s.hemiSky[1], s.hemiSky[2], THREE.SRGBColorSpace).multiplyScalar(s.hemiSkyInt);
+    lights.hemi.groundColor.set(_groundHex).multiply(_tmpC.setRGB(s.gTint[0], s.gTint[1], s.gTint[2], THREE.SRGBColorSpace)).multiplyScalar(s.gInt);
+  }
+  uniforms.uFogColor.value.setRGB(s.horCol[0], s.horCol[1], s.horCol[2], THREE.LinearSRGBColorSpace);   // sRGB crudo (ver rawColor)
+  /* A4 (agua) lee A1_SKY.skyColor/horizonColor (hex) para su reflejo de cielo: se mantienen al día con el modo vigente. */
+  A1_SKY.skyColor = _hex(s.skyCol); A1_SKY.horizonColor = _hex(s.horCol); A1_SKY.fogColor = _hex(s.fogCol);
+  if (_renderer) _renderer.toneMappingExposure = _baseExposure * s.expK;
+  const u = shadowUniforms();
+  if (u) { u.uA3P.value.w = s.shStr; u.uA3Tint.value.set(s.shTint[0], s.shTint[1], s.shTint[2]); }
+  for (const fn of _atmListeners) fn(s);
+}
+
+/* Las sombras de A3 se construyen después de createLights(): en el primer frame se vuelcan los valores del modo inicial. */
+const _offFirst = on("frame", () => { _offFirst(); if (presetName !== "mediodia") applyAtmosphere(); });
+
+const _smooth = t => t * t * (3 - 2 * t);
+function _mix(a, b, t, out) {
+  for (const k in b) {
+    if (Array.isArray(b[k])) for (let i = 0; i < b[k].length; i++) out[k][i] = a[k][i] + (b[k][i] - a[k][i]) * t;
+    else out[k] = a[k] + (b[k] - a[k]) * t;
+  }
+}
+let _anim = null;
+/* Cambia de modo. opts.instant = sin transición · opts.duration = ms (default A1_HORAS.duracionMs).
+   Devuelve una promesa que se resuelve (true) al terminar la transición; false si el nombre no existe. */
+export function setPreset(name, opts = {}) {
+  if (!PRESET_NAMES.includes(name)) return Promise.resolve(false);
+  const to = presetDef(name), from = JSON.parse(JSON.stringify(atm));
+  if (_anim) { _anim.resolve(true); _anim = null; }
+  const changed = name !== presetName;
+  presetName = name;
+  if (changed) emit("preset", { name });
+  const dur = opts.instant ? 0 : (opts.duration ?? A1_HORAS.duracionMs);
+  if (dur <= 0) { _mix(to, to, 1, atm); applyAtmosphere(); _repaint(); return Promise.resolve(true); }
+  return new Promise(resolve => {
+    const a = _anim = { resolve, t: 0, last: performance.now() };
+    const step = now => {
+      if (_anim !== a) return;                       // pisada por otra transición
+      const dt = Math.max(0, now - a.last); a.last = now;   // T5: el primer timestamp de rAF puede ser anterior a performance.now()
+      a.t = Math.min(1, a.t + dt / dur);
+      _mix(from, to, _smooth(a.t), atm);
+      applyAtmosphere(); _repaint();
+      if (a.t >= 1) { _anim = null; resolve(true); } else requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
+}
+let _repaintFn = null;
+/* style.js registra acá map.triggerRepaint (lighting.js no importa el mapa: evita ciclos). */
+export function setRepaint(fn) { _repaintFn = fn; }
+function _repaint() { if (_repaintFn) _repaintFn(); }
+export const presetActive = () => !!_anim;
