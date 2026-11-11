@@ -151,7 +151,22 @@ function resolveOpts(material, opts) {
    la clave tiene que distinguir las combinaciones de chunks. */
 const keyOf = (o, prev) => (prev ? prev + "+" : "") + "ad:" + (o.wind ? "w" : "") + (o.fog ? "f" : "") + (o.foliage ? "l" : "") + (o.srgbVC ? "c" : "") + (o.floor ? "k" + o.floor.lumMin + "_" + o.floor.shadow : "") + (o.fadeU ? "d" : "");
 
+/* Alfa del framebuffer intacto en materiales OPACOS con recorte por alfa (copas/impostores: alphaTest o alphaToCoverage).
+   Con alphaToCoverage el fragmento sale con el alfa de la textura (0..1) y, sin mezcla, ese valor se ESCRIBE en el canal alfa del
+   canvas (premultiplicado): los bordes de las copas lejanas quedaban semitransparentes y dejaban ver el fondo claro de la página
+   → puntitos pálidos sobre la bruma del horizonte (G2b). Mezcla personalizada: color = src (opaco), alfa = dst (el que dejó MapLibre).
+   No cambia el color ni la cobertura MSAA; transparent:false y depthWrite:true quedan como están. */
+function keepFramebufferAlpha(material) {
+  if (material.transparent || !(material.alphaToCoverage || material.alphaTest > 0) || material.userData.adKeepAlpha) return;
+  material.blending = THREE.CustomBlending;
+  material.blendEquation = THREE.AddEquation; material.blendEquationAlpha = THREE.AddEquation;
+  material.blendSrc = THREE.OneFactor; material.blendDst = THREE.ZeroFactor;
+  material.blendSrcAlpha = THREE.ZeroFactor; material.blendDstAlpha = THREE.OneFactor;
+  material.userData.adKeepAlpha = true;
+}
+
 export function patch(material, opts = {}) {
+  keepFramebufferAlpha(material);
   const o = resolveOpts(material, opts);
   material.onBeforeCompile = sh => applyChunks(sh, o);
   const key = keyOf(o);
@@ -166,6 +181,7 @@ export function patch(material, opts = {}) {
    Lo usa el host para dar niebla a los materiales de TODOS los sistemas sin que cada uno
    tenga que acordarse; un sistema que llame patch(mat, { fog: true }) en su build queda igual. */
 export function patchExtra(material, opts = {}) {
+  keepFramebufferAlpha(material);
   const had = material.userData.adChunks || {};
   const want = { ...opts };
   if (had.fog) want.fog = false;
