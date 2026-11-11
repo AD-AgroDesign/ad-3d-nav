@@ -3,16 +3,20 @@
 
    I · SUELO. Los polígonos corr-herb / parche-herb / bajo (y parche-le / corr-le como base bajo
        los árboles) se triangulan en metros de escena con THREE.ShapeUtils (earcut; huecos respetados;
-       la geometría GIS no se toca: los vértices son los del anillo) y se refinan con puntos medios
-       (aristas ≤ A4_GROUND.maxEdge) para tener una grilla donde interpolar la distancia al borde.
-       Shader: color base de §4 con variantes seco/verde por ruido fbm en coordenadas de MUNDO a 3
-       escalas (≈0,7 / 4 / 25 m, sin repetición), AO de borde (franja de 1–2 m, geometría aparte),
-       niebla y fade de shaderlib, luz de A1 (MeshLambert + hemisferio + sol).
-       Crecimiento (dial A4_GROUND.growth / ?crecimiento=): "revelado" (desde el eje, máscara por
-       profundidad = distancia al borde normalizada por polígono) o "extrusion" (losa con paredes que
-       sube por el scale.y del grupo, como la extrusión MapLibre anterior).
+       la geometría GIS no se toca: los vértices son los del anillo). Sin terreno queda casi el
+       triángulo crudo del earcut (maxEdgeFlat); con terreno se refina por puntos medios (maxEdge) para
+       apoyar cada vértice en heightAt. La distancia al borde (revelado) va horneada en una textura.
+       Shader: color base de §4 con variantes seco/verde por ruido en coordenadas de MUNDO a 3
+       escalas (≈0,7 / 4 / 25 m), AO de borde (franja de 1–2 m, geometría aparte), niebla y fade de
+       shaderlib, luz de A1 (MeshLambert + hemisferio + sol).
+       a4-g2: el ruido sale de UNA textura 512² generada en runtime (value noise periódico, 3 canales
+       = 3 escalas; mipmaps = antialias gratis, sin fwidth ni hash por fragmento): período ≥ 22 m en la
+       octava fina, rotaciones distintas por escala, sin repetición visible.
+       Crecimiento: SOLO "revelado" (decisión G2): desde el eje, máscara por profundidad = distancia al
+       borde normalizada por polígono. La extrusión (losa con paredes) se retiró (commit 9d7ed10).
    J · SURCOS. Malla por lote agrícola dibujada SOBRE el satélite con blending multiplicativo:
-       modula la luminancia, no el color. Dirección = eje principal del lote (PCA área-ponderada de la
+       modula la luminancia, no el color. a4-g2: antialias analítico por derivadas (huella del píxel en
+       períodos) con fundido anticipado y bandas de 8 surcos con fase deformada (sin moiré). Dirección = eje principal del lote (PCA área-ponderada de la
        malla triangulada, momento de segundo orden): es textura de render, NO dato GIS.
 
    T9: las capas MapLibre *-herb-ext y *-woody-base quedan con opacidad 0,001 (clic/popup);
@@ -31,26 +35,49 @@ import { HOME_VIEW, params } from "../../core/state.js";
 import { quality } from "../../core/quality.js";
 import { map } from "../../map/style.js";
 import { chainShader } from "./chunks.js";
-import { extOpacityProp, terrain } from "../../terrain/terrain.js";   // A6: relieve
+import { extOpacityProp } from "../../terrain/terrain.js";   // A6: relieve
 
 /* ---------- parámetros efectivos (config + URL) ---------- */
 const DBG = params.has("qa") || params.has("debug");
-const growthMode = () => {
-  const q = params.get("crecimiento");
-  return q === "extrusion" || q === "revelado" ? q : A4_GROUND.growth;
-};
 const furrowsWanted = () => {
   const q = params.get("surcos");
   return q === "0" ? false : q === "1" ? true : A4_FURROWS.enabled;
 };
 const groundWanted = () => A4_GROUND.enabled && params.get("a4") !== "off";
 
-/* ---------- GLSL común: hash entero + value noise (sin patrón repetitivo, estable a coordenadas grandes) ---------- */
-const GLSL_NOISE =
-  "float adH(vec2 i){ uvec2 q = uvec2(ivec2(i)); q = q*1664525u + 1013904223u; q.x += q.y*1664525u; q.y += q.x*1664525u;\n" +
-  "  q ^= q >> 16u; q.x += q.y*1664525u; q.y += q.x*1664525u; q ^= q >> 16u; return float(q.x ^ q.y) * (1.0/4294967296.0); }\n" +
-  "float adN(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);\n" +
-  "  return mix(mix(adH(i), adH(i+vec2(1.0,0.0)), f.x), mix(adH(i+vec2(0.0,1.0)), adH(i+vec2(1.0,1.0)), f.x), f.y); }\n";
+/* ---------- ruido: textura generada en runtime (a4-g2) ----------
+   Value noise periódico (lattice NOISE_C×NOISE_C, interpolación smoothstep: la misma estadística que el hash
+   por fragmento anterior) en NOISE_N² texels, un canal por escala (R fina, G media, B gruesa). Mipmaps +
+   filtro trilineal reemplazan el fundido por fwidth: a distancia cada octava tiende sola a su media 0,5.
+   Sin repetición visible: período real = NOISE_C × tamaño de celda (≥ 22 m en la fina, 100 m la media, 800 m la
+   gruesa) y las tres escalas van rotadas distinto. Costo: ~25 ms una vez, 1 MB de GPU. */
+const NOISE_N = 512, NOISE_C = 32;
+let noiseTex = null;
+function getNoiseTex() {
+  if (noiseTex) return noiseTex;
+  const N = NOISE_N, C = NOISE_C, data = new Uint8Array(N * N * 4);
+  let seed = 0x1badb002;
+  const rnd = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
+  const i0 = new Int32Array(N), i1 = new Int32Array(N), sw = new Float32Array(N);
+  for (let x = 0; x < N; x++) { const u = x * C / N, i = Math.floor(u), f = u - i; i0[x] = i; i1[x] = (i + 1) % C; sw[x] = f * f * (3 - 2 * f); }
+  for (let ch = 0; ch < 3; ch++) {
+    const L = new Float32Array(C * C); for (let k = 0; k < L.length; k++) L[k] = rnd();
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const a = L[i0[y] * C + i0[x]], b = L[i0[y] * C + i1[x]], c = L[i1[y] * C + i0[x]], d = L[i1[y] * C + i1[x]];
+      const top = a + (b - a) * sw[x], bot = c + (d - c) * sw[x];
+      data[(y * N + x) * 4 + ch] = Math.round((top + (bot - top) * sw[y]) * 255);
+    }
+  }
+  for (let k = 3; k < data.length; k += 4) data[k] = 255;
+  const t = new THREE.DataTexture(data, N, N, THREE.RGBAFormat);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true;
+  t.needsUpdate = true;
+  return (noiseTex = t);
+}
+/* Muestreo en GLSL: u = metros / (tamaño de celda × NOISE_C). */
+const GLSL_NOISE_TEX = "uniform sampler2D tNoise;\n";
+const nu = cell => (1 / (cell * NOISE_C)).toFixed(7);
 
 /* ---------- geometría ---------- */
 const MAXC = 8;   // clases de suelo máximas en los uniform arrays
@@ -128,33 +155,72 @@ function refine(P, T, L) {
   return T;
 }
 
-/* Distancia mínima de cada punto de P (desde `from`) a los segmentos de los anillos. */
-function distToRings(P, from, rings) {
-  const segs = [];
-  for (const r of rings) for (let i = 0, j = r.length - 1; i < r.length; j = i++) segs.push(r[j][0], r[j][1], r[i][0], r[i][1]);
-  const n = segs.length / 4, d = new Float32Array(P.length);
-  for (let k = from; k < P.length; k++) {
-    const px = P[k][0], pz = P[k][1];
-    let best = Infinity;
-    for (let s = 0; s < n; s++) {
-      const ax = segs[4 * s], az = segs[4 * s + 1], bx = segs[4 * s + 2], bz = segs[4 * s + 3];
-      const ex = bx - ax, ez = bz - az, l2 = ex * ex + ez * ez;
-      let t = l2 > 0 ? ((px - ax) * ex + (pz - az) * ez) / l2 : 0;
-      t = t < 0 ? 0 : t > 1 ? 1 : t;
-      const dx = px - (ax + t * ex), dz = pz - (az + t * ez), dd = dx * dx + dz * dz;
-      if (dd < best) best = dd;
-    }
-    d[k] = Math.sqrt(best);
+/* ---------- mapa de profundidad (a4-g2) ----------
+   El revelado "desde el eje" necesita la distancia al borde de cada punto del polígono, normalizada por su máximo.
+   Antes salía de la malla (grilla de 40 m): ~125 k triángulos en El Carmen, la mayoría sub-píxel a distancia, y eso
+   (sobre-sombreado de quads) era casi todo el costo del suelo en la Intel. Ahora se hornea UNA vez por escenario en
+   una textura R8 (transformada de distancia exacta por polígono sobre una grilla de ≥ DEPTH_CELL_MIN m) y la
+   geometría queda con los triángulos del earcut (sin terreno) → ~10× menos triángulos. Con terreno la malla se
+   sigue refinando (maxEdge) porque ahí la altura se pide por vértice. */
+const DEPTH_CELL_MIN = 4, DEPTH_MAXTEX = 1024, INF = 1e12;
+
+/* Transformada de distancia cuadrada 1D (Felzenszwalb–Huttenlocher), f en Float64Array. */
+function edt1d(f, n, d, v, z) {
+  let k = 0; v[0] = 0; z[0] = -INF; z[1] = INF;
+  for (let q = 1; q < n; q++) {
+    let sx;
+    for (;;) { const p = v[k]; sx = ((f[q] + q * q) - (f[p] + p * p)) / (2 * q - 2 * p); if (sx <= z[k]) k--; else break; }
+    k++; v[k] = q; z[k] = sx; z[k + 1] = INF;
   }
-  return d;
+  k = 0;
+  for (let q = 0; q < n; q++) { while (z[k + 1] < q) k++; d[q] = (q - v[k]) * (q - v[k]) + f[v[k]]; }
+}
+
+/* Hornea la profundidad normalizada de un polígono (anillos en metros de escena) en la textura global.
+   Devuelve dmax (m) ≈ distancia máxima al borde. map = { data, W, H, x0, z0, c }. */
+function bakeDepth(map, rings) {
+  const { W, H, x0, z0, c, data } = map;
+  let minx = Infinity, maxx = -Infinity, minz = Infinity, maxz = -Infinity;
+  for (const p of rings[0]) { if (p[0] < minx) minx = p[0]; if (p[0] > maxx) maxx = p[0]; if (p[1] < minz) minz = p[1]; if (p[1] > maxz) maxz = p[1]; }
+  const i0 = Math.max(0, Math.floor((minx - x0) / c) - 1), i1 = Math.min(W - 1, Math.ceil((maxx - x0) / c) + 1);
+  const j0 = Math.max(0, Math.floor((minz - z0) / c) - 1), j1 = Math.min(H - 1, Math.ceil((maxz - z0) / c) + 1);
+  const w = i1 - i0 + 1, h = j1 - j0 + 1;
+  if (w < 1 || h < 1) return 0.5;
+  const g = new Float64Array(w * h);   // 0 = fuera; INF = dentro
+  // relleno por scanline, regla par-impar (los huecos quedan fuera)
+  const xs = [];
+  for (let j = 0; j < h; j++) {
+    const zc = z0 + (j0 + j + 0.5) * c; xs.length = 0;
+    for (const r of rings) for (let a = 0, b = r.length - 1; a < r.length; b = a++) {
+      const za = r[b][1], zb = r[a][1];
+      if ((za <= zc) !== (zb <= zc)) xs.push(r[b][0] + (zc - za) / (zb - za) * (r[a][0] - r[b][0]));
+    }
+    xs.sort((u, v) => u - v);
+    for (let k = 0; k + 1 < xs.length; k += 2) {
+      const ia = Math.max(0, Math.ceil((xs[k] - x0) / c - 0.5) - i0), ib = Math.min(w - 1, Math.ceil((xs[k + 1] - x0) / c - 0.5) - 1 - i0);
+      for (let i = ia; i <= ib; i++) g[j * w + i] = INF;
+    }
+  }
+  // distancia al texel "fuera" más cercano (dos pasadas)
+  const n = Math.max(w, h), col = new Float64Array(n), out = new Float64Array(n), v = new Int32Array(n), z = new Float64Array(n + 1);
+  for (let i = 0; i < w; i++) { for (let j = 0; j < h; j++) col[j] = g[j * w + i]; edt1d(col, h, out, v, z); for (let j = 0; j < h; j++) g[j * w + i] = out[j]; }
+  for (let j = 0; j < h; j++) { for (let i = 0; i < w; i++) col[i] = g[j * w + i]; edt1d(col, w, out, v, z); for (let i = 0; i < w; i++) g[j * w + i] = out[i]; }
+  let dm = 0;
+  for (let k = 0; k < g.length; k++) if (g[k] > 0) { g[k] = Math.max(0.5, Math.sqrt(g[k]) - 0.5) * c; if (g[k] > dm) dm = g[k]; }
+  if (dm <= 0) return 0.5;
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+    const d = g[j * w + i]; if (d <= 0) continue;
+    data[(j0 + j) * W + (i0 + i)] = Math.max(1, Math.round(255 * Math.min(1, d / dm)));
+  }
+  return dm;
 }
 
 /* ---------- construcción de la malla de suelo ---------- */
 function buildGroundGeometry(ctx, data, toLngLat, hasH) {
-  const P_ = [], I_ = { walls: [], tops: [], ribbons: [] };   // P_: floats por vértice (11): x,y,z, cls,depth,edge,top, kind
+  const P_ = [], I_ = { tops: [], ribbons: [] };   // P_: floats por vértice (5): x,y,z, cls,edge
   let nv = 0, polys = 0, failed = 0, tiny = 0;
   const yAt = (x, z) => (hasH ? ctx.heightAt(...toLngLat(x, z)) : 0) + A4_GROUND.yOff;
-  /* A6: normal del relieve por vértice (diferencias centrales de heightAt a ±NRM_D m; las paredes de la losa, planas) */
+  /* A6: normal del relieve por vértice (diferencias centrales de heightAt a ±NRM_D m) */
   const N_ = [], NRM_D = 12;
   const nrmAt = (x, z) => {
     const [lo, la] = toLngLat(x, z);
@@ -163,13 +229,16 @@ function buildGroundGeometry(ctx, data, toLngLat, hasH) {
     const nx = -hx / (2 * NRM_D), nz = hz / (2 * NRM_D), l = Math.hypot(nx, 1, nz);
     N_.push(nx / l, 1 / l, nz / l);
   };
-  const pushV = (x, y, z, cls, depth, edge, top, kind) => {
-    P_.push(x, y, z, cls, depth, edge, top, kind);
-    if (hasH) { if (kind === 2) N_.push(0, 1, 0); else nrmAt(x, z); }
+  const pushV = (x, y, z, cls, edge) => {
+    P_.push(x, y, z, cls, edge);
+    if (hasH) nrmAt(x, z);
     return nv++;
   };
   const W = A4_GROUND.edgeAO ? A4_GROUND.edgeAO.width : 1.8;
 
+  // --- pasada 1: triangular y juntar cajas (para dimensionar el mapa de profundidad) ---
+  const items = [];
+  let bx0 = Infinity, bx1 = -Infinity, bz0 = Infinity, bz1 = -Infinity;
   for (const f of data.features) {
     const cls = f.properties._cls, ci = CLASS_LIST.indexOf(cls);
     if (ci < 0) continue;
@@ -179,72 +248,73 @@ function buildGroundGeometry(ctx, data, toLngLat, hasH) {
       if (!tri) { failed++; continue; }
       if (tri.tiny) { tiny++; continue; }
       polys++;
-      const n0 = tri.P.length;
-      const T = refine(tri.P, tri.T, A4_GROUND.maxEdge);
-      const P = tri.P;
-      const d = distToRings(P, 0, rings);
-      let dmax = 0.5;
-      for (let k = 0; k < d.length; k++) if (d[k] > dmax) dmax = d[k];
-      // --- tapa (cara hacia arriba) ---
-      const base = nv, ys = new Float32Array(P.length);
-      for (let k = 0; k < P.length; k++) {
-        ys[k] = yAt(P[k][0], P[k][1]);
-        pushV(P[k][0], ys[k], P[k][1], ci, Math.min(1, d[k] / dmax), 0, 1, 0);
-      }
-      for (const [a, b, c] of T) {
-        const cr = (P[b][1] - P[a][1]) * (P[c][0] - P[a][0]) - (P[b][0] - P[a][0]) * (P[c][1] - P[a][1]);
-        I_.tops.push(base + a, cr > 0 ? base + b : base + c, cr > 0 ? base + c : base + b);
-      }
-      // --- paredes y franja de AO por anillo (solo con los vértices originales del anillo) ---
-      rings.forEach((r, ri) => {
-        const A = ringArea2(r), isHole = ri > 0;
-        const side = (A > 0 ? 1 : -1) * (isHole ? -1 : 1);   // hacia el interior del polígono respecto de la normal izquierda
-        const w = Math.min(W, dmax * 0.8), m = r.length;
-        const bot = [], top = [], pIn = [], qIn = [];
-        for (let i = 0; i < m; i++) {
-          const p0 = r[(i + m - 1) % m], p1 = r[i], p2 = r[(i + 1) % m];
-          let d0x = p1[0] - p0[0], d0z = p1[1] - p0[1], l0 = Math.hypot(d0x, d0z) || 1; d0x /= l0; d0z /= l0;
-          let d1x = p2[0] - p1[0], d1z = p2[1] - p1[1], l1 = Math.hypot(d1x, d1z) || 1; d1x /= l1; d1z /= l1;
-          const n0x = -d0z * side, n0z = d0x * side, n1x = -d1z * side, n1z = d1x * side;
-          let mx = n0x + n1x, mz = n0z + n1z; const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml;
-          const k = Math.min(2, 1 / Math.max(mx * n0x + mz * n0z, 0.5));
-          const y = yAt(p1[0], p1[1]);
-          bot.push(pushV(p1[0], y, p1[1], ci, 0, 0, 0, 2));
-          top.push(pushV(p1[0], y, p1[1], ci, 0, 0, 1, 2));
-          pIn.push(pushV(p1[0], y, p1[1], ci, 0, 1, 1, 1));
-          qIn.push(pushV(p1[0] + mx * k * w, yAt(p1[0] + mx * k * w, p1[1] + mz * k * w), p1[1] + mz * k * w, ci, 0, 0, 1, 1));
-        }
-        for (let i = 0; i < m; i++) {
-          const j = (i + 1) % m;
-          // pared: ambos sentidos (se dibuja con culling de caras)
-          I_.walls.push(bot[i], bot[j], top[j], bot[i], top[j], top[i], bot[i], top[j], bot[j], bot[i], top[i], top[j]);
-          // franja: sentido hacia arriba
-          const a = pIn[i], b = pIn[j], c = qIn[j], e = qIn[i];
-          const quadUp = (u, v, w2, x2) => {
-            const pu = P_.slice(u * 8, u * 8 + 3), pv = P_.slice(v * 8, v * 8 + 3), pw = P_.slice(w2 * 8, w2 * 8 + 3);
-            const cr = (pv[2] - pu[2]) * (pw[0] - pu[0]) - (pv[0] - pu[0]) * (pw[2] - pu[2]);
-            if (cr > 0) I_.ribbons.push(u, v, w2, u, w2, x2); else I_.ribbons.push(u, w2, v, u, x2, w2);
-          };
-          quadUp(a, b, c, e);
-        }
-      });
+      for (const p of rings[0]) { if (p[0] < bx0) bx0 = p[0]; if (p[0] > bx1) bx1 = p[0]; if (p[1] < bz0) bz0 = p[1]; if (p[1] > bz1) bz1 = p[1]; }
+      items.push({ ci, rings, tri });
     }
   }
+  const dmap = { W: 1, H: 1, x0: 0, z0: 0, c: 1, data: new Uint8Array(1) };
+  if (items.length) {
+    const c = Math.max(DEPTH_CELL_MIN, Math.max(bx1 - bx0, bz1 - bz0) / DEPTH_MAXTEX);
+    dmap.c = c; dmap.x0 = bx0 - c; dmap.z0 = bz0 - c;
+    dmap.W = Math.ceil((bx1 - bx0) / c) + 3; dmap.H = Math.ceil((bz1 - bz0) / c) + 3;
+    dmap.data = new Uint8Array(dmap.W * dmap.H);
+  }
+
+  // --- pasada 2: profundidad horneada + geometría ---
+  for (const { ci, rings, tri } of items) {
+    const dmax = Math.max(0.5, bakeDepth(dmap, rings));
+    const T = refine(tri.P, tri.T, hasH ? A4_GROUND.maxEdge : A4_GROUND.maxEdgeFlat);
+    const P = tri.P;
+    // --- tapa (cara hacia arriba) ---
+    const base = nv;
+    for (let k = 0; k < P.length; k++) pushV(P[k][0], yAt(P[k][0], P[k][1]), P[k][1], ci, 0);
+    for (const [a, b, c] of T) {
+      const cr = (P[b][1] - P[a][1]) * (P[c][0] - P[a][0]) - (P[b][0] - P[a][0]) * (P[c][1] - P[a][1]);
+      I_.tops.push(base + a, cr > 0 ? base + b : base + c, cr > 0 ? base + c : base + b);
+    }
+    // --- franja de AO por anillo (solo con los vértices originales del anillo) ---
+    rings.forEach((r, ri) => {
+      const A = ringArea2(r), isHole = ri > 0;
+      const side = (A > 0 ? 1 : -1) * (isHole ? -1 : 1);   // hacia el interior del polígono respecto de la normal izquierda
+      const w = Math.min(W, dmax * 0.8), m = r.length;
+      const pIn = [], qIn = [];
+      for (let i = 0; i < m; i++) {
+        const p0 = r[(i + m - 1) % m], p1 = r[i], p2 = r[(i + 1) % m];
+        let d0x = p1[0] - p0[0], d0z = p1[1] - p0[1], l0 = Math.hypot(d0x, d0z) || 1; d0x /= l0; d0z /= l0;
+        let d1x = p2[0] - p1[0], d1z = p2[1] - p1[1], l1 = Math.hypot(d1x, d1z) || 1; d1x /= l1; d1z /= l1;
+        const n0x = -d0z * side, n0z = d0x * side, n1x = -d1z * side, n1z = d1x * side;
+        let mx = n0x + n1x, mz = n0z + n1z; const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml;
+        const k = Math.min(2, 1 / Math.max(mx * n0x + mz * n0z, 0.5));
+        pIn.push(pushV(p1[0], yAt(p1[0], p1[1]), p1[1], ci, 1));
+        qIn.push(pushV(p1[0] + mx * k * w, yAt(p1[0] + mx * k * w, p1[1] + mz * k * w), p1[1] + mz * k * w, ci, 0));
+      }
+      for (let i = 0; i < m; i++) {
+        const j = (i + 1) % m;
+        const a = pIn[i], b = pIn[j], c = qIn[j], e = qIn[i];
+        // franja: sentido hacia arriba
+        const pu = P_.slice(a * 5, a * 5 + 3), pv = P_.slice(b * 5, b * 5 + 3), pw = P_.slice(c * 5, c * 5 + 3);
+        const cr = (pv[2] - pu[2]) * (pw[0] - pu[0]) - (pv[0] - pu[0]) * (pw[2] - pu[2]);
+        if (cr > 0) I_.ribbons.push(a, b, c, a, c, e); else I_.ribbons.push(a, c, b, a, e, c);
+      }
+    });
+  }
+  const dTex = new THREE.DataTexture(dmap.data, dmap.W, dmap.H, THREE.RedFormat);
+  dTex.unpackAlignment = 1; dTex.magFilter = dTex.minFilter = THREE.LinearFilter; dTex.generateMipmaps = false;
+  dTex.wrapS = dTex.wrapT = THREE.ClampToEdgeWrapping; dTex.needsUpdate = true;
   const g = new THREE.BufferGeometry();
   const F = new Float32Array(P_);
-  const buf = new THREE.InterleavedBuffer(F, 8);
+  const buf = new THREE.InterleavedBuffer(F, 5);
   g.setAttribute("position", new THREE.InterleavedBufferAttribute(buf, 3, 0));
-  g.setAttribute("aG", new THREE.InterleavedBufferAttribute(buf, 4, 3));   // cls, depth, edge, top
-  g.setAttribute("aK", new THREE.InterleavedBufferAttribute(buf, 1, 7));   // 0 tapa, 1 franja AO, 2 pared
+  g.setAttribute("aG", new THREE.InterleavedBufferAttribute(buf, 2, 3));   // cls, edge (1 en el borde de la franja de AO)
   if (hasH) g.setAttribute("aNrm", new THREE.Float32BufferAttribute(N_, 3));   // A6: normales del relieve
-  const idx = [...I_.walls, ...I_.tops, ...I_.ribbons];   // orden de dibujo: paredes → tapa → franja (sin depth test)
+  const idx = [...I_.tops, ...I_.ribbons];   // orden de dibujo: tapa → franja (sin depth test)
   g.setIndex(new THREE.BufferAttribute(nv > 65535 ? new Uint32Array(idx) : new Uint16Array(idx), 1));
   g.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), 1e6);   // se dibuja siempre (frustumCulled=false igual)
-  return { geometry: g, verts: nv, tris: idx.length / 3, polys, failed, tiny };
+  return { geometry: g, dTex, dmap, verts: nv, tris: idx.length / 3, topTris: I_.tops.length / 3, ribTris: I_.ribbons.length / 3, polys, failed, tiny };
 }
 
 /* ---------- material de suelo (Lambert + chunks propios sobre patch de A1) ---------- */
-function makeGroundMaterial(ctx, key, hasH) {
+function makeGroundMaterial(ctx, key, hasH, dTex, dmap) {
   const m = new THREE.MeshLambertMaterial({ color: 0xffffff });
   m.userData.foliage = false;
   m.side = THREE.FrontSide;
@@ -259,60 +329,57 @@ function makeGroundMaterial(ctx, key, hasH) {
   m.blendSrcAlpha = THREE.ZeroFactor; m.blendDstAlpha = THREE.OneFactor;
   ctx.shaderlib.patch(m, { fog: true, fade: key });
 
-  const dry = [], grn = [], cls = [];
+  const dry = [], grn = [], alp = [];
   for (let i = 0; i < MAXC; i++) {
     const c = A4_GROUND.classes[CLASS_LIST[i]];
     const tn = c && c.tune ? c.tune : [1, 1, 1];
     dry.push(new THREE.Color(c ? c.dry : "#000000").multiply(new THREE.Color(...tn))); grn.push(new THREE.Color(c ? c.green : "#000000").multiply(new THREE.Color(...tn)));
-    cls.push(new THREE.Vector4(c ? c.alpha : 1, c ? c.lift : 0, 0, 0));
+    alp.push(c ? c.alpha : 1);
   }
   const U = {
-    uDry: { value: dry }, uGrn: { value: grn }, uCls: { value: cls },
-    uLiftOn: { value: 0 }, uMask: { value: 1 }, uGrow: { value: 1 }, uGain: { value: A4_GROUND.gain },
+    uDry: { value: dry }, uGrn: { value: grn }, uAlp: { value: alp },
+    uGrow: { value: 1 }, uGain: { value: A4_GROUND.gain }, tNoise: { value: getNoiseTex() },
+    tDepth: { value: dTex }, uDMap: { value: new THREE.Vector4(dmap.x0, dmap.z0, 1 / (dmap.W * dmap.c), 1 / (dmap.H * dmap.c)) },
     uNoise: { value: new THREE.Vector3(A4_GROUND.noise.fine, A4_GROUND.noise.mid, A4_GROUND.noise.coarse) },
     uAO: { value: new THREE.Vector2(A4_GROUND.edgeAO.width, A4_GROUND.edgeAO.strength) },
     uSoft: { value: new THREE.Vector2(A4_GROUND.reveal.soft, A4_GROUND.reveal.jitter) }
   };
   m.userData.a4u = U;
+  // Rotaciones por escala (R, R², R³ de 36,87°) para que las 3 octavas no compartan ejes.
+  const SC = [nu(0.7), nu(4), nu(25)];
   chainShader(m, hasH ? "a4ground-n" : "a4ground", sh => {
     Object.assign(sh.uniforms, U);
     sh.vertexShader = sh.vertexShader
       .replace("#include <common>",
-        "#include <common>\nattribute vec4 aG;\nattribute float aK;\n" + (hasH ? "attribute vec3 aNrm;\n" : "") + "uniform vec4 uCls[" + MAXC + "];\nuniform vec3 uDry[" + MAXC + "];\nuniform vec3 uGrn[" + MAXC + "];\n" +
-        "uniform float uLiftOn;\nvarying vec3 vWp;\nvarying vec3 vDry;\nvarying vec3 vGrn;\nvarying vec4 vPar;\nvarying vec4 vInf;")
+        "#include <common>\nattribute vec2 aG;\n" + (hasH ? "attribute vec3 aNrm;\n" : "") + "uniform float uAlp[" + MAXC + "];\nuniform vec3 uDry[" + MAXC + "];\nuniform vec3 uGrn[" + MAXC + "];\n" +
+        "varying vec3 vWp;\nflat varying vec3 vDry;\nflat varying vec3 vGrn;\nvarying vec2 vInf;")   // vInf: edge (franja AO), alfa de clase
       .replace("#include <beginnormal_vertex>", hasH ? "vec3 objectNormal = aNrm;" : "vec3 objectNormal = vec3(0.0, 1.0, 0.0);")   // A6: con terreno, normal del relieve
       .replace("#include <begin_vertex>",
         "vec3 transformed = vec3(position);\n" +
         "int ci = int(aG.x + 0.5);\n" +
-        "transformed.y += aG.w * uCls[ci].y * uLiftOn;\n" +
         "vWp = (modelMatrix * vec4(transformed, 1.0)).xyz;\n" +
-        "vDry = uDry[ci]; vGrn = uGrn[ci]; vPar = uCls[ci]; vInf = vec4(aG.y, aG.z, aK, 0.0);");
+        "vDry = uDry[ci]; vGrn = uGrn[ci]; vInf = vec2(aG.y, uAlp[ci]);");
     sh.fragmentShader = sh.fragmentShader
       .replace("#include <common>",
-        "#include <common>\nvarying vec3 vWp;\nvarying vec3 vDry;\nvarying vec3 vGrn;\nvarying vec4 vPar;\nvarying vec4 vInf;\n" +
-        "uniform float uMask;\nuniform float uGrow;\nuniform float uGain;\nuniform vec3 uNoise;\nuniform vec2 uAO;\nuniform vec2 uSoft;\n" + GLSL_NOISE)
+        "#include <common>\nvarying vec3 vWp;\nflat varying vec3 vDry;\nflat varying vec3 vGrn;\nvarying vec2 vInf;\n" +
+        "uniform sampler2D tDepth;\nuniform vec4 uDMap;\nuniform float uGrow;\nuniform float uGain;\nuniform vec3 uNoise;\nuniform vec2 uAO;\nuniform vec2 uSoft;\n" + GLSL_NOISE_TEX)
       .replace("vec4 diffuseColor = vec4( diffuse, opacity );",
-        "vec2 adP = vWp.xz + vec2(65536.0);\n" +
-        "float adFw = length(fwidth(vWp.xz));\n" +
-        "const mat2 adR = mat2(0.80, -0.60, 0.60, 0.80);\n" +
-        "float n1 = adN(adR * adP / 0.7);\n" +
-        "float n2 = adN(adR * adR * adP / 4.0 + 31.7);\n" +
-        "float n3 = adN(adR * adR * adR * adP / 25.0 + 77.1);\n" +
-        "float a1 = 1.0 - smoothstep(0.25, 0.7, adFw / 0.7);\n" +      // octava fina: se funde cuando el píxel la supera
-        "float a2 = 1.0 - smoothstep(0.25, 0.7, adFw / 4.0);\n" +
+        "vec2 adP = vWp.xz;\n" +
+        "float n1 = texture2D(tNoise, mat2(0.80, -0.60, 0.60, 0.80) * adP * " + SC[0] + ").r;\n" +
+        "float n2 = texture2D(tNoise, mat2(0.28, -0.96, 0.96, 0.28) * adP * " + SC[1] + " + vec2(0.37, 0.11)).g;\n" +
+        "float n3 = texture2D(tNoise, mat2(-0.352, -0.936, 0.936, -0.352) * adP * " + SC[2] + " + vec2(0.71, 0.53)).b;\n" +
         "float gmix = smoothstep(0.30, 0.70, n3 * 0.65 + n2 * 0.35);\n" +   // parches de pasto seco ↔ verde
         "vec3 adCol = mix(vDry, vGrn, gmix);\n" +
-        "adCol *= (1.0 + 2.0 * (uNoise.x * (n1 - 0.5) * a1 + uNoise.y * (n2 - 0.5) * a2 + uNoise.z * (n3 - 0.5))) * uGain;\n" +
-        "if (vInf.z > 1.5) adCol *= 0.62;\n" +                                   // pared de la losa
-        "else if (vInf.z > 0.5) adCol *= 1.0 - uAO.y * smoothstep(0.0, 1.0, vInf.y);\n" +   // AO de borde
+        "adCol *= (1.0 + 2.0 * (uNoise.x * (n1 - 0.5) + uNoise.y * (n2 - 0.5) + uNoise.z * (n3 - 0.5))) * uGain;\n" +
+        "adCol *= 1.0 - uAO.y * smoothstep(0.0, 1.0, vInf.x);\n" +               // AO de borde (franja)
         "float adM = 1.0;\n" +
-        "if (uMask > 0.5) {\n" +
+        "if (uGrow < 0.999) {\n" +                                                 // revelado desde el eje
         "  float span = 1.0 + uSoft.x + uSoft.y;\n" +
         "  float lo = 1.0 - uGrow * span;\n" +
-        "  float s = vInf.x + (n3 - 0.5) * 2.0 * uSoft.y;\n" +
-        "  adM = (uGrow >= 0.999) ? 1.0 : (uGrow <= 0.001 ? 0.0 : smoothstep(lo, lo + uSoft.x, s));\n" +
+        "  float s = texture2D(tDepth, (vWp.xz - uDMap.xy) * uDMap.zw).r + (n3 - 0.5) * 2.0 * uSoft.y;\n" +   // profundidad horneada (a4-g2)
+        "  adM = uGrow <= 0.001 ? 0.0 : smoothstep(lo, lo + uSoft.x, s);\n" +
         "}\n" +
-        "vec4 diffuseColor = vec4(adCol, vPar.x * adM);");
+        "vec4 diffuseColor = vec4(adCol, vInf.y * adM);");
   });
   return m;
 }
@@ -372,7 +439,10 @@ function makeFurrowMaterial(ctx, hasH) {
     uniforms: {
       uCamPos: ctx.uniforms.uCamPos,
       uFadeS: { value: 1 },
+      tNoise: { value: getNoiseTex() },
       uRow: { value: new THREE.Vector4(F.spacing, F.rowAmp, F.rowFade[0], F.rowFade[1]) },
+      uW: { value: new THREE.Vector4(F.rowW[0], F.rowW[1], F.bandW[0], F.bandW[1]) },
+      uBandAmp: { value: F.bandAmp },
       uTram: { value: new THREE.Vector4(F.tramPeriod, F.tramGauge, F.tramWidth, F.tramAmp) },
       uTramFade: { value: new THREE.Vector2(F.tramFade[0], F.tramFade[1]) }
     },
@@ -382,30 +452,33 @@ function makeFurrowMaterial(ctx, hasH) {
       "  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);\n}",
     fragmentShader:
       "precision highp float;\nvarying vec3 vRow;\nvarying vec3 vWp;\nuniform vec3 uCamPos;\nuniform float uFadeS;\n" +
-      "uniform vec4 uRow;\nuniform vec4 uTram;\nuniform vec2 uTramFade;\n" + GLSL_NOISE +
+      "uniform vec4 uRow;\nuniform vec4 uW;\nuniform float uBandAmp;\nuniform vec4 uTram;\nuniform vec2 uTramFade;\n" + GLSL_NOISE_TEX +
       "void main() {\n" +
       "  float d = distance(vWp, uCamPos);\n" +
-      "  float fRow = (1.0 - smoothstep(uRow.z, uRow.w, d)) * uFadeS;\n" +
+      "  float fD = (1.0 - smoothstep(uRow.z, uRow.w, d)) * uFadeS;\n" +
       "  float fTram = (1.0 - smoothstep(uTramFade.x, uTramFade.y, d)) * uFadeS;\n" +
-      "  if (fRow < 0.002 && fTram < 0.002) discard;\n" +
-      "  vec2 p = vWp.xz + vec2(65536.0);\n" +
+      // Antialias analítico: wR = huella del píxel en períodos de surco (derivada del parámetro de fila).
+      // El surco se funde entre rowW[0] y rowW[1] (período de 10 a 3 px): nunca se muestrea cerca de Nyquist → sin moiré.
+      // Las bandas (8 surcos, período ×8) toman la posta (fundido cruzado) y se funden con su propio w.
       "  float fu = max(fwidth(vRow.x), 1e-4);\n" +
-      // surcos: onda senoidal; la amplitud se funde a 0 (gris medio) cuando el período se acerca al píxel (sin moiré)
-      "  float wRows = fu / uRow.x;\n" +
-      "  float amp = uRow.y * fRow * (1.0 - smoothstep(0.40, 0.90, wRows));\n" +
-      // 2.º nivel (8 surcos juntos = bandas de ~4 m): toma la posta cuando el surco real ya no se resuelve (textura, no dato)
-      "  float wBand = fu / (uRow.x * 8.0);\n" +
-      "  float ampB = uRow.y * 0.7 * fRow * smoothstep(0.30, 0.90, wRows) * (1.0 - smoothstep(0.40, 0.90, wBand));\n" +
-      "  float patchy = 0.55 + 0.9 * adN(p / 9.0 + 12.3);\n" +          // rastrojo: irregularidad por manchones
-      "  float speck = (adN(p / 0.35) - 0.5) * 0.10 * fRow * (1.0 - smoothstep(0.2, 0.6, fu / 0.35));\n" +
-      "  float m = 1.0 + (amp * sin(6.2831853 * vRow.x / uRow.x) + ampB * sin(6.2831853 * vRow.x / (uRow.x * 8.0) + 1.7)) * patchy + speck;\n" +
+      "  float wR = fu / uRow.x;\n" +
+      "  float inB = smoothstep(uW.x, uW.y, wR);\n" +
+      "  float aRow = fD * (1.0 - inB);\n" +
+      "  float aBand = fD * inB * (1.0 - smoothstep(uW.z, uW.w, wR * 0.125));\n" +
+      "  if (aRow < 0.003 && aBand < 0.003 && fTram < 0.002) discard;\n" +
+      "  vec2 p = vWp.xz;\n" +
+      "  float patchy = 0.55 + 0.9 * texture2D(tNoise, p * " + nu(9) + " + vec2(0.13, 0.61)).b;\n" +   // rastrojo: manchones
+      "  float warp = (texture2D(tNoise, p * " + nu(45) + " + vec2(0.52, 0.27)).g - 0.5) * 5.0;\n" +    // bandas onduladas: sin paralelismo perfecto
+      "  float speck = (texture2D(tNoise, p * " + nu(0.35) + ").r - 0.5) * 0.10 * aRow;\n" +             // el mipmap lo funde solo
+      "  float m = 1.0 + (aRow * uRow.y * sin(6.2831853 * vRow.x / uRow.x)\n" +
+      "                 + aBand * uBandAmp * sin(6.2831853 * vRow.x / (uRow.x * 8.0) + 1.7 + warp)) * patchy + speck;\n" +
       // huellas de pulverizadora: dos líneas de ancho uTram.z separadas uTram.y, cada uTram.x m
       "  float q = mod(vRow.x, uTram.x) - uTram.x * 0.5;\n" +
       "  float dd = abs(abs(q) - uTram.y * 0.5);\n" +
       "  float hw = uTram.z * 0.5;\n" +
       "  float line = 1.0 - smoothstep(hw - fu * 0.75, hw + fu * 0.75, dd);\n" +
       "  line *= min(1.0, sqrt(hw / (fu * 1.5)));\n" +
-      "  float broken = 0.6 + 0.8 * adN(vec2(vRow.y / 40.0, floor(vRow.x / uTram.x)) + 5.1);\n" +
+      "  float broken = 0.6 + 0.8 * texture2D(tNoise, vec2(vRow.y * " + nu(40) + ", floor(vRow.x / uTram.x) * 0.137) + vec2(0.9, 0.3)).g;\n" +
       "  m -= uTram.w * fTram * line * min(broken, 1.0);\n" +
       // salida = factor/2: con blend (DST_COLOR, SRC_COLOR) el resultado es dst * factor
       "  gl_FragColor = vec4(vec3(0.5 * m), 0.5);\n}"
@@ -445,12 +518,7 @@ function syncMapLayers(key) {
 }
 
 function applyModes() {
-  const mode = growthMode();
   for (const k in S) {
-    const u = S[k].gMat.userData.a4u;
-    u.uMask.value = mode === "revelado" ? 1 : 0;
-    u.uLiftOn.value = mode === "extrusion" ? 1 : 0;
-    if (mode === "extrusion") u.uGrow.value = 1;
     S[k].gMesh.visible = active;
     if (S[k].fMesh) S[k].fMesh.visible = active && furrowsOn;
     syncMapLayers(k);
@@ -471,7 +539,7 @@ export default {
     const hasH = [[0, 0], [0.01, 0], [-0.01, 0], [0, 0.01], [0, -0.01]].some(([a, b]) => ctx.heightAt(c[0] + a, c[1] + b) !== 0);
 
     const gg = buildGroundGeometry(ctx, data, toLngLat, hasH);
-    const gMat = makeGroundMaterial(ctx, key, hasH);
+    const gMat = makeGroundMaterial(ctx, key, hasH, gg.dTex, gg.dmap);
     const gMesh = new THREE.Mesh(gg.geometry, gMat);
     gMesh.frustumCulled = false; gMesh.renderOrder = -10; gMesh.name = "a4-ground-" + key;
     group.add(gMesh);
@@ -482,8 +550,8 @@ export default {
     fMesh.frustumCulled = false; fMesh.renderOrder = -20; fMesh.name = "a4-furrows-" + key;
     group.add(fMesh);
 
-    S[key] = { group, gMesh, fMesh, gMat, fMat, opacity: key === "inicial" ? 1 : 0,
-      info: { verts: gg.verts, tris: gg.tris, polys: gg.polys, failed: gg.failed, tiny: gg.tiny, furrowTris: fg.tris, lots: fg.lots, buildMs: Math.round(performance.now() - t0) } };
+    S[key] = { group, gMesh, fMesh, gMat, fMat, dTex: gg.dTex, opacity: key === "inicial" ? 1 : 0,
+      info: { verts: gg.verts, tris: gg.tris, topTris: gg.topTris, ribTris: gg.ribTris, polys: gg.polys, failed: gg.failed, tiny: gg.tiny, furrowTris: fg.tris, lots: fg.lots, buildMs: Math.round(performance.now() - t0) } };
     applyModes();
     // materials vacío: el host no re-parcha (la niebla y el fade ya van en patch()); los surcos no usan niebla
     return { object3d: group, materials: [] };
@@ -498,9 +566,7 @@ export default {
 
   setGrowth(key, t) {
     const s = S[key]; if (!s) return;
-    s.gMat.userData.a4u.uGrow.value = growthMode() === "revelado" ? t : 1;
-    // A6: con terreno el host no escala el grupo en Y (ver host.js, growthU): el "lift" de la losa crece con t acá
-    if (terrain.active && growthMode() === "extrusion") s.gMat.userData.a4u.uLiftOn.value = t;
+    s.gMat.userData.a4u.uGrow.value = t;   // revelado desde el eje (única variante desde a4-g2)
   },
 
   update(frame) {
@@ -519,7 +585,7 @@ export default {
   },
 
   dispose() {
-    for (const k in S) { S[k].gMesh.geometry.dispose(); S[k].gMat.dispose(); S[k].fMesh.geometry.dispose(); S[k].fMat.dispose(); }
+    for (const k in S) { S[k].gMesh.geometry.dispose(); S[k].gMat.dispose(); S[k].dTex.dispose(); S[k].fMesh.geometry.dispose(); S[k].fMat.dispose(); }
   },
 
   stats(key) { return S[key] ? { suelo: S[key].info } : {}; }
