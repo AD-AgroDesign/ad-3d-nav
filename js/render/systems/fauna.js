@@ -345,11 +345,7 @@ export default {
 
   build(ctx, key, data, veg) {
     hostCtx = ctx;
-    /* MapLibre 4.7: cada repintado forzado en reposo dispara una cadena de 5-8 frames por el fundido de colocación de
-       símbolos (_placementDirty, fadeDuration 300 ms) aunque el estilo no tenga símbolos: 10 repintados/s daban 34 fps.
-       Se apaga acá (propiedad privada, sin efecto visual: no hay capas de símbolos) hasta que P lo ponga en las opciones
-       del Map (`fadeDuration: 0`, ver handoff). */
-    if (mapRef && mapRef._fadeDuration) mapRef._fadeDuration = 0;
+    /* El fundido de símbolos (cadena de 5-8 frames por repintado en reposo) se apaga con fadeDuration: 0 en map/style.js. */
     const group = new THREE.Group();
     const info = { group, birds: null, flocks: [], bfly: [], grow: { value: 1 }, total: 0, nB: 0 };
     built[key] = info;
