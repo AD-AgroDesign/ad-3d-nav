@@ -30,6 +30,9 @@ const FS = "precision highp float;\nvarying vec2 vN;\n" +
 }
 `;
 
+const _q = new URLSearchParams(location.search);
+const NOTINT = (_q.has("qa") || _q.has("debug")) && _q.has("notint");   // solo diagnóstico: mide el costo de la pasada de color
+
 export const atmo = {
   id: "atmo-fog",
   type: "custom",
@@ -67,7 +70,7 @@ export const atmo = {
 
   render(gl, matrix) {
     if (!host.origin) return;                  // el host todavía no hizo onAdd (primer frame)
-    const T = atm.tint, tinted = T[0] < 0.999 || T[1] < 0.999 || T[2] < 0.999;   // mediodía = sin pasada de color (costo 0)
+    const T = atm.tint, tinted = !NOTINT && (T[0] < 0.999 || T[1] < 0.999 || T[2] < 0.999);   // mediodía = sin pasada de color (costo 0)
     const wantFog = !terrain.active;           // A6: con terreno la niebla es la de MapLibre (por profundidad real); este quad supone suelo plano y partiría el horizonte
     if (!tinted && !wantFog) return;
     const H = this.map.getCanvas().clientHeight;

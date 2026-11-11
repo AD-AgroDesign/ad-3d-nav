@@ -142,13 +142,16 @@ export function shadowOffsetM(h) {
 export const PRESET_NAMES = ["mediodia", "dorada", "atardecer"];
 const _rgb = hex => { const n = parseInt(String(hex).replace("#", ""), 16); return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255]; };
 
+const _SKY0 = { ...A1_SKY };   // el mediodía = los colores de config ANTES de que applyAtmosphere() empiece a reescribir A1_SKY
+const _hex = c => "#" + c.map(v => Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16).padStart(2, "0")).join("");
+
 /* Estado normalizado de un modo (colores como [r,g,b] sRGB 0..1; todo lo demás, números). */
 export function presetDef(name) {
   if (name === "mediodia" || !A1_HORAS[name]) {
     return {
       sunElev: A1_SUN.elevation, sunAz: 0, sunCol: _rgb(A1_LIGHT.sunColor), sunInt: A1_LIGHT.sunInt,
       hemiSky: _rgb(A1_LIGHT.hemiSky), hemiSkyInt: A1_LIGHT.hemiSkyInt, gTint: [1, 1, 1], gInt: A1_LIGHT.hemiGroundInt,
-      skyCol: _rgb(A1_SKY.skyColor), horCol: _rgb(A1_SKY.horizonColor), fogCol: _rgb(A1_SKY.fogColor), fogK: 1, expK: 1,
+      skyCol: _rgb(_SKY0.skyColor), horCol: _rgb(_SKY0.horizonColor), fogCol: _rgb(_SKY0.fogColor), fogK: 1, expK: 1,
       tint: [1, 1, 1], rSat: A1_RASTER.saturation, rCon: A1_RASTER.contrast, rBMin: A1_RASTER.brightnessMin, rBMax: A1_RASTER.brightnessMax, rHue: A1_RASTER.hueRotate,
       shStr: A3_SHADOWS.strength, shTint: A3_SHADOWS.tint.slice()
     };
@@ -192,6 +195,8 @@ export function applyAtmosphere() {
     lights.hemi.groundColor.set(_groundHex).multiply(_tmpC.setRGB(s.gTint[0], s.gTint[1], s.gTint[2], THREE.SRGBColorSpace)).multiplyScalar(s.gInt);
   }
   uniforms.uFogColor.value.setRGB(s.horCol[0], s.horCol[1], s.horCol[2], THREE.LinearSRGBColorSpace);   // sRGB crudo (ver rawColor)
+  /* A4 (agua) lee A1_SKY.skyColor/horizonColor (hex) para su reflejo de cielo: se mantienen al día con el modo vigente. */
+  A1_SKY.skyColor = _hex(s.skyCol); A1_SKY.horizonColor = _hex(s.horCol); A1_SKY.fogColor = _hex(s.fogCol);
   if (_renderer) _renderer.toneMappingExposure = _baseExposure * s.expK;
   const u = shadowUniforms();
   if (u) { u.uA3P.value.w = s.shStr; u.uA3Tint.value.set(s.shTint[0], s.shTint[1], s.shTint[2]); }
