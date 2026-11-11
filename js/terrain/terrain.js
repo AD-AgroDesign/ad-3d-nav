@@ -15,6 +15,7 @@
 import { A1_CAMPOS, A1_SUN, A6_TERRAIN as C } from "../core/config.js";
 import { pointInPolygon, ringBBox } from "../core/geo.js";
 import { params, state } from "../core/state.js";
+import { quality, terrainEnabled } from "../core/quality.js";
 import { chainShader } from "../render/systems/chunks.js";
 import { loadHeightfield } from "./heightfield.js";
 
@@ -93,13 +94,16 @@ function maskDe(fc) {
 
 /* ---------- MapLibre: fuente raster-dem, hillshade y malla ---------- */
 function agregarFuenteYHillshade(map) {
-  const fuente = attribution => ({ type: "raster-dem", tiles: [C.demUrl], encoding: "terrarium", tileSize: 256, maxzoom: C.demZoom, ...(attribution ? { attribution } : {}) });
+  const fuente = (attribution, over = {}) => ({ type: "raster-dem", tiles: [C.demUrl], encoding: "terrarium", tileSize: 256, maxzoom: C.demZoom, ...(attribution ? { attribution } : {}), ...over });
+  // G2: el hillshade usa una fuente propia más gruesa (menos teselas y menos píxeles a sombrear por frame que con z13)
+  const hsz = DBG && params.get("hsz") ? parseInt(params.get("hsz"), 10) : C.hillshade.maxzoom;
+  const hsTs = DBG && params.get("hsts") ? parseInt(params.get("hsts"), 10) : C.hillshade.tileSize;
   // MapLibre avisa (warning en consola) si el hillshade y el terreno comparten fuente: van dos fuentes con las mismas teselas
   // (el navegador las sirve de su caché HTTP; la de relieve lleva la atribución).
   if (!map.getSource("dem")) map.addSource("dem", fuente(C.attribution));
   const hs = params.get("hillshade");
   if ((hs === "1" || (hs !== "0" && C.hillshade.enabled)) && !map.getLayer("hillshade")) {
-    if (!map.getSource("dem-hs")) map.addSource("dem-hs", fuente());
+    if (!map.getSource("dem-hs")) map.addSource("dem-hs", fuente(null, { maxzoom: hsz, tileSize: hsTs }));
     const campoCfg = A1_CAMPOS[(state.campo || {}).id] || {};
     const h = C.hillshade;
     // justo arriba del satélite y debajo de todo lo demás (las capas de escenario se agregan después)
@@ -134,6 +138,11 @@ export async function initTerrain(map, bbox, data) {
   /* ?terreno=0 apaga TODO lo de A6 (terreno, hillshade y hasta la descarga del DEM): el visor queda idéntico al de antes
      del terreno (sirve de interruptor de comparación). ?hillshade=0|1 fuerza solo el sombreado de relieve. */
   if (params.get("terreno") === "0") { terrain.reason = "URL ?terreno=0 (todo apagado)"; return terrain; }
+  /* G2: según calidad (quality.terrain): en integradas y en Media/Baja NO se descarga el DEM ni hay hillshade ni terreno
+     (visor idéntico al de antes de A6, heightAt = 0). ?terreno=1 en la URL lo fuerza igual. */
+  if (params.get("terreno") !== "1" && !terrainEnabled(quality)) {
+    terrain.reason = `calidad ${quality.name}: terreno apagado (GPU integrada o nivel bajo; ?terreno=1 lo fuerza)`; return terrain;
+  }
   if (!C.enabled && !C.hillshade.enabled) return terrain;
   try {
     const m = 0.01;   // margen (°) para que el borde del campo no quede pegado al límite de la grilla
