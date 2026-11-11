@@ -77,6 +77,22 @@ export function densifyPath(path, stepM = 8) {
    así la cámara llega exactamente en la pose donde arranca el recorrido. */
 export const RAZANTE_CAM = { zoom: 17.25, pitch: 76 };
 
+/* Variantes de rasante más bajo para que elija el dueño (ajuste G2). SOLO QA/local:
+   ?rasante=v1|v2|v3 con ?qa/?debug o con ?local en un host de desarrollo. Sin el
+   parámetro (o en producción) RAZANTE_CAM queda como está. Se muta el mismo objeto,
+   así lo ven tour, vuelo y vistas del harness. Altura ∝ cos(pitch)/2^zoom; maxPitch = 80. */
+export const RAZANTE_VARIANTES = {
+  v1: { zoom: 17.45, pitch: 78 },     // ≈ −25 % de altura sobre el suelo
+  v2: { zoom: 17.6, pitch: 79 },      // ≈ −38 %
+  v3: { zoom: 17.8, pitch: 80 }       // ≈ −50 % (tope: maxZoom 17.8 y maxPitch 80 del mapa)
+};
+(() => {
+  const q = new URLSearchParams(location.search);
+  const dev = /^(localhost|127\.0\.0\.1|\[::1\]|.*\.localhost)$/.test(location.hostname);
+  const v = RAZANTE_VARIANTES[q.get("rasante")];
+  if (v && (q.has("qa") || q.has("debug") || (dev && q.has("local")))) Object.assign(RAZANTE_CAM, v);
+})();
+
 /* Geometría del rasante precalculada: posición y rumbo continuos por
    distancia a lo largo de la ruta suavizada. */
 export function makeFlight(rawPath) {
