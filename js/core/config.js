@@ -285,3 +285,54 @@ export const A3_SHADOWS = {
   }
 }
 /* === A3: fin === */
+
+/* === A5: inicio === */
+/* Fauna (render/systems/fauna.js): aves en bandadas y polinizadores. Diales y método: handoffs/a5-fauna.md.
+   Todo procedural (sin assets). Semilla fija: la misma fauna en cada carga (con ?qa y sin él). */
+export const A5_FAUNA = {
+  enabled: true,               // false = sin fauna. También ?fauna=0 (con ?qa/?debug)
+  seed: 0xA5F0,                // semilla base (se suma 1 en inicial, 2 en multi)
+  ratioInicial: 0.25,          // D-4: proporción inicial : multi = 1 : 4 (aves). Los polinizadores usan butterflyInicial
+  birds: {
+    treesPerBird: 25,          // el total de aves de multi sale de (árboles del escenario / esto), entre min y max
+    min: 40, max: 130,
+    flockSize: [8, 25],        // individuos por bandada
+    anchorCell: 300,           // m · celda para buscar parches leñosos (centros de gravedad de los árboles)
+    anchorMinTrees: 8,         // árboles mínimos en una celda para que sea un parche donde anidan
+    anchorSep: 380,            // m · separación mínima entre recorridos de bandadas distintas
+    orbit: [90, 190],          // m · radio del recorrido alrededor del parche (se suma la dispersión del parche)
+    alt: [25, 56],             // m sobre el suelo · el piso se calcula también contra el árbol más alto (treeClear)
+    treeClear: 7,              // m · colchón mínimo sobre la copa más alta de TREE_SPECIES (sin atravesar árboles)
+    speed: [8, 13],            // m/s
+    span: 3.4,                 // m · envergadura (escala estilizada, como GRASS_SCALE: de 100-300 m se tiene que leer)
+    spanVar: 0.3,              // ± fracción
+    flapHz: [2.0, 2.8],        // aleteo
+    boostFrom: 180, farBoost: 2.2,   // desde boostFrom m el ave crece ∝ distancia (tope ×farBoost): a 400 m se sigue leyendo (≈ 20 px)
+    maxDist: [900, 1400],     // m · se encogen a 0 entre estas distancias a la cámara (sub-píxel: no vale dibujarlas)
+    palette: [[0x34373a, 0.58], [0x5d5249, 0.24], [0x85807a, 0.10], [0xe7e4da, 0.08]]   // [color sRGB, peso]
+  },
+  butterflies: {
+    tuftsPerButterfly: { "corr-herb": 26, "parche-herb": 300 },   // 1 polinizador cada N matas (en multi)
+    max: 16000,                // tope por escenario (solo se dibujan las celdas a < visDist de la cámara)
+    inicial: 0,                // fracción de multi en el escenario inicial (casi ninguno: 0 = ninguno)
+    cell: 200,                 // m · celda de instanciado (una InstancedMesh por celda)
+    visDist: [230, 330],       // m · se achican a 0 entre estas distancias a la cámara (y solo se dibujan las celdas dentro)
+    farBoost: 1.8,             // entre 60 y 190 m de la cámara crecen hasta ×1,8 (a 150 m una de 2,2 m mide ~17 px)
+    span: 2.2,                 // m · envergadura (escala estilizada)
+    alt: [2.4, 6.0],           // m · sobre el suelo: 0,5-2,5 m reales × GRASS_SCALE a medias (las matas miden 2-4,7 m: si vuelan más bajo quedan tapadas)
+    wander: [7, 16],           // m · radio de vuelo errático alrededor de la mata
+    palette: [[0xffd21f, 0.40], [0xff7d14, 0.35], [0xffffff, 0.25]]
+  }
+};
+/* Ajuste en caliente (solo ?debug/?qa): ?a5={"ratioInicial":0.5} se mezcla (superficial) sobre A5_FAUNA. */
+{
+  const q = new URLSearchParams(location.search);
+  if ((q.has("debug") || q.has("qa")) && q.get("a5")) {
+    try {
+      const o = JSON.parse(q.get("a5"));
+      for (const k in o) { if (o[k] && typeof o[k] === "object" && !Array.isArray(o[k]) && A5_FAUNA[k]) Object.assign(A5_FAUNA[k], o[k]); else A5_FAUNA[k] = o[k]; }
+    } catch (e) { console.warn("a5: JSON inválido en ?a5"); }
+  }
+  if ((q.has("debug") || q.has("qa")) && q.get("fauna") === "0") A5_FAUNA.enabled = false;
+}
+/* === A5: fin === */

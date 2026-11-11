@@ -28,6 +28,7 @@ import grass from "./systems/grass.js";
 import ground from "./systems/ground.js";   // A4: suelo por shader + surcos
 import { growthU, heightAt, patchGrowth, terrain } from "../terrain/terrain.js";   // A6: relieve (heightAt real; terrain.active)
 import shadows from "./systems/shadows.js";   // A3: sombras de árboles (pase propio + receptor + blobs)
+import fauna from "./systems/fauna.js";   // A5: aves y polinizadores
 
 const SCENARIOS = ["inicial", "multi"];
 
@@ -207,3 +208,4 @@ host.register(trees);
 host.register(grass);
 host.register(ground);   // A4
 host.register(shadows);   // A3
+host.register(fauna);   // A5
