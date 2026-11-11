@@ -224,12 +224,13 @@ export const A6_TERRAIN = {
   /* Override por campo (id de campo): { terreno: true|false, exag: n }. Tiene menos prioridad que el campo
      `terreno` de campos.local.json / la tabla `campos`, y que ?terreno=0|1 en la URL (la más fuerte). */
   campos: {
-    // nikunihue: { terreno: true },   // ver pregunta 2 del handoff: la regla automática lo deja llano
+    nikunihue: { terreno: true },   // G2 (Mike): forzado para que se vea el escarpe, donde el terreno esté activo por calidad (quality.terrain)
   },
   /* Sombreado de relieve (hillshade MapLibre), sutil y en TODOS los campos. La luz sale del azimut del sol de
      A1 (A1_CAMPOS[campo].sunAzimuth, o A1_SUN.defaultAzimuth). */
   hillshade: {
     enabled: true,
+    maxzoom: 13, tileSize: 256,   // G2: fuente del hillshade (más barato con maxzoom menor / tileSize 512); ver handoffs/a6-calidad.md
     exaggeration: 0.4,      // 0..1: intensidad (0,5 es el default de MapLibre; 0,28 era imperceptible, dE<0,7; 0,6 ya moteaba el llano con el ruido del SRTM)
     shadow: "#26301a", highlight: "#fff6e0", accent: "#26301a"
   },

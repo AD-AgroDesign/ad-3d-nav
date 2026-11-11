@@ -18,12 +18,13 @@ export const LABELS = { ultra: "Ultra", alta: "Alta", media: "Media", baja: "Baj
      treeCardDist    follaje en tarjetas hasta esa distancia; treeImpostorDist: impostor desde ahí
      shadows         tamaño del shadow map (0 = sombras blob actuales)
      soil / fauna / water   suelo por shader, fauna, agua por shader
+     terrain         terreno 3D + hillshade (A6; true/false; "gpu" = sí salvo GPU integrada o de gama baja)
      idleFps         tope del lazo de animación en reposo (0 = apagado) */
 export const LEVEL_PARAMS = {
-  ultra: { msaa: true,  pixelRatioCap: 2,    grassDensity: 1,       grassLodDist: 1400, treeCardDist: 900, treeImpostorDist: Infinity, shadows: 4096, soil: "completo",   fauna: 1,   water: "shader", idleFps: 30 },
-  alta:  { msaa: "gpu", pixelRatioCap: 1.5,  grassDensity: 1,       grassLodDist: 1000, treeCardDist: 600, treeImpostorDist: Infinity, shadows: 2048, soil: "completo",   fauna: 1,   water: "shader", idleFps: 30 },
-  media: { msaa: "gpu", pixelRatioCap: 1.25, grassDensity: "movil", grassLodDist: 600,  treeCardDist: 300, treeImpostorDist: 1500,     shadows: 1024, soil: "sin-surcos", fauna: 0.5, water: "shader", idleFps: 20 },
-  baja:  { msaa: false, pixelRatioCap: 1,    grassDensity: 0.5,     grassLodDist: 400,  treeCardDist: 0,   treeImpostorDist: 0,        shadows: 0,    soil: "apagado",    fauna: 0,   water: "plano",  idleFps: 0 }
+  ultra: { msaa: true,  pixelRatioCap: 2,    grassDensity: 1,       grassLodDist: 1400, treeCardDist: 900, treeImpostorDist: Infinity, shadows: 4096, soil: "completo",   fauna: 1,   water: "shader", idleFps: 30, terrain: true },
+  alta:  { msaa: "gpu", pixelRatioCap: 1.5,  grassDensity: 1,       grassLodDist: 1000, treeCardDist: 600, treeImpostorDist: Infinity, shadows: 2048, soil: "completo",   fauna: 1,   water: "shader", idleFps: 30, terrain: "gpu" },
+  media: { msaa: "gpu", pixelRatioCap: 1.25, grassDensity: "movil", grassLodDist: 600,  treeCardDist: 300, treeImpostorDist: 1500,     shadows: 1024, soil: "sin-surcos", fauna: 0.5, water: "shader", idleFps: 20, terrain: false },
+  baja:  { msaa: false, pixelRatioCap: 1,    grassDensity: 0.5,     grassLodDist: 400,  treeCardDist: 0,   treeImpostorDist: 0,        shadows: 0,    soil: "apagado",    fauna: 0,   water: "plano",  idleFps: 0, terrain: false }
 };
 
 const LS_KEY = "ad_calidad";
@@ -58,6 +59,18 @@ const gpuName = () => (_gpu === null ? (_gpu = gpuRenderer()) : _gpu);
 /* Resuelve el valor msaa de un nivel (true/false/"gpu") a un booleano. */
 export function msaaEnabled(q) {
   if (q.msaa !== "gpu") return !!q.msaa;
+  const g = gpuName();
+  return !(GPU_BAJA.test(g) || GPU_INTEGRADA.test(g));
+}
+
+/* A6 (G2, decisión de Mike 2026-11-11): terreno 3D + hillshade solo en Ultra y en Alta con GPU dedicada.
+   En la Intel HD 520 el terreno MapLibre costaba +10 a +85 ms por frame (a7 G2). Override solo de QA:
+   ?gpu=integrada|dedicada (con ?qa) simula el tipo de GPU del headless (SwiftShader no es ninguno de los dos). */
+export function terrainEnabled(q) {
+  if (q.terrain !== "gpu") return !!q.terrain;
+  const sim = new URLSearchParams(location.search);
+  if (sim.has("qa") && sim.get("gpu") === "dedicada") return true;
+  if (sim.has("qa") && sim.get("gpu") === "integrada") return false;
   const g = gpuName();
   return !(GPU_BAJA.test(g) || GPU_INTEGRADA.test(g));
 }
@@ -97,12 +110,13 @@ export const CONTEXT_PARAMS_ACTIVE = true;   // A1 1.3: style.js ya conecta anti
 export function setQuality(name, opts = {}) {
   name = String(name).toLowerCase();
   if (!LEVELS.includes(name)) return false;
-  const prev = { ...quality };
+  const prev = { ...quality }, terrPrev = terrainEnabled(quality);
   Object.assign(quality, { name, ...LEVEL_PARAMS[name], source: "usuario" });
   if (opts.persist !== false) lsSet(name);
   emit("quality", quality);
   const needsReload = CONTEXT_PARAMS_ACTIVE &&
-    (prev.msaa !== quality.msaa || prev.pixelRatioCap !== quality.pixelRatioCap);
+    (prev.msaa !== quality.msaa || prev.pixelRatioCap !== quality.pixelRatioCap ||
+     terrPrev !== terrainEnabled(quality));   // A6: el terreno se decide al cargar el campo
   if (needsReload && opts.reload !== false) location.reload();
   return true;
 }
