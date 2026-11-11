@@ -373,7 +373,7 @@ export function buildProxy() {
    su color e iluminación horneados. Es proyección ortográfica de quads planos = transformaciones afines:
    alcanza con drawImage + transform (sin WebGL, sin render-to-texture: no toca el contexto de MapLibre). */
 export const IMP_COLS = 3, IMP_ROWS = 3;            // columnas: lateral 0°, lateral 90°, cenital; filas: una por especie
-const IMP_T = 128, IMP_M = 2, IMP_DEPTH_AO = 0.45;                       // px por tile y margen interno
+const IMP_T = 128, IMP_M = 2, IMP_DEPTH_AO = 0.45, IMP_BLEED = 3, IMP_EDGE_DARK = 0.15;                       // px por tile y margen interno
 
 const rgb255 = c => "rgb(" + Math.round(Math.min(1, c[0]) * 255) + "," + Math.round(Math.min(1, c[1]) * 255) + "," + Math.round(Math.min(1, c[2]) * 255) + ")";
 
@@ -473,15 +473,30 @@ export function buildImpostorAtlas(list) {
     }
     mean[r * IMP_COLS + k] = n ? [sr / n, sg / n, sb / n] : [100, 120, 80];
   }
+  /* Halo claro (G2b). CAUSA: getImageData ya devuelve el color SIN premultiplicar, y acá se lo dividía otra vez por el alfa
+     (img * 255 / a): todo texel de alfa parcial (el borde de la silueta y las hojas ralas) salía hasta 6x más brillante
+     (saturado a casi blanco) = el "bordecito claro / bolsa clara". Además, los mipmaps promedian RGB sin ponderar por alfa.
+     ARREGLO: se usa el color tal cual; los texels de alfa parcial/nulo toman el color medio de sus vecinos ponderado por
+     alfa (sangrado, radio IMP_BLEED, dentro del tile), así los mipmaps y el filtrado no arrastran fondo ni colores sueltos;
+     y el borde se oscurece apenas (IMP_EDGE_DARK) para que el contorno no quede más claro que la masa. */
+  const R = IMP_BLEED, bk = IMP_EDGE_DARK;
   for (let y = 0; y < Hd; y++) {
-    const dst = (Hd - 1 - y) * Wd * 4;
+    const dst = (Hd - 1 - y) * Wd * 4, tx = 0, ty = Math.floor(y / T) * T;
     for (let x = 0; x < Wd; x++) {
-      const o = (y * Wd + x) * 4, d = dst + x * 4, a = img[o + 3];
-      const mn = mean[Math.floor(y / T) * IMP_COLS + Math.floor(x / T)], sub = a > 0 ? 255 / a : 0;
-      data[d]     = a > 40 ? Math.min(255, img[o] * sub) : mn[0];
-      data[d + 1] = a > 40 ? Math.min(255, img[o + 1] * sub) : mn[1];
-      data[d + 2] = a > 40 ? Math.min(255, img[o + 2] * sub) : mn[2];
-      data[d + 3] = a;
+      const o = (y * Wd + x) * 4, d = dst + x * 4, a = img[o + 3], x0 = Math.floor(x / T) * T;
+      let r = img[o], g = img[o + 1], b = img[o + 2];
+      if (a < 255) {
+        let sr = 0, sg = 0, sb = 0, sa = 0;
+        for (let yy = Math.max(ty, y - R); yy <= Math.min(ty + T - 1, y + R); yy++) for (let xx = Math.max(x0, x - R); xx <= Math.min(x0 + T - 1, x + R); xx++) {
+          const q = (yy * Wd + xx) * 4, w = img[q + 3] / 255; w * w && (sr += img[q] * w * w, sg += img[q + 1] * w * w, sb += img[q + 2] * w * w, sa += w * w);
+        }
+        const mn = mean[Math.floor(y / T) * IMP_COLS + Math.floor(x / T)];
+        const nr = sa > 0.02 ? sr / sa : mn[0], ng = sa > 0.02 ? sg / sa : mn[1], nb = sa > 0.02 ? sb / sa : mn[2];
+        const t = a < 40 ? 1 : 1 - a / 255;                    // 1 = todo vecindad, 0 = color propio
+        const k = 1 - bk * (1 - a / 255);                      // oscurecimiento del borde
+        r = (r + (nr - r) * t) * k; g = (g + (ng - g) * t) * k; b = (b + (nb - b) * t) * k;
+      }
+      data[d] = r; data[d + 1] = g; data[d + 2] = b; data[d + 3] = a;
     }
   }
   const tex = new THREE.DataTexture(data, Wd, Hd, THREE.RGBAFormat, THREE.UnsignedByteType);

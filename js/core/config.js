@@ -89,14 +89,14 @@ export const TREE_AO = { trunk: 0.35, crown: 0.28 };  // troncos: 30 % inferior;
                 del elipsoide de la copa); proxyFlat = factor de grosor vertical del impostor; proxyShade = oscurecimiento del impostor para empalmar con el follaje */
 export const TREE_SPECIES = {
   tala:      { label: "Tala",      mix: 0.45, h: [6.25, 11.25], crownK: [0.42, 0.60], leaf: 0x436f31, bark: 0x6a5a48, cards: 44, proxyK: 0.95, proxyFlat: 1, proxyShade: 0.85 },
-  algarrobo: { label: "Algarrobo", mix: 0.35, h: [7.5, 15], crownK: [0.50, 0.75], leaf: 0x6a8556, bark: 0x4a392b, cards: 60, proxyK: 0.92, proxyFlat: 1.7, proxyShade: 0.55 },
-  chanar:    { label: "Chañar",    mix: 0.20, h: [3.75, 8.75], crownK: [0.42, 0.60], leaf: 0x9fac48, bark: 0x7a7552, cards: 34, proxyK: 0.85, proxyFlat: 1, proxyShade: 0.78 }
+  algarrobo: { label: "Algarrobo", mix: 0.35, h: [7.5, 15], crownK: [0.50, 0.75], leaf: 0x6a8556, bark: 0x4a392b, cards: 60, proxyK: 0.92, proxyFlat: 1.7, proxyShade: 0.80 },
+  chanar:    { label: "Chañar",    mix: 0.20, h: [3.75, 8.75], crownK: [0.42, 0.60], leaf: 0x9fac48, bark: 0x7a7552, cards: 34, proxyK: 0.85, proxyFlat: 1, proxyShade: 0.68 }
 };
 /* G2 (2026-11-11, decisión del dueño): alturas de las nativas ×1,25 (promedio ~7,2 → ~9,1 m; los árboles anteriores eran ~9,5 m),
    mismas proporciones (crownK) y misma variación por individuo (el rango se mapea desde la altura original 5-14 m).
    Boceto A de las tres especies (B y C descartados: eran solo para la revisión). */
 export const TREE_ALPHA_TEST = 0.4;        // corte del alfa de las tarjetas (con MSAA se suaviza con alphaToCoverage)
-export const TREE_LOD_BAND = 0.2;          // franja (fracción de treeCardDist) donde tarjetas e impostor se funden por dither
+export const TREE_LOD_BAND = 0.3;          // franja (fracción de treeCardDist) donde tarjetas e impostor se funden por dither
 /* G2 · impostores: ya no son el elipsoide de 32 tris sino 3 quads cruzados (6 tris) con una textura horneada en el navegador
    desde el propio modelo de cada especie (treegen.buildImpostorAtlas). cardDistK agranda la distancia de las tarjetas
    (quality.treeCardDist × cardDistK; Baja sigue en 0 = solo impostor) porque el impostor nuevo es barato y se parece al árbol.
