@@ -88,12 +88,21 @@ export const TREE_AO = { trunk: 0.35, crown: 0.28 };  // troncos: 30 % inferior;
      cards      tarjetas de follaje por árbol (2 tris c/u); proxyK = tamaño del impostor (fracción
                 del elipsoide de la copa); proxyFlat = factor de grosor vertical del impostor; proxyShade = oscurecimiento del impostor para empalmar con el follaje */
 export const TREE_SPECIES = {
-  tala:      { label: "Tala",      mix: 0.45, h: [5, 9],  crownK: [0.42, 0.60], leaf: 0x436f31, bark: 0x6a5a48, cards: 44, proxyK: 0.95, proxyFlat: 1, proxyShade: 0.80 },
-  algarrobo: { label: "Algarrobo", mix: 0.35, h: [6, 12], crownK: [0.50, 0.75], leaf: 0x6a8556, bark: 0x4a392b, cards: 60, proxyK: 0.92, proxyFlat: 1.7, proxyShade: 0.66 },
-  chanar:    { label: "Chañar",    mix: 0.20, h: [3, 7],  crownK: [0.42, 0.60], leaf: 0x9fac48, bark: 0x7a7552, cards: 34, proxyK: 0.85, proxyFlat: 1, proxyShade: 0.74 }
+  tala:      { label: "Tala",      mix: 0.45, h: [6.25, 11.25], crownK: [0.42, 0.60], leaf: 0x436f31, bark: 0x6a5a48, cards: 44, proxyK: 0.95, proxyFlat: 1, proxyShade: 0.85 },
+  algarrobo: { label: "Algarrobo", mix: 0.35, h: [7.5, 15], crownK: [0.50, 0.75], leaf: 0x6a8556, bark: 0x4a392b, cards: 60, proxyK: 0.92, proxyFlat: 1.7, proxyShade: 0.55 },
+  chanar:    { label: "Chañar",    mix: 0.20, h: [3.75, 8.75], crownK: [0.42, 0.60], leaf: 0x9fac48, bark: 0x7a7552, cards: 34, proxyK: 0.85, proxyFlat: 1, proxyShade: 0.78 }
 };
+/* G2 (2026-11-11, decisión del dueño): alturas de las nativas ×1,25 (promedio ~7,2 → ~9,1 m; los árboles anteriores eran ~9,5 m),
+   mismas proporciones (crownK) y misma variación por individuo (el rango se mapea desde la altura original 5-14 m).
+   Boceto A de las tres especies (B y C descartados: eran solo para la revisión). */
 export const TREE_ALPHA_TEST = 0.4;        // corte del alfa de las tarjetas (con MSAA se suaviza con alphaToCoverage)
 export const TREE_LOD_BAND = 0.2;          // franja (fracción de treeCardDist) donde tarjetas e impostor se funden por dither
+/* G2 · impostores: ya no son el elipsoide de 32 tris sino 3 quads cruzados (6 tris) con una textura horneada en el navegador
+   desde el propio modelo de cada especie (treegen.buildImpostorAtlas). cardDistK agranda la distancia de las tarjetas
+   (quality.treeCardDist × cardDistK; Baja sigue en 0 = solo impostor) porque el impostor nuevo es barato y se parece al árbol.
+   shade = brillo del impostor para empalmar con el follaje cercano (el cercano usa normales esféricas y este normal +Y);
+   alphaTest = corte del alfa horneado (bajo: los mipmaps adelgazan la silueta). */
+export const TREE_IMPOSTOR = { cardDistK: 1.5, shade: 1, alphaTest: 0.32, alphaFar: [500, 2500], minSizeDist: 4000 };   // minSizeDist: desde esa distancia (m) el impostor crece ∝ d (tope ×3) para no desaparecer (1 px) en el home   // alphaFar = (m donde empieza, m donde llega) la baja del corte de alfa a 0,1 (los mipmaps adelgazan la silueta)
 export const TREE_IMPOSTOR_CULL = false;   // true = respeta quality.treeImpostorDist finito (Media 1500 m): en cenital/home desaparecen todos los árboles; el impostor cuesta ~32 tris, por eso por defecto nunca se omite
 export const TREE_SWAY = 0.035;            // vaivén de la copa (fracción de la altura en la punta); ≤ 1/3 del pasto
 export const TREE_BAKE = { interior: 0.18, bottom: 0.14, trunk: 0.22 };   // oclusión horneada en el color de vértice (valores sRGB)
@@ -105,6 +114,7 @@ export const TREE_BAKE = { interior: 0.18, bottom: 0.14, trunk: 0.22 };   // ocl
     try {
       const o = JSON.parse(q.get("a2"));
       for (const k in (o.TREE_SPECIES || {})) if (TREE_SPECIES[k]) Object.assign(TREE_SPECIES[k], o.TREE_SPECIES[k]);
+      if (o.TREE_IMPOSTOR) Object.assign(TREE_IMPOSTOR, o.TREE_IMPOSTOR);    // G2: ?a2={"TREE_IMPOSTOR":{"cardDistK":0.01}} = solo impostores
     } catch (e) { console.warn("a2: JSON inválido en ?a2"); }
   }
 }

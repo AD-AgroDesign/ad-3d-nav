@@ -9,7 +9,12 @@
                                     normales ESFÉRICAS (desde el centro de la copa) y oclusión horneada
                                     en el color de vértice. Una sola geometría = una sola malla por
                                     especie/celda (tronco y follaje comparten material y atlas).
-   - buildProxy()                → copa simplificada (32 tris, elipsoide unitario) para el impostor.
+   - buildProxy()                → copa simplificada (32 tris, elipsoide unitario): YA NO se dibuja; queda solo como
+                                    geometría de sombra lejana (trees.casters().far, lo consume A3).
+   - buildImpostorAtlas(list)    → impostores horneados EN EL NAVEGADOR a partir del propio modelo (G2): vistas laterales
+                                    (2, a 0° y 90°) y cenital de cada especie, dibujadas con canvas 2D (proyección ortográfica
+                                    de las mismas tarjetas, troncos y colores con AO). Sin WebGL: no toca el contexto de MapLibre.
+   - buildImpostorGeometry()     → 3 quads cruzados (2 verticales + 1 horizontal = 6 tris) de caja unitaria.
    Colores de vértice en sRGB (host.js los pasa a lineal con el chunk srgbVC, como las matas).
    Las semillas son fijas (mulberry32): la misma geometría en cada carga. */
 import * as THREE from "three";
@@ -26,7 +31,7 @@ function tileUV(tile, u, v) {
 }
 
 /* ---------------------------------------------------------------- Atlas ---------- */
-let atlasCache = null;
+let atlasCache = null, atlasSrc = null;   // atlasSrc: canvas 512x512 RGBA (sin voltear) = fuente de los impostores horneados
 
 function gray(g) { g = Math.max(0, Math.min(255, Math.round(g))); return "rgb(" + g + "," + g + "," + g + ")"; }
 function leaf(c, x, y, len, wid, ang, g) {
@@ -117,6 +122,7 @@ export function buildAtlas() {
   paintTiles(c);
   const src = c.getImageData(0, 0, ATLAS, ATLAS).data;
   const data = new Uint8Array(ATLAS * ATLAS * 4);
+  const flat = new Uint8ClampedArray(ATLAS * ATLAS * 4);
   for (let y = 0; y < ATLAS; y++) {
     const dst = (ATLAS - 1 - y) * ATLAS * 4;      // fila 0 de la textura = abajo (v=0): se invierte el canvas
     for (let x = 0; x < ATLAS; x++) {
@@ -128,8 +134,12 @@ export function buildAtlas() {
       const g = isBark ? v : Math.max(v, 185);
       data[o] = data[o + 1] = data[o + 2] = g;
       data[o + 3] = isBark ? 255 : Math.round(Math.max(0, Math.min(1, (v - 24) / 90)) * 255);
+      const f = (y * ATLAS + x) * 4;
+      flat[f] = flat[f + 1] = flat[f + 2] = g; flat[f + 3] = data[o + 3];
     }
   }
+  atlasSrc = document.createElement("canvas"); atlasSrc.width = atlasSrc.height = ATLAS;
+  atlasSrc.getContext("2d").putImageData(new ImageData(flat, ATLAS, ATLAS), 0, 0);
   const tex = new THREE.DataTexture(data, ATLAS, ATLAS, THREE.RGBAFormat, THREE.UnsignedByteType);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.generateMipmaps = true;
@@ -155,11 +165,12 @@ const sstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a)
 const hex3 = h => [((h >> 16) & 255) / 255, ((h >> 8) & 255) / 255, (h & 255) / 255];
 
 class GeoBuilder {
-  constructor() { this.pos = []; this.nor = []; this.col = []; this.uv = []; this.idx = []; }
+  constructor() { this.pos = []; this.nor = []; this.col = []; this.uv = []; this.idx = []; this.tubes = []; this.cards = []; }   // tubes/cards: copia de lo armado, para hornear los impostores
   vert(p, n, c, uv) { this.pos.push(p[0], p[1], p[2]); this.nor.push(n[0], n[1], n[2]); this.col.push(c[0], c[1], c[2]); this.uv.push(uv[0], uv[1]); return this.pos.length / 3 - 1; }
 
   /* Tubo cónico de `sides` lados entre p0 y p1 (radios r0, r1), sin tapas. colorAt(y) → rgb. */
   tube(p0, p1, r0, r1, sides, colorAt) {
+    this.tubes.push({ p0, p1, r0, r1, col: colorAt((p0[1] + p1[1]) / 2) });
     const a = v3.norm(v3.sub(p1, p0));
     let u = v3.cross(a, Math.abs(a[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0]); u = v3.norm(u);
     const w = v3.cross(a, u);                  // (u, w, a) diestro
@@ -187,11 +198,14 @@ class GeoBuilder {
     up = v3.add(v3.mul(up, cs), v3.mul(v3.cross(n, up), sn));
     const right = v3.norm(v3.cross(up, n));
     const base = this.pos.length / 3;
+    const rec = { P: [], T: [], tile, col: colorAt(c) };
     for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
       const p = v3.add(c, v3.add(v3.mul(right, sx * w / 2), v3.mul(up, sy * h / 2)));
       const u = PAD + (1 - 2 * PAD) * ((sx > 0) !== flip ? 1 : 0), v = PAD + (1 - 2 * PAD) * (sy > 0 ? 1 : 0);
       this.vert(p, normalFn(p), colorAt(p), tileUV(tile, u, v));
+      rec.P.push(p); rec.T.push([u, v]);
     }
+    this.cards.push(rec);
     this.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
   }
 
@@ -315,7 +329,8 @@ export function buildSpecies(name, cfg) {
   return {
     geometry: b.toGeometry(inv),
     R0u: shape.R * inv,                              // radio de copa nominal (en unidades de altura)
-    cyU: cc[1] * inv, rxU: cr[0] * inv, ryU: cr[1] * inv
+    cyU: cc[1] * inv, rxU: cr[0] * inv, ryU: cr[1] * inv,
+    bake: { cards: b.cards, tubes: b.tubes, H }       // material para buildImpostorAtlas (metros nominales)
   };
 }
 
@@ -346,6 +361,157 @@ export function buildProxy() {
   g.setAttribute("position", new THREE.Float32BufferAttribute(b.pos, 3));
   g.setAttribute("normal", new THREE.Float32BufferAttribute(b.nor, 3));
   g.setAttribute("color", new THREE.Float32BufferAttribute(b.col, 3));
+  g.setIndex(b.idx);
+  g.computeBoundingSphere();
+  return g;
+}
+
+/* ======================================================= Impostores horneados (G2) ======
+   Para cada especie se dibuja, con canvas 2D, una vista lateral a 0°, otra a 90° y una cenital del
+   propio árbol (las mismas tarjetas con su tinte/AO y los mismos troncos). Tres quads cruzados
+   (buildImpostorGeometry) las muestran a distancia: se parecen al árbol real de esa especie y llevan
+   su color e iluminación horneados. Es proyección ortográfica de quads planos = transformaciones afines:
+   alcanza con drawImage + transform (sin WebGL, sin render-to-texture: no toca el contexto de MapLibre). */
+export const IMP_COLS = 3, IMP_ROWS = 3;            // columnas: lateral 0°, lateral 90°, cenital; filas: una por especie
+const IMP_T = 128, IMP_M = 2, IMP_DEPTH_AO = 0.45;                       // px por tile y margen interno
+
+const rgb255 = c => "rgb(" + Math.round(Math.min(1, c[0]) * 255) + "," + Math.round(Math.min(1, c[1]) * 255) + "," + Math.round(Math.min(1, c[2]) * 255) + ")";
+
+/* Afín que lleva los puntos a0,a1,a3 (px de la imagen fuente) a s0,s1,s3 (px del tile). */
+function affine(a0, a1, a3, s0, s1, s3) {
+  const e1 = [a1[0] - a0[0], a1[1] - a0[1]], e2 = [a3[0] - a0[0], a3[1] - a0[1]];
+  const det = e1[0] * e2[1] - e1[1] * e2[0];
+  const S1 = [s1[0] - s0[0], s1[1] - s0[1]], S2 = [s3[0] - s0[0], s3[1] - s0[1]];
+  const A = (S1[0] * e2[1] - S2[0] * e1[1]) / det, C = (S2[0] * e1[0] - S1[0] * e2[0]) / det;
+  const B = (S1[1] * e2[1] - S2[1] * e1[1]) / det, D = (S2[1] * e1[0] - S1[1] * e2[0]) / det;
+  return [A, B, C, D, s0[0] - (A * a0[0] + C * a0[1]), s0[1] - (B * a0[0] + D * a0[1])];
+}
+
+/* Extensión de un árbol (metros nominales): semiancho W (x/z) y alto Ht. */
+function extents(src) {
+  let W = 0, Ht = 0;
+  for (const cd of src.cards) for (const p of cd.P) { W = Math.max(W, Math.abs(p[0]), Math.abs(p[2])); Ht = Math.max(Ht, p[1]); }
+  for (const t of src.tubes) for (const p of [t.p0, t.p1]) { W = Math.max(W, Math.abs(p[0]) + t.r0, Math.abs(p[2]) + t.r0); Ht = Math.max(Ht, p[1]); }
+  return { W: W * 1.01, Ht: Ht * 1.01 };
+}
+
+/* list: [{ name, bake: { cards, tubes, H }, cy }] (en orden de fila; cy = altura nominal del centro de la copa).
+   Devuelve { texture, info: { name: { row, half (semiancho del quad / H), yb (base del quad / H),
+   hgt (alto del quad / H), topFrac (altura del quad cenital dentro de la caja, 0..1) } } }. */
+export function buildImpostorAtlas(list) {
+  buildAtlas();
+  const T = IMP_T, M = IMP_M, inner = T - 2 * M;
+  const cv = document.createElement("canvas");
+  cv.width = IMP_COLS * T; cv.height = IMP_ROWS * T;
+  const c = cv.getContext("2d", { willReadFrequently: true });
+  const tmp = document.createElement("canvas"); tmp.width = tmp.height = 64;
+  const tc = tmp.getContext("2d");
+  const info = {};
+
+  list.forEach(({ name, bake: src, cy }, row) => {
+    const { W, Ht } = extents(src), H = src.H;
+    const pxX = x => M + (x + W) / (2 * W) * inner;            // -W..W → M..T-M
+    const pxY = y => T - M - y / Ht * inner;                   // 0..Ht → T-M..M
+    const quadHalf = W * T / inner, yb = -M * Ht / inner, yt = (T - M) * Ht / inner;
+    const views = [
+      { proj: p => [pxX(p[0]), pxY(p[1])], depth: p => p[2], tube: true },       // lateral 0° (cámara en +z)
+      { proj: p => [pxX(-p[2]), pxY(p[1])], depth: p => p[0], tube: true },      // lateral 90° (cámara en +x)
+      { proj: p => [pxX(p[0]), M + (p[2] + W) / (2 * W) * inner], depth: p => p[1], tube: false }   // cenital
+    ];
+    views.forEach((V, col) => {
+      c.save();
+      c.beginPath(); c.rect(col * T, row * T, T, T); c.clip();
+      c.translate(col * T, row * T);
+      c.imageSmoothingQuality = "high";
+      if (V.tube) {                                              // tronco y ramas, detrás de las hojas
+        for (const t of src.tubes) {
+          const a = V.proj(t.p0), b = V.proj(t.p1), sc = inner / (2 * W);
+          const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1, nx = -dy / L, ny = dx / L;
+          const w0 = Math.max(0.7, t.r0 * sc), w1 = Math.max(0.5, t.r1 * sc);
+          c.fillStyle = rgb255(t.col);
+          c.beginPath();
+          c.moveTo(a[0] + nx * w0, a[1] + ny * w0); c.lineTo(b[0] + nx * w1, b[1] + ny * w1);
+          c.lineTo(b[0] - nx * w1, b[1] - ny * w1); c.lineTo(a[0] - nx * w0, a[1] - ny * w0);
+          c.closePath(); c.fill();
+        }
+      }
+      const mid = cd => [(cd.P[0][0] + cd.P[2][0]) / 2, (cd.P[0][1] + cd.P[2][1]) / 2, (cd.P[0][2] + cd.P[2][2]) / 2];
+      const order = src.cards.map((cd, i) => ({ i, d: V.depth(mid(cd)) })).sort((p, q) => p.d - q.d);   // lejos → cerca
+      const dMin = order[0].d, dSpan = (order[order.length - 1].d - dMin) || 1;
+      for (const { i, d } of order) {
+        const cd = src.cards[i];
+        /* oclusión por profundidad (AO horneado de la vista): las tarjetas del fondo, vistas a través de los huecos del frente, quedan más oscuras */
+        const dk = 1 - IMP_DEPTH_AO * (1 - (d - dMin) / dSpan), tint = [cd.col[0] * dk, cd.col[1] * dk, cd.col[2] * dk];
+        // tile de hoja con el tinte de la tarjeta (64x64): gris × color, con el alfa del tile
+        tc.globalCompositeOperation = "source-over"; tc.clearRect(0, 0, 64, 64);
+        const ox = (cd.tile & 1) * TILE_PX, oy = (cd.tile >> 1) * TILE_PX;
+        tc.drawImage(atlasSrc, ox, oy, TILE_PX, TILE_PX, 0, 0, 64, 64);
+        tc.globalCompositeOperation = "multiply"; tc.fillStyle = rgb255(tint); tc.fillRect(0, 0, 64, 64);
+        tc.globalCompositeOperation = "destination-in"; tc.drawImage(atlasSrc, ox, oy, TILE_PX, TILE_PX, 0, 0, 64, 64);
+        const a = k => [cd.T[k][0] * 64, (1 - cd.T[k][1]) * 64];
+        const m = affine(a(0), a(1), a(3), V.proj(cd.P[0]), V.proj(cd.P[1]), V.proj(cd.P[3]));
+        c.save();
+        c.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
+        c.drawImage(tmp, 0, 0);
+        c.restore();
+      }
+      c.restore();
+    });
+    info[name] = { row, half: quadHalf / H, yb: yb / H, hgt: (yt - yb) / H, topFrac: Math.min(1, Math.max(0, (cy - yb) / (yt - yb))) };
+  });
+
+  /* Bajada a textura (fila 0 = abajo). En los píxeles casi transparentes el RGB se rellena con el color medio
+     de su tile: los mipmaps no arrastran halos oscuros ni de otros tiles. El canvas guarda premultiplicado. */
+  const img = c.getImageData(0, 0, cv.width, cv.height).data, Wd = cv.width, Hd = cv.height;
+  const data = new Uint8Array(Wd * Hd * 4);
+  const mean = [];
+  for (let r = 0; r < IMP_ROWS; r++) for (let k = 0; k < IMP_COLS; k++) {
+    let sr = 0, sg = 0, sb = 0, n = 0;
+    for (let y = r * T; y < (r + 1) * T; y++) for (let x = k * T; x < (k + 1) * T; x++) {
+      const o = (y * Wd + x) * 4;
+      if (img[o + 3] > 200) { sr += img[o]; sg += img[o + 1]; sb += img[o + 2]; n++; }
+    }
+    mean[r * IMP_COLS + k] = n ? [sr / n, sg / n, sb / n] : [100, 120, 80];
+  }
+  for (let y = 0; y < Hd; y++) {
+    const dst = (Hd - 1 - y) * Wd * 4;
+    for (let x = 0; x < Wd; x++) {
+      const o = (y * Wd + x) * 4, d = dst + x * 4, a = img[o + 3];
+      const mn = mean[Math.floor(y / T) * IMP_COLS + Math.floor(x / T)], sub = a > 0 ? 255 / a : 0;
+      data[d]     = a > 40 ? Math.min(255, img[o] * sub) : mn[0];
+      data[d + 1] = a > 40 ? Math.min(255, img[o + 1] * sub) : mn[1];
+      data[d + 2] = a > 40 ? Math.min(255, img[o + 2] * sub) : mn[2];
+      data[d + 3] = a;
+    }
+  }
+  const tex = new THREE.DataTexture(data, Wd, Hd, THREE.RGBAFormat, THREE.UnsignedByteType);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.anisotropy = 2;
+  tex.needsUpdate = true;
+  return { texture: tex, info, debugCanvas: cv };
+}
+
+/* 3 quads de caja unitaria (x,z en -1..1; y en 0..1): lateral 0° (plano z=0), lateral 90° (plano x=0) y
+   cenital (plano horizontal; y = 0.5 solo como marca: el vertex shader lo pone a la altura de la copa
+   de la especie con aImp.z). UV de la fila de abajo (el shader suma el offset de fila por instancia).
+   La marca de "cenital" es normal.y > 0.5; la iluminación usa siempre +Y (se fuerza en el shader). */
+export function buildImpostorGeometry() {
+  const b = new GeoBuilder();
+  const quad = (pts, n, col, uvOf) => {
+    const ids = pts.map(p => { const [u, v] = uvOf(p); return b.vert(p, n, [1, 1, 1], [(col + u) / IMP_COLS, v / IMP_ROWS]); });
+    b.idx.push(ids[0], ids[1], ids[2], ids[0], ids[2], ids[3]);
+  };
+  quad([[-1, 0, 0], [1, 0, 0], [1, 1, 0], [-1, 1, 0]], [0, 0, 1], 0, p => [(p[0] + 1) / 2, p[1]]);
+  quad([[0, 0, 1], [0, 0, -1], [0, 1, -1], [0, 1, 1]], [1, 0, 0], 1, p => [(1 - p[2]) / 2, p[1]]);          // u = (-z+1)/2
+  quad([[-1, 0.5, -1], [-1, 0.5, 1], [1, 0.5, 1], [1, 0.5, -1]], [0, 1, 0], 2, p => [(p[0] + 1) / 2, 1 - (p[2] + 1) / 2]);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(b.pos, 3));
+  g.setAttribute("normal", new THREE.Float32BufferAttribute(b.nor, 3));
+  g.setAttribute("color", new THREE.Float32BufferAttribute(b.col, 3));
+  g.setAttribute("uv", new THREE.Float32BufferAttribute(b.uv, 2));
   g.setIndex(b.idx);
   g.computeBoundingSphere();
   return g;

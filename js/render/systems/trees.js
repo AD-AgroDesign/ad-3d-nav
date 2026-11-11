@@ -6,17 +6,19 @@
      - CERCA: tronco + ramas + copa de tarjetas de follaje con atlas procedural (treegen.js), una
        InstancedMesh por especie y celda (tronco y follaje comparten geometría y material).
        alphaTest + alphaToCoverage (con MSAA); normales esféricas; vaivén sutil con uTime.
-     - LEJOS (impostor): copa simplificada de 32 tris (elipsoide), UNA InstancedMesh por celda para
-       las tres especies (color por instancia). Se funde con las tarjetas por dither (screen-door)
-       en una franja de TREE_LOD_BAND × treeCardDist: sin "pop".
-   Distancias por nivel (core/quality.js): treeCardDist / treeImpostorDist. Alta 600/∞, Media 300/1500,
-   Baja solo impostor (treeCardDist 0; treeImpostorDist 0 se interpreta como sin límite).
+     - LEJOS (impostor, G2): 3 quads cruzados (6 tris) con una textura horneada en el navegador desde el
+       propio modelo de cada especie (treegen.buildImpostorAtlas); UNA InstancedMesh por celda para las tres
+       especies (la fila del atlas va por instancia). Se funde con las tarjetas por dither (screen-door) en una
+       franja de TREE_LOD_BAND × distancia de tarjetas: sin "pop". Las sombras lejanas (A3) siguen usando el
+       elipsoide de 32 tris (`far`, que ya no se dibuja).
+   Distancias por nivel (core/quality.js): treeCardDist × TREE_IMPOSTOR.cardDistK / treeImpostorDist. Alta 900/∞,
+   Media 450/1500, Baja solo impostor (treeCardDist 0; treeImpostorDist 0 se interpreta como sin límite).
 
    Para A3 (sombras): ver `casters(scenarioKey)` abajo. */
 import * as THREE from "three";
-import { CHUNK_CELL_TREES, TREE_ALPHA_TEST, TREE_IMPOSTOR_CULL, TREE_LOD_BAND, TREE_SPECIES, TREE_SWAY } from "../../core/config.js";
+import { CHUNK_CELL_TREES, TREE_ALPHA_TEST, TREE_IMPOSTOR, TREE_IMPOSTOR_CULL, TREE_LOD_BAND, TREE_SPECIES, TREE_SWAY } from "../../core/config.js";
 import { chainShader, partitionCells } from "./chunks.js";
-import { buildAtlas, buildProxy, buildSpecies } from "./treegen.js";
+import { buildAtlas, buildImpostorAtlas, buildImpostorGeometry, buildProxy, buildSpecies } from "./treegen.js";
 
 const built = {};   // scenarioKey → { cells, nearMat, farMat, counts, n }
 const SPECIES = Object.keys(TREE_SPECIES);
@@ -24,7 +26,7 @@ const SPECIES = Object.keys(TREE_SPECIES);
 /* Uniforms compartidos: (cardStart, cardEnd, impStart, impEnd) en metros */
 const lodU = { value: new THREE.Vector4(480, 600, 1e9 - 1, 1e9) };
 function setLodFromQuality(q) {
-  const c = q.treeCardDist || 0;
+  const c = (q.treeCardDist || 0) * TREE_IMPOSTOR.cardDistK;
   const band = TREE_LOD_BAND;
   let ie = q.treeImpostorDist;
   if (!TREE_IMPOSTOR_CULL || !ie || !isFinite(ie)) ie = 1e9;              // Infinity y 0 (Baja: solo impostor) = sin límite
@@ -44,15 +46,18 @@ function pickSpecies(t) {
 /* Shader común (se encadena DESPUÉS de patch()): vaivén de copa, LOD por distancia con dither y,
    en las tarjetas, normal SIN invertir por cara (las normales esféricas valen para ambos lados). */
 function treeShader(mat, kind, sway) {
+  const imp = kind === "imp";            // impostor horneado: atlas por fila de instancia, quad cenital a la altura de la copa, normal +Y
   return chainShader(mat, "a2tree-" + kind + (sway ? "s" : ""), sh => {
     sh.uniforms.uA2TCam = mat.userData.camU;
     sh.uniforms.uA2TLod = lodU;
     sh.uniforms.uTime = mat.userData.timeU;
     sh.vertexShader = sh.vertexShader
-      .replace("#include <common>", "#include <common>\nuniform vec3 uA2TCam;\nuniform vec4 uA2TLod;\nuniform float uTime;\nvarying vec2 vA2TVis;")
+      .replace("#include <common>", "#include <common>\nuniform vec3 uA2TCam;\nuniform vec4 uA2TLod;\nuniform float uTime;\nvarying vec2 vA2TVis;" + (imp ? "\nattribute vec3 aImp;\nvarying float vA2TD;" : ""))
       .replace("#include <begin_vertex>",
         "#include <begin_vertex>\n" +
+        (imp ? "transformed.y = mix(transformed.y, aImp.z, step(0.5, normal.y));\n" : "") +
         "{\n  vec3 tip = instanceMatrix[3].xyz;\n  float d = distance(uA2TCam, tip);\n" +
+        (imp ? "  vA2TD = d;\n  transformed *= clamp(d / " + TREE_IMPOSTOR.minSizeDist.toFixed(1) + ", 1.0, 3.0);\n" : "") +
         (kind === "near"
           ? "  vA2TVis = vec2(1.0 - smoothstep(uA2TLod.x, uA2TLod.y, d), 1.0);\n"
           : "  vA2TVis = vec2(smoothstep(uA2TLod.x, uA2TLod.y, d), 1.0 - smoothstep(uA2TLod.z, uA2TLod.w, d));\n") +
@@ -61,27 +66,63 @@ function treeShader(mat, kind, sway) {
             "  transformed.x += sin(uTime * 0.9 + tph) * sw;\n  transformed.z += cos(uTime * 0.7 + tph * 1.7) * sw * 0.7;\n"
           : "") +
         "}");
+    if (imp) {
+      sh.vertexShader = sh.vertexShader
+        .replace("#include <beginnormal_vertex>", "#include <beginnormal_vertex>\nobjectNormal = vec3(0.0, 1.0, 0.0);")
+        .replace("#include <uv_vertex>", "#include <uv_vertex>\n#ifdef USE_MAP\n  vMapUv.y += aImp.y;\n#endif");
+    }
     const discardCode = kind === "near"
       ? "  if (vA2TVis.x < 1.0 && ign >= vA2TVis.x) discard;\n"
       : "  if ((vA2TVis.x < 1.0 && ign < 1.0 - vA2TVis.x) || (vA2TVis.y < 1.0 && ign >= vA2TVis.y)) discard;\n";
     sh.fragmentShader = sh.fragmentShader
       .replace("#include <common>", "#include <common>\nvarying vec2 vA2TVis;")
       .replace("void main() {", "void main() {\n  float ign = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));\n" + discardCode);
-    if (kind === "near") {
+    if (imp) {
+      /* Los mipmaps del alfa adelgazan la silueta con la distancia y los árboles lejanos (decenas de km en el home) se
+         iban borrando: el corte de alfa baja con la distancia (de TREE_IMPOSTOR.alphaTest a 0,1) y la masa de copas se conserva. */
+      sh.fragmentShader = sh.fragmentShader
+        .replace("#include <common>", "#include <common>\nvarying float vA2TD;")
+        .replace("#include <alphatest_fragment>", [
+          "#ifdef USE_ALPHATEST",
+          "  float a2T = mix(alphaTest, 0.1, smoothstep(" + TREE_IMPOSTOR.alphaFar[0].toFixed(1) + ", " + TREE_IMPOSTOR.alphaFar[1].toFixed(1) + ", vA2TD));",
+          "  #ifdef ALPHA_TO_COVERAGE",
+          "    diffuseColor.a = smoothstep(a2T, a2T + fwidth(diffuseColor.a), diffuseColor.a);",
+          "    if (diffuseColor.a == 0.0) discard;",
+          "  #else",
+          "    if (diffuseColor.a < a2T) discard;",
+          "  #endif",
+          "#endif"
+        ].join("\n"));
+    }
+    if (kind === "near" || imp) {
       sh.fragmentShader = sh.fragmentShader.replace("#include <normal_fragment_begin>",
         THREE.ShaderChunk.normal_fragment_begin.replace("normal *= faceDirection;", ""));
     }
   });
 }
 
-let speciesGeo = null, proxyGeo = null;
+const IMP_ROWS_ = 3;   // = treegen.IMP_ROWS (filas del atlas de impostores: una por especie)
+/* Geometría del impostor de UNA celda: comparte posición/uv/índice con la base y agrega el atributo por instancia
+   aImp = (0, offset de fila del atlas, altura del quad cenital). */
+function impG(base, n) {
+  const g = new THREE.BufferGeometry();
+  for (const k of ["position", "normal", "color", "uv"]) g.setAttribute(k, base.getAttribute(k));
+  g.setIndex(base.getIndex());
+  g.setAttribute("aImp", new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3));
+  return g;
+}
+
+let speciesGeo = null, proxyGeo = null, impGeo = null, impAtlas = null;
 function geometries() {
   if (!speciesGeo) {
     speciesGeo = {};
     for (const s of SPECIES) speciesGeo[s] = buildSpecies(s, TREE_SPECIES[s]);
-    proxyGeo = buildProxy();
+    proxyGeo = buildProxy();                                  // solo sombras lejanas (A3)
+    buildAtlas();
+    impAtlas = buildImpostorAtlas(SPECIES.map(s => ({ name: s, bake: speciesGeo[s].bake, cy: speciesGeo[s].cyU * speciesGeo[s].bake.H })));
+    impGeo = buildImpostorGeometry();
   }
-  return { speciesGeo, proxyGeo };
+  return { speciesGeo, proxyGeo, impGeo, impAtlas };
 }
 
 export default {
@@ -90,7 +131,7 @@ export default {
   build(ctx, scenarioKey, data, veg) {
     const trees = veg.trees;
     const group = new THREE.Group();
-    const { speciesGeo, proxyGeo } = geometries();
+    const { speciesGeo, proxyGeo, impGeo, impAtlas } = geometries();
     const atlas = buildAtlas();
     setLodFromQuality(ctx.quality);
 
@@ -99,13 +140,14 @@ export default {
       map: atlas, vertexColors: true, side: THREE.DoubleSide, shininess: 0, specular: 0x000000,
       alphaTest: TREE_ALPHA_TEST, alphaToCoverage: !!ctx.quality.msaa
     });
-    const farMat = new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 0, specular: 0x000000 });
+    const farMat = new THREE.MeshPhongMaterial({ map: impAtlas.texture, vertexColors: true, side: THREE.DoubleSide, shininess: 0, specular: 0x000000,
+      alphaTest: TREE_IMPOSTOR.alphaTest, alphaToCoverage: !!ctx.quality.msaa });
     for (const m of [nearMat, farMat]) {
       m.userData.camU = ctx.uniforms.uCamPos; m.userData.timeU = ctx.uniforms.uTime;
       ctx.shaderlib.patch(m, { fog: true, fade: scenarioKey });     // niebla + cross-fade de escenario (dither)
     }
     treeShader(nearMat, "near", true);
-    treeShader(farMat, "far", false);
+    treeShader(farMat, "imp", false);
     /* Tronco y follaje comparten material (una sola malla por especie/celda → menos draws): el
        "no-follaje" de A1 (userData.foliage=false) no se puede separar del tronco; ver handoff. */
 
@@ -119,8 +161,10 @@ export default {
     const pos = new THREE.Vector3(), scl = new THREE.Vector3();
 
     for (const cell of cells.values()) {
-      const entry = { near: [], far: null, cx: 0, cy: 0, cz: 0, r: 0 };
-      const farMesh = new THREE.InstancedMesh(proxyGeo, farMat, cell.items.length);
+      const entry = { near: [], far: null, imp: null, cx: 0, cy: 0, cz: 0, r: 0 };
+      const farMesh = new THREE.InstancedMesh(proxyGeo, farMat, cell.items.length);   // NO se dibuja (no se agrega al grupo): geometría de sombra lejana para A3
+      const impMesh = new THREE.InstancedMesh(impG(impGeo, cell.items.length), farMat, cell.items.length);
+      const aImp = impMesh.geometry.getAttribute("aImp");
       const perSp = {};
       cell.items.forEach((o, i) => {
         const { t, xz: [x, z], sp, gy } = o;
@@ -136,18 +180,30 @@ export default {
         eul.set(0, yaw, 0, "YXZ");
         m4.compose(pos.set(x, gy + g.cyU * H, z), q.setFromEuler(eul), scl.set(g.rxU * sxz * cfg.proxyK, g.ryU * H * cfg.proxyK * cfg.proxyFlat, g.rxU * sxz * cfg.proxyK));
         farMesh.setMatrixAt(i, m4);
-        col.setHex(cfg.leaf).multiplyScalar(cfg.proxyShade * b); col.r *= 1 + c; col.b *= 1 - c;
-        farMesh.setColorAt(i, col);
+
+        // impostor horneado: mismo árbol (posición, giro, tamaño, tinte), 3 quads cruzados con la textura de su especie
+        const ii = impAtlas.info[sp];
+        eul.set(0, yaw, 0, "YXZ");
+        m4.compose(pos.set(x, gy + ii.yb * H, z), q.setFromEuler(eul), scl.set(ii.half * sxz, ii.hgt * H, ii.half * sxz));
+        impMesh.setMatrixAt(i, m4);
+        const sh = TREE_IMPOSTOR.shade * cfg.proxyShade;
+        col.setRGB(sh * b * (1 + c), sh * b, sh * b * (1 - c));
+        impMesh.setColorAt(i, col);
+        aImp.setXYZ(i, 0, (IMP_ROWS_ - 1 - ii.row) / IMP_ROWS_, ii.topFrac);
 
         // árbol cercano
         (perSp[sp] || (perSp[sp] = [])).push({ x, gy, z, H, sxz, yaw, tx, tz, b, c });
         nTrees++;
       });
       farMesh.instanceMatrix.needsUpdate = true;
-      if (farMesh.instanceColor) farMesh.instanceColor.needsUpdate = true;
       farMesh.computeBoundingSphere();
-      entry.far = farMesh;
-      group.add(farMesh);
+      impMesh.instanceMatrix.needsUpdate = true;
+      impMesh.instanceColor.needsUpdate = true;
+      aImp.needsUpdate = true;
+      impMesh.computeBoundingSphere();
+      impMesh.boundingSphere.radius += 0.5;
+      entry.far = farMesh; entry.imp = impMesh;
+      group.add(impMesh);
 
       for (const sp of SPECIES) {
         const list = perSp[sp];
@@ -192,7 +248,7 @@ export default {
         const d = Math.hypot(c.x - e.cx, c.y - e.cy, c.z - e.cz), dmin = d - e.r, dmax = d + e.r;
         const nv = L.y > 0 && dmin < L.y, fv = dmax > L.x && dmin < L.w;
         for (const m of e.near) m.visible = nv;
-        e.far.visible = fv;
+        e.far.visible = e.imp.visible = fv;
         if (nv) near++; if (fv) far++;
       }
       b.nearCells = near; b.farCells = far;
