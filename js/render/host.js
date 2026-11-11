@@ -26,8 +26,10 @@ import { scenarioFade } from "./shaderlib.js";   // A1: uniforme de fade dither 
 import trees from "./systems/trees.js";
 import grass from "./systems/grass.js";
 import ground from "./systems/ground.js";   // A4: suelo por shader + surcos
+import water from "./systems/water.js";   // A4: agua por shader
 import { growthU, heightAt, patchGrowth, terrain } from "../terrain/terrain.js";   // A6: relieve (heightAt real; terrain.active)
 import shadows from "./systems/shadows.js";   // A3: sombras de árboles (pase propio + receptor + blobs)
+import fauna from "./systems/fauna.js";   // A5: aves y polinizadores
 
 const SCENARIOS = ["inicial", "multi"];
 
@@ -206,4 +208,6 @@ on("quality", q => host.setQuality(q));
 host.register(trees);
 host.register(grass);
 host.register(ground);   // A4
+host.register(water);   // A4: agua
 host.register(shadows);   // A3
+host.register(fauna);   // A5

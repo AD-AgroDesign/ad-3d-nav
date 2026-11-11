@@ -89,14 +89,14 @@ export const TREE_AO = { trunk: 0.35, crown: 0.28 };  // troncos: 30 % inferior;
                 del elipsoide de la copa); proxyFlat = factor de grosor vertical del impostor; proxyShade = oscurecimiento del impostor para empalmar con el follaje */
 export const TREE_SPECIES = {
   tala:      { label: "Tala",      mix: 0.45, h: [6.25, 11.25], crownK: [0.42, 0.60], leaf: 0x436f31, bark: 0x6a5a48, cards: 44, proxyK: 0.95, proxyFlat: 1, proxyShade: 0.85 },
-  algarrobo: { label: "Algarrobo", mix: 0.35, h: [7.5, 15], crownK: [0.50, 0.75], leaf: 0x6a8556, bark: 0x4a392b, cards: 60, proxyK: 0.92, proxyFlat: 1.7, proxyShade: 0.55 },
-  chanar:    { label: "Chañar",    mix: 0.20, h: [3.75, 8.75], crownK: [0.42, 0.60], leaf: 0x9fac48, bark: 0x7a7552, cards: 34, proxyK: 0.85, proxyFlat: 1, proxyShade: 0.78 }
+  algarrobo: { label: "Algarrobo", mix: 0.35, h: [7.5, 15], crownK: [0.50, 0.75], leaf: 0x6a8556, bark: 0x4a392b, cards: 60, proxyK: 0.92, proxyFlat: 1.7, proxyShade: 0.80 },
+  chanar:    { label: "Chañar",    mix: 0.20, h: [3.75, 8.75], crownK: [0.42, 0.60], leaf: 0x9fac48, bark: 0x7a7552, cards: 34, proxyK: 0.85, proxyFlat: 1, proxyShade: 0.68 }
 };
 /* G2 (2026-11-11, decisión del dueño): alturas de las nativas ×1,25 (promedio ~7,2 → ~9,1 m; los árboles anteriores eran ~9,5 m),
    mismas proporciones (crownK) y misma variación por individuo (el rango se mapea desde la altura original 5-14 m).
    Boceto A de las tres especies (B y C descartados: eran solo para la revisión). */
 export const TREE_ALPHA_TEST = 0.4;        // corte del alfa de las tarjetas (con MSAA se suaviza con alphaToCoverage)
-export const TREE_LOD_BAND = 0.2;          // franja (fracción de treeCardDist) donde tarjetas e impostor se funden por dither
+export const TREE_LOD_BAND = 0.3;          // franja (fracción de treeCardDist) donde tarjetas e impostor se funden por dither
 /* G2 · impostores: ya no son el elipsoide de 32 tris sino 3 quads cruzados (6 tris) con una textura horneada en el navegador
    desde el propio modelo de cada especie (treegen.buildImpostorAtlas). cardDistK agranda la distancia de las tarjetas
    (quality.treeCardDist × cardDistK; Baja sigue en 0 = solo impostor) porque el impostor nuevo es barato y se parece al árbol.
@@ -249,6 +249,33 @@ export const A4_FURROWS = {
   tramFade: [700, 1500],         // m · huellas
   classes: ["agri", "zona1", "zona2", "zona3"]
 };
+/* Agua (M, Ola 3): render/systems/water.js. Base = #3f7fb5 (leyenda, §4): NO se cambia; somero/profundo son variantes
+   de la misma tonalidad. Todo lo demás (ondulación, fresnel, destello, orilla) es textura de render, no dato. */
+export const A4_WATER = {
+  enabled: true,
+  yOff: 0.03,                // m sobre la altura del suelo (heightAt); menor que A4_GROUND.yOff: con terreno el suelo leñoso queda encima
+  shoreCell: 1.0,            // m · celda del mapa de distancia a la orilla (R8; sube sola si el agua se extiende > 2 km)
+  maxEdge: 60,               // m · arista máx. de la malla (astillas del earcut de 3 km dan huecos de precisión en la GPU)
+  maxEdgeRelief: 10,         // m · idem CON terreno (la altura se pide por vértice)
+  color: "#3f7fb5",          // agua de profundidad media (leyenda)
+  shallow: "#76a9bf",        // orilla: más clara y verdosa (se ve el fondo)
+  deep: "#2c6290",           // centro del cauce
+  rim: "#9ecbe8",            // reborde claro en la orilla (el mismo de la línea de MapLibre que reemplaza)
+  alpha: [0.50, 0.86],       // opacidad somero → profundo (el satélite se transparenta en la orilla)
+  shoreWidth: 3.2,           // m · de la orilla al "profundo"
+  edgeSoft: 0.7,             // m · borde suave contra el suelo
+  rimStrength: 0.30,         // intensidad del reborde claro
+  waveScale: [8, 21],        // m · período de las dos capas de ondas (rotadas y con deriva distinta: sin repetición visible)
+  drift: [0.030, 0.012, -0.016, 0.022],   // textura/s de cada capa (xy capa 1, xy capa 2)
+  waveSlope: 0.22,           // pendiente máxima de las normales animadas
+  waveFade: [220, 800],      // m · las ondas se aplanan con la distancia (sin parpadeo; el fresnel hace el resto)
+  f0: 0.02,                  // reflectancia a incidencia normal (agua)
+  gain: 0.82,                // calibración del cuerpo del agua (paridad de leyenda contra el agua anterior: ΔE de la media)
+  reflection: 0.55,          // intensidad del cielo reflejado (cielo de MapLibre aproximado: zenit → horizonte/niebla)
+  spec: [300, 0.8],          // brillo del destello del sol: exponente, intensidad
+  lineOpacity: 0,            // opacidad de la línea `*-agua-line` de MapLibre cuando el shader está activo (0 = apagada)
+  idleMaxDist: 1000          // m · más lejos que esto no hace falta animar en reposo (lazo acotado, T7)
+};
 /* === A4: fin === */
 
 /* === A6: inicio === */
@@ -314,3 +341,56 @@ export const A3_SHADOWS = {
   }
 }
 /* === A3: fin === */
+
+/* === A5: inicio === */
+/* Fauna (render/systems/fauna.js): aves en bandadas y polinizadores. Diales y método: handoffs/a5-fauna.md.
+   Todo procedural (sin assets). Semilla fija: la misma fauna en cada carga (con ?qa y sin él). */
+export const A5_FAUNA = {
+  enabled: true,               // false = sin fauna. También ?fauna=0 (con ?qa/?debug)
+  seed: 0xA5F0,                // semilla base (se suma 1 en inicial, 2 en multi)
+  ratioInicial: 0.25,          // D-4: proporción inicial : multi = 1 : 4 (aves). Los polinizadores usan butterflyInicial
+  birds: {
+    treesPerBird: 25,          // el total de aves de multi sale de (árboles del escenario / esto), entre min y max
+    min: 40, max: 130,
+    flockSize: [8, 25],        // individuos por bandada
+    anchorCell: 300,           // m · celda para buscar parches leñosos (centros de gravedad de los árboles)
+    anchorMinTrees: 8,         // árboles mínimos en una celda para que sea un parche donde anidan
+    corrNear: 350, corrBonus: 3,  // parches a < corrNear m de un corredor herbáceo valen ×corrBonus al elegir dónde van las bandadas (se ven desde el rasante)
+    corrNear: 350, corrBonus: 3,  // parches a < corrNear m de un corredor herbáceo valen ×corrBonus al elegir dónde van las bandadas (se ven desde el rasante)
+    anchorSep: 380,            // m · separación mínima entre recorridos de bandadas distintas
+    orbit: [90, 190],          // m · radio del recorrido alrededor del parche (se suma la dispersión del parche)
+    alt: [25, 56],             // m sobre el suelo · el piso se calcula también contra el árbol más alto (treeClear)
+    treeClear: 7,              // m · colchón mínimo sobre la copa más alta de TREE_SPECIES (sin atravesar árboles)
+    speed: [8, 13],            // m/s
+    span: 3.4,                 // m · envergadura (escala estilizada, como GRASS_SCALE: de 100-300 m se tiene que leer)
+    spanVar: 0.3,              // ± fracción
+    flapHz: [2.0, 2.8],        // aleteo
+    boostFrom: 180, farBoost: 2.2,   // desde boostFrom m el ave crece ∝ distancia (tope ×farBoost): a 400 m se sigue leyendo (≈ 20 px)
+    maxDist: [900, 1400],     // m · se encogen a 0 entre estas distancias a la cámara (sub-píxel: no vale dibujarlas)
+    palette: [[0x34373a, 0.58], [0x5d5249, 0.24], [0x85807a, 0.10], [0xe7e4da, 0.08]]   // [color sRGB, peso]
+  },
+  butterflies: {
+    tuftsPerButterfly: { "corr-herb": 26, "parche-herb": 300 },   // 1 polinizador cada N matas (en multi)
+    max: 16000,                // tope por escenario (solo se dibujan las celdas a < visDist de la cámara)
+    inicial: 0,                // fracción de multi en el escenario inicial (casi ninguno: 0 = ninguno)
+    cell: 320,                 // m · celda de instanciado (una InstancedMesh por celda)
+    visDist: [290, 400],       // m · se achican a 0 entre estas distancias a la cámara (y solo se dibujan las celdas dentro)
+    farBoost: 2.2,             // entre 60 y 260 m de la cámara crecen hasta ×2,2 (a 250 m una de 2,2 m mide ~20 px)
+    span: 2.2,                 // m · envergadura (escala estilizada)
+    alt: [2.4, 6.0],           // m · sobre el suelo: 0,5-2,5 m reales × GRASS_SCALE a medias (las matas miden 2-4,7 m: si vuelan más bajo quedan tapadas)
+    wander: [7, 16],           // m · radio de vuelo errático alrededor de la mata
+    palette: [[0xffd21f, 0.40], [0xff7d14, 0.35], [0xffffff, 0.25]]
+  }
+};
+/* Ajuste en caliente (solo ?debug/?qa): ?a5={"ratioInicial":0.5} se mezcla (superficial) sobre A5_FAUNA. */
+{
+  const q = new URLSearchParams(location.search);
+  if ((q.has("debug") || q.has("qa")) && q.get("a5")) {
+    try {
+      const o = JSON.parse(q.get("a5"));
+      for (const k in o) { if (o[k] && typeof o[k] === "object" && !Array.isArray(o[k]) && A5_FAUNA[k]) Object.assign(A5_FAUNA[k], o[k]); else A5_FAUNA[k] = o[k]; }
+    } catch (e) { console.warn("a5: JSON inválido en ?a5"); }
+  }
+  if ((q.has("debug") || q.has("qa")) && q.get("fauna") === "0") A5_FAUNA.enabled = false;
+}
+/* === A5: fin === */
