@@ -75,7 +75,7 @@ export function densifyPath(path, stepM = 8) {
 
 /* Pose de crucero del rasante: la comparten la aproximación y el vuelo,
    así la cámara llega exactamente en la pose donde arranca el recorrido. */
-export const RAZANTE_CAM = { zoom: 17.25, pitch: 76 };
+export const RAZANTE_CAM = { zoom: 17.6, pitch: 79 };   // G2: v2 elegida por Mike (~76 m sobre el suelo; antes 17.25/76 ≈ 123 m)
 
 /* Variantes de rasante más bajo para que elija el dueño (ajuste G2). SOLO QA/local:
    ?rasante=v1|v2|v3 con ?qa/?debug o con ?local en un host de desarrollo. Sin el
