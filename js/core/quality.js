@@ -2,8 +2,7 @@
    Ultra / Alta / Media / Baja. Se resuelven ANTES de crear el Map (T3: antialias y
    pixelRatio se fijan al crear el contexto WebGL; cambiarlos requiere recargar).
    Prioridad: ?calidad=<nivel> en la URL > localStorage ("ad_calidad") > detección.
-   HOY NO TIENE EFECTOS VISIBLES: los parámetros están declarados pero nadie los consume
-   todavía (A1: MSAA/pixelRatio; A2: LOD; A3: sombras; A4: suelo/agua; A5: fauna). */
+   Consumidores: A1 (MSAA/pixelRatio), A2 (LOD), A3 (sombras), A4 (suelo/agua), A5 (fauna), A6 (terreno), idleDriver (render/idle.js). */
 import { IS_MOBILE } from "./config.js";
 import { emit } from "./events.js";
 

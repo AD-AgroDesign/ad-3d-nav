@@ -30,12 +30,76 @@ Supabase Auth  →  profiles (rol, cliente_id)  →  campos [RLS]  →  bucket g
 
 ## Estructura
 
-- `index.html` — UI (acceso, splash, header, panel, controles de vuelo)
+- `index.html` — UI (acceso, splash, header, panel, controles de vuelo); carga MapLibre, supabase-js y, por importmap, Three.js r170
 - `css/style.css` — tema AgroDesign, responsive
-- `js/auth.js` — login, permisos, selector de campos, URLs firmadas
-- `js/main.js` — mapa MapLibre GL, vegetación 3D procedural, tour de dron, conmutador de escenarios
-- `vendor/` — MapLibre GL 4.7.1, Three.js 0.149.0, supabase-js 2.112.2 (sin CDN externos)
+- `js/auth.js` — login, permisos, selector de campos, URLs firmadas (script clásico)
+- `js/app.js` — punto de entrada ES (módulo diferido): arma mapa, capas, host de render, tour y UI
+- `js/core/` — `config.js` (todos los diales), `quality.js` (niveles de calidad), `state.js`, `events.js`, `camera.js`, `geo.js`
+- `js/map/` — estilo MapLibre y datos (`style.js`, `data.js`, `layers.js`, `scenario.js`, `interact.js`)
+- `js/render/` — host de render y sistemas (ver abajo); `lighting.js` (luz, niebla, modos de hora), `atmo.js` (cielo y color), `shaderlib.js`
+- `js/terrain/` — relieve (`terrain.js`, `heightfield.js`)
+- `js/tour/`, `js/ui/`, `js/debug/` — vuelo de dron, panel y controles, API de QA (`__nav3d`, solo con `?qa`/`?debug`)
+- `vendor/` — MapLibre GL 4.7.1, Three.js r170 (`three.module.js`, ES module), supabase-js 2.112.2 (sin CDN externos)
 - `data/<campo>/*.geojson` — copia local de los datos, fuera de git
+
+## Arquitectura del render (programa "Salto de realismo")
+
+Three.js dibuja dentro de MapLibre como una capa custom (`js/render/host.js`, id `veg-3d`). El host no tiene lógica de
+paisaje: contiene **sistemas** independientes registrados en `js/render/systems/`, cada uno con el mismo contrato
+(`build`, `setOpacity`, `setGrowth`, `update(frame)`, `onQuality`, `dispose`; ver el comentario de cabecera de `host.js`):
+
+| Sistema | Qué hace |
+|---|---|
+| `trees.js` + `treegen.js` | árboles procedurales por especie; follaje en tarjetas cerca e impostores lejos, instanciados por celda |
+| `grass.js` | matas de pasto instanciadas por celda con LOD por distancia |
+| `ground.js` | suelo por shader (con surcos en los lotes agrícolas) |
+| `water.js` | agua por shader (orillas, brillo, animación) |
+| `shadows.js` | sombras reales de los árboles (pase propio, receptor sobre el suelo, blobs para lo lejano) |
+| `fauna.js` | aves y polinizadores, animados en el vertex shader |
+| `chunks.js` | utilidades comunes de celdas, LOD y cadena de shaders |
+
+Soporte compartido: `shaderlib.js` (fade dither entre escenarios, niebla, follaje), `lighting.js` (luz del campo, niebla,
+modos de hora), `atmo.js` (cielo y corrección de color), `idle.js` (ver "Reposo").
+
+**Calidad** (`js/core/quality.js`). Cuatro niveles: Ultra, Alta, Media, Baja. Se elige con `?calidad=`, luego el valor
+guardado en el navegador (`ad_calidad`), luego una detección por GPU/memoria/móvil. Cada nivel fija MSAA y `pixelRatio`
+(cambiarlos recarga la página), distancia de LOD del pasto, distancias de tarjetas/impostores, tamaño del mapa de sombras,
+suelo, fauna, agua, terreno y tope de fps en reposo. En GPU integrada de notebook (p. ej. Intel HD/UHD) o de gama baja,
+"Alta" y "Media" apagan el MSAA. El selector está en el panel.
+
+**Terreno según calidad.** El relieve 3D (más el sombreado de relieve) se descarga y se activa solo en Ultra y en Alta con GPU
+dedicada. En GPU integrada, Media y Baja el visor queda sin relieve (altura 0), idéntico al de antes del terreno. `?terreno=1|0`
+lo fuerza o lo apaga.
+
+**Modos de hora.** Mediodía (por defecto), hora dorada y atardecer: conjuntos de parámetros (`A1_HORAS` en `config.js`) que
+cambian luz, cielo, niebla, color y sombras con transición. Se eligen en el panel o con `?hora=dorada|atardecer|mediodia`.
+
+**Fauna, agua y viento.** Aves y polinizadores (fauna), agua y el viento de árboles y pasto se animan por shader con el reloj
+`uTime`; no hay lógica por frame en JavaScript. Fauna: en Media la mitad, en Baja ninguna. Agua: shader en Ultra/Alta/Media;
+en Baja queda el plano de MapLibre. Viento: lo aplican los materiales de árboles y pasto.
+
+**Reposo.** Con la cámara quieta MapLibre no repinta solo. `js/render/idle.js` (`host.idleDriver`) es el lazo único que
+repinta a `quality.idleFps` (30 Ultra/Alta, 20 Media, 0 Baja) y solo si algún sistema lo pide con
+`idleDriver.request(owner, active)`: fauna o agua en cuadro y cerca, o vegetación en cuadro a menos de `WIND_IDLE_DIST` (250 m).
+Vistas altas (home, cenital) no gastan nada; en movimiento no suma repintados; se pausa con la pestaña oculta o con el
+tiempo congelado (QA).
+
+## Parámetros de URL
+
+Públicos:
+
+| Parámetro | Efecto |
+|---|---|
+| `?campo=<slug>` | abre ese campo (si el usuario tiene permiso) |
+| `?calidad=ultra\|alta\|media\|baja` | fuerza el nivel de calidad (no se guarda) |
+| `?hora=dorada\|atardecer\|mediodia` | modo de hora inicial |
+| `?terreno=1\|0` | fuerza o apaga el relieve 3D, sin importar la calidad |
+
+Solo con `?qa` o `?debug`: `?qa` expone `window.__nav3d` y deja el visor determinista (sin
+tour ni cámara automáticos); `?debug` expone `__nav3d`, `__map` y `__state` sin cambiar lo visible. Con alguno de los dos:
+`?gpu=integrada|dedicada` (simula el tipo de GPU para el terreno según calidad), `?sombras=0|blobs`, `?surcos=0|1`,
+`?agua=off`, `?a4=off`, `?fauna=0`, `?hillshade=0|1`, `?aa=0`, `?tm=` y `?exp=` (tone mapping), y los diales `?a1=`, `?a2=`, `?a3=`, `?a5=` (JSON). `?rasante=v1|v2|v3` (altura de la cámara del rasante) vale con `?qa`/`?debug` o con `?local` en un host de desarrollo.
+`?local` carga los datos de `data/` en vez de Supabase y solo funciona en `localhost`, `127.0.0.1`, `[::1]` y `*.localhost`.
 
 ## Fuentes de datos
 
@@ -71,7 +135,7 @@ locales sólo hacen falta para el procedimiento manual de abajo.
 
 4. `python tools/upload_gis.py --campo <slug>`
 
-No hay que tocar `js/main.js`: el encuadre inicial y los límites de navegación se calculan
+No hay que tocar el código (`js/map/data.js` y `js/map/scenario.js`): el encuadre inicial y los límites de navegación se calculan
 de la geometría, y `classify()` tolera los distintos esquemas de atributos (`UNIDAD`/`Unidad`
 con nombres largos, o sólo códigos `RASTER`). Las geometrías `Polygon` y los registros sin
 geometría se normalizan al cargar. Si el campo trae una clase nueva, sumarla a `CLASS_META`,
