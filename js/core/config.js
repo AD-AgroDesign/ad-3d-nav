@@ -195,7 +195,7 @@ export const A1_HORAS = {
     label: "Atardecer", sunElev: 8, sunAz: -35, sunColor: "#ff8a45", sunInt: 3.2,
     hemiSky: "#a99bb4", hemiSkyInt: 0.5, gTint: "#ff9c6a", gInt: 0.4,
     skyColor: "#6e84b4", horizonColor: "#f2b690", fogColor: "#efb08c", fogK: 0.6, expK: 1.1,
-    tint: "#ffc79f", rSat: 0.25, rCon: 0.14, rBMin: 0, rBMax: 0.82, rHue: -6,
+    tint: "#ffc79f", rSat: 0.25, rCon: 0.14, rBMin: 0, rBMax: 0.9, rHue: -6,
     shStr: 0.9, shTint: [0.46, 0.44, 0.58]
   }
 };

@@ -1,5 +1,5 @@
 /* ============ UI de los modos de hora (A1 · Ola 3 · 3.1) ============
-   Sección "Hora del día" en el panel lateral: tres botones con ícono (sol alto / sol bajo / ocaso). El modo elegido viaja en la URL
+   G3: control segmentado compacto "Hora del día" bajo el selector de calidad: tres segmentos con ícono chico (sol alto / sol bajo / ocaso). El modo elegido viaja en la URL
    (?hora=dorada|atardecer; mediodía = sin parámetro) para compartir vistas. La lógica y la transición viven en render/lighting.js;
    acá solo se arma el DOM, se escucha "preset" (lo emite lighting.js, también desde la API de QA) y se actualiza la URL.
    D-5: el tour NO cambia de modo solo; lo elige el usuario. */
@@ -17,12 +17,13 @@ const ICONOS = {
 const TEXTOS = { mediodia: "Mediodía", dorada: "Hora dorada", atardecer: "Atardecer" };
 
 function armar() {
-  const panel = document.getElementById("panel");
-  if (!panel || document.getElementById("hora-section")) return;
-  const sec = document.createElement("div");
-  sec.className = "panel-section"; sec.id = "hora-section";
-  sec.innerHTML = '<h3>Hora del día</h3><div id="hora-btns" role="group" aria-label="Hora del día"></div>';
-  const cont = sec.querySelector("#hora-btns");
+  const qs = document.getElementById("quality-section");
+  if (!qs || document.getElementById("hora-btns")) return;
+  // G3: control segmentado compacto, dentro de la sección de calidad y debajo de su selector (la hora no es protagonista)
+  const lab = document.createElement("span");
+  lab.className = "hora-label"; lab.id = "hora-label"; lab.textContent = "Hora del día";
+  const cont = document.createElement("div");
+  cont.id = "hora-btns"; cont.setAttribute("role", "group"); cont.setAttribute("aria-labelledby", "hora-label");
   for (const name of PRESET_NAMES) {
     const b = document.createElement("button");
     b.type = "button"; b.className = "hora-btn"; b.dataset.hora = name; b.title = TEXTOS[name];
@@ -30,7 +31,7 @@ function armar() {
     b.addEventListener("click", () => setPreset(name));
     cont.appendChild(b);
   }
-  panel.insertBefore(sec, document.getElementById("quality-section") || document.querySelector("#panel .panel-footer"));
+  qs.appendChild(lab); qs.appendChild(cont);
   marcar(presetName);
 }
 
