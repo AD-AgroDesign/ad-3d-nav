@@ -118,6 +118,10 @@ export const TREE_BAKE = { interior: 0.18, bottom: 0.14, trunk: 0.22 };   // ocl
     } catch (e) { console.warn("a2: JSON inválido en ?a2"); }
   }
 }
+/* Viento en reposo (ajuste G3, 2026-11-11): con la cámara quieta, árboles y pasto siguen moviéndose si hay
+   vegetación EN CUADRO a menos de WIND_IDLE_DIST m (distancia a la esfera de la celda). Rasante (~76 m) y de cerca: se
+   mueve; vistas altas/cenitales (> ~250 m del follaje más cercano): no. Tope quality.idleFps (0 = apagado). */
+export const WIND_IDLE_DIST = 250;
 /* === A2: fin === */
 
 /* === A1: inicio === */

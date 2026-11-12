@@ -16,8 +16,12 @@
 
    Para A3 (sombras): ver `casters(scenarioKey)` abajo. */
 import * as THREE from "three";
-import { CHUNK_CELL_TREES, TREE_ALPHA_TEST, TREE_IMPOSTOR, TREE_IMPOSTOR_CULL, TREE_LOD_BAND, TREE_SPECIES, TREE_SWAY } from "../../core/config.js";
-import { chainShader, partitionCells } from "./chunks.js";
+import { CHUNK_CELL_TREES, TREE_ALPHA_TEST, TREE_IMPOSTOR, TREE_IMPOSTOR_CULL, TREE_LOD_BAND, TREE_SPECIES, TREE_SWAY, WIND_IDLE_DIST } from "../../core/config.js";
+import { chainShader, partitionCells, windIdle } from "./chunks.js";
+import { map } from "../../map/style.js";
+import { uniforms } from "../lighting.js";
+
+const _fr = new THREE.Frustum(), _sp = new THREE.Sphere();
 import { buildAtlas, buildImpostorAtlas, buildImpostorGeometry, buildProxy, buildSpecies } from "./treegen.js";
 
 const built = {};   // scenarioKey → { cells, nearMat, farMat, counts, n }
@@ -240,6 +244,9 @@ export default {
   /* LOD por celda: decide qué mallas se dibujan (el fundido fino es por instancia, en el shader) */
   update(frame) {
     setLodFromQuality(frame.quality);
+    windIdle.bind(map, uniforms); windIdle.frame(frame.now);
+    _fr.setFromProjectionMatrix(frame.viewProj);
+    let windNear = false;
     const c = frame.camPosScene, L = lodU.value;
     for (const b of Object.values(built)) {
       if (!b.group.visible) continue;
@@ -250,9 +257,11 @@ export default {
         for (const m of e.near) m.visible = nv;
         e.far.visible = e.imp.visible = fv;
         if (nv) near++; if (fv) far++;
+        if (nv && !windNear && dmin < WIND_IDLE_DIST && _fr.intersectsSphere(_sp.set(_sp.center.set(e.cx, e.cy, e.cz), e.r))) windNear = true;
       }
       b.nearCells = near; b.farCells = far;
     }
+    windIdle.set("trees", windNear, frame.quality);
   },
 
   onQuality(q) { setLodFromQuality(q); },
