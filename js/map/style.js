@@ -66,11 +66,11 @@ export const map = new maplibregl.Map({
   zoom: 11.4,
   pitch: 0,
   bearing: 0,
-  maxPitch: 80,
+  maxPitch: 85,   // A5 4.2: 80 → 85 (tope de MapLibre 4.7.1); con maxZoom 21 la cámara manual baja a ~3,5 m sobre el suelo
   minZoom: 9.5,
   /* ORQ (G3, Mike "A"): 17.8 → 19.5 para acercarse en navegación manual (mariposas y detalle 3D de cerca).
      El tour y el rasante usan zooms fijos (RAZANTE_CAM 17.6) y no cambian; más allá del maxzoom de Esri el ráster se reescala. */
-  maxZoom: 19.5,
+  maxZoom: 21,    // A5 4.2: 19.5 → 21 (ver abajo); a pitch 85 la cámara queda a ~3,5 m, a pitch 60 a ~20 m
   attributionControl: { compact: true },
   /* ORQ (pedido A5): sin fundido de colocación de símbolos. El estilo no tiene capas symbol, pero en 4.7 cada
      repintado forzado en reposo disparaba 5-8 frames extra por ese fundido (fauna/agua en el lazo acotado). */
