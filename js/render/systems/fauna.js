@@ -10,13 +10,13 @@
        (chunks.js). Todo el movimiento (vuelo errático, rumbo, aleteo) corre en el vertex shader; solo se
        dibujan las celdas a menos de ~85 m de la cámara y se achican con la distancia (uCamPos, T1; G3: solo con la cámara muy cerca).
    Narrativa: en `inicial`, pocas aves (D-4: 1 de 4) y ningún polinizador; en `multi`, abundante.
-   Reposo (T7): lazo acotado a quality.idleFps solo si hay fauna en cuadro; pausa con document.hidden;
+   Reposo (T7): pide repintado al idleDriver del host (render/idle.js, tope quality.idleFps) solo si hay fauna en cuadro;
    apagada en calidad Baja (fauna = 0); Media = 50 %. Tiempo: uniforms.uTime (lo congela __nav3d.freezeTime) y
    funciones cerradas del tiempo (sin integrar dt: T5 no aplica salvo en el lazo de reposo, que usa max(0, …)). */
 import * as THREE from "three";
+import { idleDriver } from "../idle.js";
 import { A5_FAUNA, TREE_SPECIES } from "../../core/config.js";
 import { state } from "../../core/state.js";
-import { map } from "../../map/style.js";
 import { quality } from "../../core/quality.js";
 import { uniforms } from "../lighting.js";
 import { patch } from "../shaderlib.js";
@@ -313,7 +313,6 @@ vec3 transformed = vec3(position);
 
 const built = {};   // scenarioKey → { group, birds, flocks, bfly: [chunk…], grow: {value}, stats }
 let hostCtx = null;
-const mapRef = map;
 
 function makeMat(key, tag, vsDecl, begin, extra, vertexColors = false) {
   const mat = new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true, side: THREE.DoubleSide, vertexColors });
@@ -329,22 +328,7 @@ function makeMat(key, tag, vsDecl, begin, extra, vertexColors = false) {
   return mat;
 }
 
-/* ---- lazo de repintado en reposo (T7) ---- */
-let idleTimer = 0, lastRenderTs = 0, anyVisible = false, timeMoving = true, lastT = null, sameT = 0, hidHook = false;
-function idleTick() {
-  idleTimer = 0;
-  if (document.hidden || !anyVisible || !timeMoving || !mapRef) return;       // update() lo vuelve a armar cuando corresponda
-  const fps = quality.idleFps;
-  if (!fps || quality.fauna <= 0) return;
-  if (performance.now() - lastRenderTs >= 1000 / fps * 0.5) mapRef.triggerRepaint();   // con el mapa en movimiento los frames llegan cada ~16 ms y esto no dispara
-  idleTimer = setTimeout(idleTick, 1000 / fps);
-}
-function armIdle() {
-  if (idleTimer || !mapRef || document.hidden) return;
-  const fps = quality.idleFps;
-  if (!fps || quality.fauna <= 0) return;
-  idleTimer = setTimeout(idleTick, 1000 / fps);
-}
+/* ---- reposo (T7): el repintado lo maneja el idleDriver único del host (render/idle.js); acá solo se avisa si hay fauna en cuadro ---- */
 
 const _v4 = new THREE.Vector4();
 function inView(vp, x, y, z, m = 1.25) {
@@ -461,10 +445,6 @@ export default {
   update(frame) {
     const f = quality.fauna;
     const T = uniforms.uTime.value, cam = frame.camPosScene, vp = frame.viewProj;
-    lastRenderTs = frame.now;
-    /* tiempo congelado (QA) → no hace falta lazo de reposo */
-    if (lastT !== null && T === lastT) { if (++sameT >= 2) timeMoving = false; } else { sameT = 0; timeMoving = true; }
-    lastT = T;
     let birdsVis = 0, bflyVis = 0, chunksVis = 0;
     for (const key in built) {
       const b = built[key], vis = f > 0 && C.enabled && b.group.parent && b.group.parent.visible;
@@ -501,9 +481,7 @@ export default {
       }
     }
     lastStats.birdsVis = birdsVis; lastStats.bflyVis = bflyVis; lastStats.chunksVis = chunksVis;
-    anyVisible = birdsVis > 0 || bflyVis > 0;
-    if (!hidHook) { hidHook = true; document.addEventListener("visibilitychange", () => { if (!document.hidden && mapRef) mapRef.triggerRepaint(); }); }
-    if (anyVisible && timeMoving) armIdle();
+    idleDriver.request("fauna", birdsVis > 0 || bflyVis > 0);   // tiempo congelado, document.hidden e idleFps los resuelve el driver
   },
 
   /* para __nav3d.stats().instances[key].fauna */
@@ -573,7 +551,7 @@ export default {
   },
 
   dispose() {
-    clearTimeout(idleTimer); idleTimer = 0;
+    idleDriver.request("fauna", false);
     for (const k in built) delete built[k];
   }
 };

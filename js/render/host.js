@@ -21,6 +21,7 @@ import { mulberry32 } from "../core/geo.js";
 import { quality } from "../core/quality.js";
 import { HOME_VIEW, state } from "../core/state.js";
 import { applyCampoLighting, applyRenderSettings, createLights, uniforms, updateFog } from "./lighting.js";   // A1: updateFog (niebla)
+import { idleDriver } from "./idle.js";   // lazo único de repintado en reposo (Ola 4)
 import * as shaderlib from "./shaderlib.js";
 import { scenarioFade } from "./shaderlib.js";   // A1: uniforme de fade dither por escenario
 import trees from "./systems/trees.js";
@@ -42,6 +43,7 @@ export const host = {
   systems: [],         // sistemas registrados, en orden de construcción
   preLayers: [],       // capas custom extra que deben quedar ANTES de ésta (p. ej. atmo-fog de A1)
   quality,             // nivel de calidad vigente (core/quality.js: objeto único y mutable)
+  idleDriver,          // lazo único de reposo: request(owner, active) (render/idle.js)
   camera3d: null,      // última cámara real calculada por core/camera.js (ver render())
 
   /* Registra un sistema. Se construye en onAdd, en el orden de registro. */
@@ -60,6 +62,7 @@ export const host = {
 
   onAdd(mapInstance, gl) {
     this.map = mapInstance;
+    idleDriver.bind(mapInstance);
     this.camera = new THREE.Camera();
     this.scene = new THREE.Scene();
     createLights(this.scene);
@@ -179,6 +182,7 @@ export const host = {
     updateFog(cam, this.map.getCanvas().clientHeight);   // A1: uFogNear/uFogFar de este frame (lighting.js)
     const frame = { now, dt, camPosScene: uniforms.uCamPos.value, viewProj: this.camera.projectionMatrix,
                     camera: cam, quality: this.quality, preset: null };
+    idleDriver.frame(now, uniforms.uTime.value);
     for (const sys of this.systems) if (sys.update) sys.update(frame);
     if (hasListeners("frame")) emit("frame", frame);
     this.renderer.resetState();
