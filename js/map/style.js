@@ -68,7 +68,9 @@ export const map = new maplibregl.Map({
   bearing: 0,
   maxPitch: 80,
   minZoom: 9.5,
-  maxZoom: 17.8,
+  /* ORQ (G3, Mike "A"): 17.8 → 19.5 para acercarse en navegación manual (mariposas y detalle 3D de cerca).
+     El tour y el rasante usan zooms fijos (RAZANTE_CAM 17.6) y no cambian; más allá del maxzoom de Esri el ráster se reescala. */
+  maxZoom: 19.5,
   attributionControl: { compact: true },
   /* ORQ (pedido A5): sin fundido de colocación de símbolos. El estilo no tiene capas symbol, pero en 4.7 cada
      repintado forzado en reposo disparaba 5-8 frames extra por ese fundido (fauna/agua en el lazo acotado). */
