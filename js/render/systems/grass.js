@@ -3,10 +3,14 @@
    sin cambios de geometría, colores, densidades, semillas ni orden de construcción (§4).
    Contrato: §6.3. */
 import * as THREE from "three";
-import { CHUNK_CELL_GRASS, GRASS_CLASSES, GRASS_AO, GRASS_LOD_BAND, GRASS_LOD_COMP_MAX, GRASS_LOD_FAR_MULT, GRASS_LOD_NEAR_MULT, GRASS_SCALE } from "../../core/config.js";
+import { CHUNK_CELL_GRASS, GRASS_CLASSES, GRASS_AO, GRASS_LOD_BAND, GRASS_LOD_COMP_MAX, GRASS_LOD_FAR_MULT, GRASS_LOD_NEAR_MULT, GRASS_SCALE, WIND_IDLE_DIST } from "../../core/config.js";
 import { quality } from "../../core/quality.js";
 import { patch } from "../shaderlib.js";
-import { ChunkLod, addRank, applyAO, applyLod, cellSeed, partitionCells, shuffleDet } from "./chunks.js";
+import { ChunkLod, addRank, applyAO, applyLod, cellSeed, partitionCells, shuffleDet, windIdle } from "./chunks.js";
+import { map } from "../../map/style.js";
+import { uniforms } from "../lighting.js";
+
+const _fr = new THREE.Frustum(), _sp = new THREE.Sphere();
 
 /* Geometría unitaria de una mata: 4 hojas inclinadas hacia afuera
    (base y=0, puntas y≈1). Gradiente base → punta vía colores de vértice
@@ -158,9 +162,19 @@ export default {
   update(frame) {
     const c = frame.camPosScene;
     const lod = lodU.value;
+    windIdle.bind(map, uniforms); windIdle.frame(frame.now);
+    _fr.setFromProjectionMatrix(frame.viewProj);
+    let windNear = false;
     for (const b of Object.values(built)) {
-      if (b.group.visible) b.visibleChunks = b.lod.update(c, lod.x, lod.y, lod.z);
+      if (!b.group.visible) continue;
+      b.visibleChunks = b.lod.update(c, lod.x, lod.y, lod.z);
+      if (windNear) continue;
+      for (const k of b.lod.chunks) {   // viento en reposo: ¿hay pasto en cuadro a menos de WIND_IDLE_DIST?
+        if (!k.mesh.visible) continue;
+        if (Math.hypot(c.x - k.cx, c.y - k.cy, c.z - k.cz) - k.r < WIND_IDLE_DIST && _fr.intersectsSphere(_sp.set(_sp.center.set(k.cx, k.cy, k.cz), k.r))) { windNear = true; break; }
+      }
     }
+    windIdle.set("grass", windNear, frame.quality);
   },
 
   onQuality(q) { setLodFromQuality(q); },
