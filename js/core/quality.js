@@ -8,7 +8,6 @@ import { IS_MOBILE } from "./config.js";
 import { emit } from "./events.js";
 
 export const LEVELS = ["ultra", "alta", "media", "baja"];
-export const LABELS = { ultra: "Ultra", alta: "Alta", media: "Media", baja: "Baja" };
 
 /* Tabla de §6.4. Qué haría cada parámetro cuando lo consuma su dueño:
      msaa            antialias del contexto WebGL (true/false; "gpu" = sí salvo GPU de gama baja)

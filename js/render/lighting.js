@@ -121,14 +121,6 @@ export function updateFog(cam, H) {
   return fog;
 }
 
-/* Desplazamiento (m) de la sombra de un objeto de altura h: este y norte, opuesto al sol.
-   Lo usará A3 (y cualquier sombra "blob") para que coincida con el sol de la escena y con las
-   sombras horneadas del satélite (T13). */
-export function shadowOffsetM(h) {
-  const len = h / Math.tan(lights.elevation * Math.PI / 180), az = lights.azimuth * Math.PI / 180;
-  return [-Math.sin(az) * len, -Math.cos(az) * len];
-}
-
 /* ============ Modos de hora (Ola 3 · 3.1) ============
    Mediodía (el actual, por defecto) · hora dorada · atardecer. Un modo es un conjunto de parámetros (A1_HORAS en config.js;
    el mediodía sale de los diales de siempre, así que no cambia nada). `atm` es el estado VIGENTE, ya interpolado; applyAtmosphere()
@@ -164,7 +156,6 @@ export function presetDef(name) {
     tint: _rgb(h.tint), rSat: h.rSat, rCon: h.rCon, rBMin: h.rBMin, rBMax: h.rBMax, rHue: h.rHue, shStr: h.shStr, shTint: h.shTint.slice()
   };
 }
-export function presetLabel(name) { return (A1_HORAS[name] && A1_HORAS[name].label) || "Mediodía"; }
 
 /* Modo inicial: ?hora=dorada|atardecer|mediodia (sin animación). */
 const _horaQ = _tm.get("hora");
@@ -242,4 +233,3 @@ let _repaintFn = null;
 /* style.js registra acá map.triggerRepaint (lighting.js no importa el mapa: evita ciclos). */
 export function setRepaint(fn) { _repaintFn = fn; }
 function _repaint() { if (_repaintFn) _repaintFn(); }
-export const presetActive = () => !!_anim;
