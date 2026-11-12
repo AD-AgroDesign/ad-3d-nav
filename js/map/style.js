@@ -78,7 +78,7 @@ export const map = new maplibregl.Map({
   /* A1 (1.3, A): antialias y pixelRatio según el nivel de calidad. Se fijan al crear el contexto
      (T3): cambiar de nivel recarga la página (quality.js CONTEXT_PARAMS_ACTIVE). msaa "gpu" (Alta, Media):
      sí, salvo GPU integrada o de gama baja (msaaEnabled en quality.js; ORQ 2026-11-10). */
-  antialias: msaaEnabled(QUALITY) && new URLSearchParams(location.search).get("aa") !== "0",   // ?aa=0: solo para comparar capturas
+  antialias: msaaEnabled(QUALITY) && !(/[?&](qa|debug)/.test(location.search) && new URLSearchParams(location.search).get("aa") === "0"),   // ?aa=0: solo para comparar capturas, y solo con ?qa/?debug
   pixelRatio: Math.min(window.devicePixelRatio || 1, QUALITY.pixelRatioCap)
 });
 /* A1 (3.1): cada paso de la transición de hora vuelca el cielo, el ráster y el hillshade al mapa. */

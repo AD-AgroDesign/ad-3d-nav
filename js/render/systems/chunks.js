@@ -26,12 +26,8 @@
    Compensación (compMax>1): las instancias que sobreviven se agrandan keep^-0.5 en XZ y keep^-0.25
    en Y (tope compMax), para que a lo lejos se conserve la masa de color del pasto en vez de
    verse el suelo pelado; en keep=1 (cerca) el factor es 1: la densidad y forma cercanas no cambian.
-   windIdle (viento en reposo, ajuste G3): lazo de repintado acotado, UNO para trees y grass.
-       windIdle.bind(map, uniforms)         una vez (en build)
-       windIdle.frame(now)                  al inicio de update() de cada sistema (idempotente por frame)
-       windIdle.set(owner, near, quality)   near = hay vegetación en cuadro y cerca (WIND_IDLE_DIST)
-     Corre a quality.idleFps solo si algún owner está near; no suma en movimiento (solo repinta si el último
-     frame fue hace > 1 intervalo); apagado con idleFps = 0, document.hidden o uTime congelado (QA).
+   Viento en reposo (ajuste G3): lo resuelve el idleDriver único del host (render/idle.js); trees y grass piden
+   idleDriver.request("trees"|"grass", near) con near = vegetación en cuadro y a menos de WIND_IDLE_DIST.
    Coordinación con A1 (shaderlib): este módulo usa nombres propios (uA2Cam, uA2Lod, aRank) y
    se engancha DESPUÉS de shaderlib.patch() (chainShader compone onBeforeCompile y
    customProgramCacheKey; propuesta a A1 en handoffs/a2-fade.md); solo exige que `#include <common>` y
@@ -155,34 +151,3 @@ export class ChunkLod {
     return vis;
   }
 }
-
-/* ---------- viento en reposo (ajuste G3) ---------- */
-export const windIdle = (() => {
-  const on = new Map();                       // owner → bool
-  let map = null, uni = null, timer = 0, lastRender = 0, lastNow = -1, lastUT = NaN, sameT = 0, idleFps = 0, hook = false;
-  const any = () => { for (const v of on.values()) if (v) return true; return false; };
-  function step() {
-    timer = 0;
-    if (!map || !idleFps || document.hidden || !any()) return;   // update() lo re-arma
-    const iv = 1000 / idleFps;
-    if (performance.now() - lastRender >= iv && sameT < 2) map.triggerRepaint();   // congelado: nada que animar
-    timer = setTimeout(step, iv);
-  }
-  function arm() { if (!timer && map && idleFps > 0 && !document.hidden && any()) timer = setTimeout(step, 1000 / idleFps); }
-  return {
-    bind(m, u) {
-      map = m; uni = u;
-      if (!hook) { hook = true; document.addEventListener("visibilitychange", () => { if (!document.hidden && map && any()) { arm(); map.triggerRepaint(); } }); }
-    },
-    frame(now) {
-      if (now === lastNow) return;
-      lastNow = now; lastRender = performance.now();
-      const ut = uni ? uni.uTime.value : 0; sameT = ut === lastUT ? sameT + 1 : 0; lastUT = ut;
-    },
-    set(owner, near, quality) {
-      idleFps = quality.idleFps | 0;
-      on.set(owner, !!near && idleFps > 0);
-      if (any()) arm(); else if (timer) { clearTimeout(timer); timer = 0; }
-    }
-  };
-})();

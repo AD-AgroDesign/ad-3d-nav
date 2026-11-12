@@ -30,7 +30,6 @@ export const MISC_CLASSES = ["otros", "instalaciones", "camino", "ganaderia", "s
 
 /* Paleta de copas de monte de espinal */
 export const CROWN_PALETTE = [0x2a4f22, 0x33602a, 0x3e6d2f, 0x4a7434, 0x567c38, 0x6a7f3e];
-export const TRUNK_COLOR = 0x5b4632;
 export const WOODY_BASE = { color: "#2e5026", height: 1.2, opacity: 0.45 };
 export const HERB_HEIGHT = 0.6;
 
@@ -77,7 +76,6 @@ export const GRASS_LOD_COMP_MAX = 2.2;     // tope del agrandado que compensa el
 export const GRASS_LOD_BAND = 0.15;        // franja de encogimiento progresivo por instancia (fracción del orden aleatorio)
 /* E-AO: oclusión falsa por vértice (amount = oscurecimiento máx. en la base, 0..1; top = y local donde termina) */
 export const GRASS_AO = { amount: 0.28, top: 0.4 };   // matas: solo el tramo bajo; puntas y flores (y>0.4) intactas
-export const TREE_AO = { trunk: 0.35, crown: 0.28 };  // troncos: 30 % inferior; copas: mitad inferior
 /* G · Árboles nuevos (render/systems/trees.js + treegen.js). Decisión del dueño en G1 (2026-11-10):
    nativas del espinal (tala, algarrobo, chañar), sin eucalipto. La clase (parche-le / corr-le) no
    cambia la mezcla: el dato de árbol no la guarda y la ficha da la misma mezcla para las dos.

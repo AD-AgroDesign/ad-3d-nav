@@ -17,7 +17,7 @@
      - orilla: borde suave (alfa) + aclarado por distancia + reborde claro (reemplaza la línea de MapLibre).
    Sombras de A3: el receptor de A3 MULTIPLICA el framebuffer en la lista opaca con renderOrder -9; el agua dibuja ANTES
        (renderOrder -11, lista opaca con mezcla alfa a medida, igual que el suelo): recibe las sombras gratis, sin código propio.
-   Animación en reposo (T7): lazo propio y acotado (quality.idleFps, 30/20/0): solo si el agua está en cuadro y a menos de
+   Animación en reposo (T7): pide repintado al idleDriver del host (render/idle.js, quality.idleFps 30/20/0): solo si el agua está en cuadro y a menos de
        idleMaxDist, solo si el último repintado fue hace más de un intervalo (en movimiento no suma nada), pausa con
        document.hidden, y no repinta si el tiempo está congelado (freezeTime). Calidad Baja: sin malla (plano de MapLibre).
    T9: `*-agua-fill` queda con opacidad 0,001 (clic/popup); `*-agua-line` en config (0). En Baja se restauran (0,38 / 0,7). */
@@ -25,12 +25,13 @@ import * as THREE from "three";
 import { A1_SKY, A4_WATER as CFG } from "../../core/config.js";
 import { HOME_VIEW, params } from "../../core/state.js";
 import { quality } from "../../core/quality.js";
+import { idleDriver } from "../idle.js";
 import { map } from "../../map/style.js";
 import { lights, uniforms } from "../lighting.js";
 import { GLSL_ADFOG, GLSL_FOG_UNIFORMS, scenarioFade } from "../shaderlib.js";
 import { dedupRing, triangulatePoly } from "./ground.js";
 
-const wanted = () => CFG.enabled && params.get("agua") !== "off";
+const wanted = () => CFG.enabled && !((params.has("qa") || params.has("debug")) && params.get("agua") === "off");   // ?agua=off: solo ?qa/?debug
 
 /* ---------- textura de normales (runtime, ~15 ms, 256 KB) ----------
    Altura = value noise periódico de 3 octavas (8 / 16 / 32 celdas por período); normal por diferencias centrales con
@@ -363,22 +364,9 @@ function applyModes() {
   for (const k in S) { S[k].mesh.visible = active && S[k].info.tris > 0; syncMapLayers(k); }
 }
 
-/* ---------- lazo de animación en reposo (T7) ---------- */
+/* ---------- animación en reposo (T7): el repintado lo maneja el idleDriver único del host (render/idle.js) ---------- */
 const frustum = new THREE.Frustum(), tmpV = new THREE.Vector3();
-let inView = false, lastRender = 0, lastUT = NaN, sameT = 0, loop = null;   // sameT: renders seguidos con el mismo uTime (tiempo congelado)
-
-function idleStep() {
-  loop = null;
-  const fps = quality.idleFps | 0;
-  if (!active || fps <= 0 || !inView || document.hidden) return;   // se re-arma solo desde update() / visibilitychange
-  const iv = 1000 / fps, now = performance.now();
-  if (now - lastRender >= iv && sameT < 2) map.triggerRepaint();   // en movimiento el mapa ya repinta: no suma; congelado (freezeTime): nada que animar
-  loop = setTimeout(idleStep, iv);
-}
-function ensureLoop() {
-  if (loop === null && active && inView && quality.idleFps > 0 && !document.hidden) loop = setTimeout(idleStep, 1000 / quality.idleFps);
-}
-document.addEventListener("visibilitychange", () => { if (!document.hidden) { ensureLoop(); if (inView) map.triggerRepaint(); } });
+let inView = false;
 
 export default {
   id: "water",
@@ -408,8 +396,6 @@ export default {
   },
 
   update(frame) {
-    lastRender = frame.now;
-    const ut = uniforms.uTime.value; sameT = ut === lastUT ? sameT + 1 : 0; lastUT = ut;
     if (lights.sun) U.uSunI.value = lights.sun.intensity;
     if (U.uZenith.value.getHex() !== _zen.set(A1_SKY.skyColor).getHex()) U.uZenith.value.set(A1_SKY.skyColor);   // por si A1 cambia el cielo con la hora
     // ¿hay agua visible en cuadro y lo bastante cerca como para que se note la animación?
@@ -427,18 +413,17 @@ export default {
         }
       }
     }
-    if (inView) ensureLoop();
+    idleDriver.request("water", inView);
   },
 
   onQuality(q) {
     active = wanted() && q.water !== "plano";
     applyModes();
-    if (!active && loop !== null) { clearTimeout(loop); loop = null; }
-    else ensureLoop();
+    if (!active) { inView = false; idleDriver.request("water", false); }
   },
 
   dispose() {
-    if (loop !== null) { clearTimeout(loop); loop = null; }
+    inView = false; idleDriver.request("water", false);
     for (const k in S) { S[k].geometry.dispose(); S[k].mat.dispose(); S[k].tex.dispose(); }
     if (waveTex) { waveTex.dispose(); waveTex = null; }
   },

@@ -6,7 +6,8 @@ import * as THREE from "three";
 import { CHUNK_CELL_GRASS, GRASS_CLASSES, GRASS_AO, GRASS_LOD_BAND, GRASS_LOD_COMP_MAX, GRASS_LOD_FAR_MULT, GRASS_LOD_NEAR_MULT, GRASS_SCALE, WIND_IDLE_DIST } from "../../core/config.js";
 import { quality } from "../../core/quality.js";
 import { patch } from "../shaderlib.js";
-import { ChunkLod, addRank, applyAO, applyLod, cellSeed, partitionCells, shuffleDet, windIdle } from "./chunks.js";
+import { idleDriver } from "../idle.js";
+import { ChunkLod, addRank, applyAO, applyLod, cellSeed, partitionCells, shuffleDet } from "./chunks.js";
 import { map } from "../../map/style.js";
 import { uniforms } from "../lighting.js";
 
@@ -162,7 +163,6 @@ export default {
   update(frame) {
     const c = frame.camPosScene;
     const lod = lodU.value;
-    windIdle.bind(map, uniforms); windIdle.frame(frame.now);
     _fr.setFromProjectionMatrix(frame.viewProj);
     let windNear = false;
     for (const b of Object.values(built)) {
@@ -174,7 +174,7 @@ export default {
         if (Math.hypot(c.x - k.cx, c.y - k.cy, c.z - k.cz) - k.r < WIND_IDLE_DIST && _fr.intersectsSphere(_sp.set(_sp.center.set(k.cx, k.cy, k.cz), k.r))) { windNear = true; break; }
       }
     }
-    windIdle.set("grass", windNear, frame.quality);
+    idleDriver.request("grass", windNear);
   },
 
   onQuality(q) { setLodFromQuality(q); },

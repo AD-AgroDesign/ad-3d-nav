@@ -29,13 +29,6 @@ export function lonLatToPixel(lon, lat, z) {
   const y = (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * n;
   return { x, y };
 }
-export function pixelToLonLat(px, py, z) {
-  const n = TS * Math.pow(2, z);
-  const lon = px / n * 360 - 180;
-  const a = Math.PI * (1 - 2 * py / n);
-  const lat = Math.atan(Math.sinh(a)) / D2R;
-  return { lon, lat };
-}
 
 async function decodeTile(url) {
   // timeout: un tile colgado no debe frenar el arranque del visor (initTerrain cae a "sin terreno" si algo falla)

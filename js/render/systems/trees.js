@@ -17,8 +17,8 @@
    Para A3 (sombras): ver `casters(scenarioKey)` abajo. */
 import * as THREE from "three";
 import { CHUNK_CELL_TREES, TREE_ALPHA_TEST, TREE_IMPOSTOR, TREE_IMPOSTOR_CULL, TREE_LOD_BAND, TREE_SPECIES, TREE_SWAY, WIND_IDLE_DIST } from "../../core/config.js";
-import { chainShader, partitionCells, windIdle } from "./chunks.js";
-import { map } from "../../map/style.js";
+import { idleDriver } from "../idle.js";
+import { chainShader, partitionCells } from "./chunks.js";
 import { uniforms } from "../lighting.js";
 
 const _fr = new THREE.Frustum(), _sp = new THREE.Sphere();
@@ -244,7 +244,6 @@ export default {
   /* LOD por celda: decide qué mallas se dibujan (el fundido fino es por instancia, en el shader) */
   update(frame) {
     setLodFromQuality(frame.quality);
-    windIdle.bind(map, uniforms); windIdle.frame(frame.now);
     _fr.setFromProjectionMatrix(frame.viewProj);
     let windNear = false;
     const c = frame.camPosScene, L = lodU.value;
@@ -261,7 +260,7 @@ export default {
       }
       b.nearCells = near; b.farCells = far;
     }
-    windIdle.set("trees", windNear, frame.quality);
+    idleDriver.request("trees", windNear);
   },
 
   onQuality(q) { setLodFromQuality(q); },
