@@ -441,4 +441,6 @@ html, body { height: 100%; overflow: hidden; background: var(--ad-green-dark); }
 #hora-btns .hora-btn:hover { background: rgba(230, 185, 61, 0.12); }
 #hora-btns .hora-btn[aria-pressed="true"] { color: var(--ad-gold); background: rgba(230, 185, 61, 0.18); }
 #hora-btns .hora-btn:focus-visible { outline: 2px solid var(--ad-gold); outline-offset: -2px; }
+/* 4.2: aviso de degradación automática Ultra -> Alta (una línea, discreto) */
+#quality-aviso { flex: 0 0 100%; margin: 6px 0 0; font-size: 11px; line-height: 1.35; opacity: .7; }
 /* === A1: fin === */
