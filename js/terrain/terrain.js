@@ -101,7 +101,7 @@ function agregarFuenteYHillshade(map) {
   // MapLibre avisa (warning en consola) si el hillshade y el terreno comparten fuente: van dos fuentes con las mismas teselas
   // (el navegador las sirve de su caché HTTP; la de relieve lleva la atribución).
   if (!map.getSource("dem")) map.addSource("dem", fuente(C.attribution));
-  const hs = params.get("hillshade");
+  const hs = DBG ? params.get("hillshade") : null;   // ?hillshade=0|1: solo ?qa/?debug
   if ((hs === "1" || (hs !== "0" && C.hillshade.enabled)) && !map.getLayer("hillshade")) {
     if (!map.getSource("dem-hs")) map.addSource("dem-hs", fuente(null, { maxzoom: hsz, tileSize: hsTs }));
     const campoCfg = A1_CAMPOS[(state.campo || {}).id] || {};

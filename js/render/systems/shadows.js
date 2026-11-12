@@ -36,7 +36,7 @@ import trees from "./trees.js";
 import { growthU, patchGrowth, terrain } from "../../terrain/terrain.js";   // A6: receptor y casters sobre el relieve
 
 const URL = new URLSearchParams(location.search);
-const MODE = URL.get("sombras");                       // ?sombras=0 apaga todo · ?sombras=blobs solo blobs
+const MODE = (URL.has("qa") || URL.has("debug")) ? URL.get("sombras") : null;   // solo ?qa/?debug: ?sombras=0 apaga todo · ?sombras=blobs solo blobs
 const ENABLED = CFG.enabled && MODE !== "0" && MODE !== "off";
 const FORCE_BLOBS = MODE === "blobs";
 const TIMING = (URL.has("qa") || URL.has("debug")) && URL.has("a3time");   // mide el pase con gl.finish() (solo diagnóstico)

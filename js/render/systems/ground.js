@@ -40,10 +40,10 @@ import { extOpacityProp } from "../../terrain/terrain.js";   // A6: relieve
 /* ---------- parámetros efectivos (config + URL) ---------- */
 const DBG = params.has("qa") || params.has("debug");
 const furrowsWanted = () => {
-  const q = params.get("surcos");
+  const q = DBG ? params.get("surcos") : null;   // solo ?qa/?debug
   return q === "0" ? false : q === "1" ? true : A4_FURROWS.enabled;
 };
-const groundWanted = () => A4_GROUND.enabled && params.get("a4") !== "off";
+const groundWanted = () => A4_GROUND.enabled && !(DBG && params.get("a4") === "off")   // ?a4=off: solo ?qa/?debug;
 
 /* ---------- ruido: textura generada en runtime (a4-g2) ----------
    Value noise periódico (lattice NOISE_C×NOISE_C, interpolación smoothstep: la misma estadística que el hash

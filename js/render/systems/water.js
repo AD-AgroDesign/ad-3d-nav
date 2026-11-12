@@ -31,7 +31,7 @@ import { lights, uniforms } from "../lighting.js";
 import { GLSL_ADFOG, GLSL_FOG_UNIFORMS, scenarioFade } from "../shaderlib.js";
 import { dedupRing, triangulatePoly } from "./ground.js";
 
-const wanted = () => CFG.enabled && params.get("agua") !== "off";
+const wanted = () => CFG.enabled && !((params.has("qa") || params.has("debug")) && params.get("agua") === "off");   // ?agua=off: solo ?qa/?debug
 
 /* ---------- textura de normales (runtime, ~15 ms, 256 KB) ----------
    Altura = value noise periódico de 3 octavas (8 / 16 / 32 celdas por período); normal por diferencias centrales con
