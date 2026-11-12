@@ -122,7 +122,7 @@ const SHORE_MAX = 12, SHORE_TEX = 2048;
 function bakeShore(polys) {   // polys: [{ rings }] en metros de escena → { data, W, H, x0, z0, c }
   let x0 = 1e18, x1 = -1e18, z0 = 1e18, z1 = -1e18;
   for (const { rings } of polys) for (const p of rings[0]) { if (p[0] < x0) x0 = p[0]; if (p[0] > x1) x1 = p[0]; if (p[1] < z0) z0 = p[1]; if (p[1] > z1) z1 = p[1]; }
-  if (!(x1 > x0)) return { data: new Uint8Array(1), W: 1, H: 1, x0: 0, z0: 0, c: 1 };
+  if (!(x1 > x0)) return { data: new Uint8Array(2), W: 1, H: 1, x0: 0, z0: 0, c: 1 };
   const c = Math.max(CFG.shoreCell, Math.max(x1 - x0, z1 - z0) / SHORE_TEX);
   x0 -= 2 * c; z0 -= 2 * c;
   const W = Math.ceil((x1 - x0) / c) + 3, H = Math.ceil((z1 - z0) / c) + 3, data = new Uint8Array(W * H);
@@ -179,7 +179,23 @@ function bakeShore(polys) {   // polys: [{ rings }] en metros de escena → { da
       }
     }
   }
-  return { data, W, H, x0, z0, c };
+  return { data: addHalfWidth(data, W, H, c), W, H, x0, z0, c };
+}
+
+/* Semi-ancho local (G): máximo de la distancia a la orilla en una ventana de ±HW_WIN m (filtro separable). En una cinta la cresta
+   de la distancia ES el semi-ancho, así que cada texel sabe qué tan angosto es el curso donde está (arroyos < 4 m: ajuste en el shader). */
+const HW_WIN = 6;
+function addHalfWidth(d, W, H, c) {
+  const r = Math.max(1, Math.ceil(HW_WIN / c)), tmp = new Uint8Array(W * H), out = new Uint8Array(W * H * 2);
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+    let m = 0; for (let k = Math.max(0, i - r), e = Math.min(W - 1, i + r); k <= e; k++) { const v = d[j * W + k]; if (v > m) m = v; }
+    tmp[j * W + i] = m;
+  }
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+    let m = 0; for (let k = Math.max(0, j - r), e = Math.min(H - 1, j + r); k <= e; k++) { const v = tmp[k * W + i]; if (v > m) m = v; }
+    out[(j * W + i) * 2] = d[j * W + i]; out[(j * W + i) * 2 + 1] = d[j * W + i] ? m : 0;
+  }
+  return out;
 }
 
 /* ---------- geometría ---------- */
@@ -215,7 +231,7 @@ function buildGeometry(ctx, data, hasH) {
     }
   }
   const sh = bakeShore(items);
-  const tex = new THREE.DataTexture(sh.data, sh.W, sh.H, THREE.RedFormat);
+  const tex = new THREE.DataTexture(sh.data, sh.W, sh.H, THREE.RGFormat);
   tex.unpackAlignment = 1; tex.magFilter = tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;
   tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping; tex.needsUpdate = true;
   const g = new THREE.BufferGeometry();
@@ -240,7 +256,7 @@ const FS =
   "uniform vec3 uCamPos;\nuniform float uTime;\nuniform float uFade;\nuniform sampler2D tWave;\n" +
   "uniform vec3 uSunDir;\nuniform vec3 uSunColor;\nuniform float uSunI;\nuniform vec3 uHemiSky;\nuniform vec3 uHemiGround;\n" +
   "uniform vec3 uZenith;\nuniform vec3 uColShallow;\nuniform vec3 uColMid;\nuniform vec3 uColDeep;\nuniform vec3 uColRim;\n" +
-  "uniform vec4 uA;\nuniform vec4 uB;\nuniform vec4 uC;\nuniform vec4 uD;\nuniform vec4 uDrift;\n" +
+  "uniform vec4 uA;\nuniform vec4 uB;\nuniform vec4 uC;\nuniform vec4 uD;\nuniform vec4 uDrift;\nuniform vec4 uE;\nuniform vec4 uF;\nuniform vec3 uColNarrow;\n" +
   GLSL_FOG_UNIFORMS + GLSL_ADFOG +
   "const float PI_ = 3.14159265;\n" +
   "void main() {\n" +
@@ -248,7 +264,10 @@ const FS =
   "  float dist = length(toCam);\n" +
   "  vec3 V = toCam / dist;\n" +
   "  vec2 p = vWp.xz;\n" +
-  "  float vD = texture2D(tShore, (p - uSh.xy) * uSh.zw).r * " + SHORE_MAX.toFixed(1) + ";\n" +   // distancia a la orilla (m), horneada
+  "  vec2 sh2 = texture2D(tShore, (p - uSh.xy) * uSh.zw).rg * " + SHORE_MAX.toFixed(1) + ";\n" +
+  "  float vD = sh2.x;\n" +
+  // cursos angostos: kN = 1 con semi-ancho local <= hw[0], 0 con >= hw[1] (los cuerpos anchos no cambian: kN = 0)
+  "  float kN = (1.0 - smoothstep(uE.x, uE.y, sh2.y)) * uE.z;\n" +   // distancia a la orilla (m), horneada
   // normales animadas: dos capas de la misma textura, rotadas y con deriva distinta; los mipmaps las aplanan solos a distancia
   "  vec4 w1 = texture2D(tWave, mat2(0.80, -0.60, 0.60, 0.80) * p / uA.x + uTime * uDrift.xy);\n" +
   "  vec4 w2 = texture2D(tWave, mat2(0.60, 0.80, -0.80, 0.60) * p / uA.y + uTime * uDrift.zw + vec2(0.37, 0.61));\n" +
@@ -258,7 +277,9 @@ const FS =
   // profundidad aparente: de la orilla (0) al cauce (1), con un poco de ruido para que no sea un degradé perfecto
   "  float dd = clamp((vD + (w1.b - 0.5) * 0.9) / uC.z, 0.0, 1.0);\n" +
   "  dd = dd * dd * (3.0 - 2.0 * dd);\n" +
+  "  dd = max(dd, kN);\n" +
   "  vec3 body = dd < 0.5 ? mix(uColShallow, uColMid, dd * 2.0) : mix(uColMid, uColDeep, dd * 2.0 - 1.0);\n" +
+  "  body = mix(body, uColNarrow, kN);\n" +
   // luz difusa: mismas unidades que MeshLambert (albedo/pi · irradiancia)
   "  float NL = max(dot(N, uSunDir), 0.0);\n" +
   "  vec3 E = mix(uHemiGround, uHemiSky, 0.5 * N.y + 0.5) + uSunColor * uSunI * NL;\n" +
@@ -269,17 +290,18 @@ const FS =
   // cielo reflejado: zenit → horizonte (= color de la niebla, pasado a lineal)
   "  vec3 R = reflect(-V, N);\n" +
   "  vec3 sky = mix(pow(uFogColor, vec3(2.2)), uZenith, pow(clamp(R.y, 0.0, 1.0), 0.45));\n" +
-  "  vec3 refl = sky * uB.x;\n" +
+  "  vec3 refl = sky * uB.x * mix(1.0, uF.y, kN);\n" +
   // destello del sol (Blinn-Phong normalizado)
   "  vec3 H = normalize(V + uSunDir);\n" +
   "  float spec = pow(max(dot(N, H), 0.0), uB.y) * (uB.y + 8.0) / (8.0 * PI_) * NL;\n" +
   "  vec3 col = mix(diff, refl, F) + uSunColor * uSunI * min(spec * F, 6.0) * uB.z;\n" +
   // reborde claro en la orilla (reemplaza la línea de MapLibre)
   "  float rim = (1.0 - smoothstep(0.0, 0.9, vD)) * (0.55 + 0.9 * w2.b);\n" +
-  "  col = mix(col, uColRim * E / PI_, clamp(rim * uD.y, 0.0, 1.0));\n" +
+  "  col = mix(col, uColRim * E / PI_, clamp(rim * uD.y * mix(1.0, uF.z, kN), 0.0, 1.0));\n" +
   "  float a = mix(uC.x, uC.y, dd);\n" +
   "  a = mix(a, 1.0, F * 0.6);\n" +
-  "  a *= smoothstep(0.0, uC.w, vD + (w1.b - 0.5) * 0.3);\n" +   // borde suave contra el suelo
+  "  a = mix(a, max(a, uF.x), kN);\n" +
+  "  a *= smoothstep(0.0, uC.w * mix(1.0, uF.w, kN), vD + (w1.b - 0.5) * 0.3);\n" +   // borde suave contra el suelo
   "  a *= uFade;\n" +
   "  if (a < 0.003) discard;\n" +
   "  gl_FragColor = vec4(col, a);\n" +
@@ -301,7 +323,10 @@ const U = {   // uniforms comunes a los dos escenarios (compartidos por referenc
   uB: { value: new THREE.Vector4(CFG.reflection, CFG.spec[0], CFG.spec[1], CFG.waveFade[0]) },
   uC: { value: new THREE.Vector4(CFG.alpha[0], CFG.alpha[1], CFG.shoreWidth, CFG.edgeSoft) },
   uD: { value: new THREE.Vector4(CFG.waveFade[1], CFG.rimStrength, CFG.gain, 0) },
-  uDrift: { value: new THREE.Vector4(...CFG.drift) }
+  uDrift: { value: new THREE.Vector4(...CFG.drift) },
+  uE: { value: new THREE.Vector4(CFG.narrow.hw[0], CFG.narrow.hw[1], CFG.narrow.enabled ? 1 : 0, 0) },
+  uF: { value: new THREE.Vector4(CFG.narrow.alpha, CFG.narrow.reflection, CFG.narrow.rim, CFG.narrow.edge) },
+  uColNarrow: { value: new THREE.Color(CFG.narrow.color) }
 };
 
 function makeMaterial(key, hasH, tex, sh) {

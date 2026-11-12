@@ -278,7 +278,10 @@ export const A4_WATER = {
   reflection: 0.55,          // intensidad del cielo reflejado (cielo de MapLibre aproximado: zenit → horizonte/niebla)
   spec: [300, 0.8],          // brillo del destello del sol: exponente, intensidad
   lineOpacity: 0,            // opacidad de la línea `*-agua-line` de MapLibre cuando el shader está activo (0 = apagada)
-  idleMaxDist: 1000          // m · más lejos que esto no hace falta animar en reposo (lazo acotado, T7)
+  idleMaxDist: 1000,         // m · más lejos que esto no hace falta animar en reposo (lazo acotado, T7)
+  /* Cursos angostos (G3: Chapa II-V, ~2,4 m, se leía como camino de tierra). Con semi-ancho local <= hw[0] el ajuste es total, con >= hw[1] no
+     hay ajuste (Nikunihué y El Carmen no cambian). Ajuste: cuerpo azul oscuro y casi opaco, menos cielo reflejado, sin reborde claro y borde corto. */
+  narrow: { enabled: true, hw: [1.4, 2.0], color: "#356fa0", alpha: 0.92, reflection: 0.35, rim: 0.15, edge: 0.3 }
 };
 /* === A4: fin === */
 
