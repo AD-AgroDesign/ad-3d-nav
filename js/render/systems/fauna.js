@@ -428,7 +428,7 @@ export default {
         mesh.frustumCulled = true;
         mesh.visible = false;
         group.add(mesh);
-        info.bfly.push({ mesh, n, cx, cy, cz, rad });
+        info.bfly.push({ mesh, n, cx, cy, cz, rad, home: [cell.items[0].x, cell.items[0].z] });
         info.total += n;
       }
     }
@@ -548,6 +548,14 @@ export default {
       const [alon, alat] = hostCtx.toLngLat(fl.anchor.x, fl.anchor.z);
       return { lon, lat, alon, alat, size: fl.size, pathLen: Math.round(fl.path.L), y: +o.p[1].toFixed(1) };
     });
+  },
+
+  /* QA: lon/lat de la mata de origen de un polinizador (el de la celda más poblada), para acercar la cámara */
+  whereBfly(key) {
+    const b = built[key]; if (!b || !hostCtx || !b.bfly.length) return null;
+    const c = b.bfly.reduce((m, x) => (x.n > m.n ? x : m));
+    const [lon, lat] = hostCtx.toLngLat(c.home[0], c.home[1]);
+    return { lon, lat, celdas: b.bfly.length, nCelda: c.n };
   },
 
   dispose() {
