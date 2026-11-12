@@ -362,7 +362,7 @@ export const A5_FAUNA = {
     alt: [25, 56],             // m sobre el suelo · el piso se calcula también contra el árbol más alto (treeClear)
     treeClear: 7,              // m · colchón mínimo sobre la copa más alta de TREE_SPECIES (sin atravesar árboles)
     speed: [8, 13],            // m/s
-    span: 3.4,                 // m · envergadura (escala estilizada, como GRASS_SCALE: de 100-300 m se tiene que leer)
+    span: 2.2,                 // m · envergadura (G3: -35 % respecto de 3,4; escala estilizada, de 100-300 m se sigue leyendo gracias a farBoost)
     spanVar: 0.3,              // ± fracción
     flapHz: [2.0, 2.8],        // aleteo
     boostFrom: 180, farBoost: 2.2,   // desde boostFrom m el ave crece ∝ distancia (tope ×farBoost): a 400 m se sigue leyendo (≈ 20 px)
@@ -370,16 +370,18 @@ export const A5_FAUNA = {
     palette: [[0x34373a, 0.58], [0x5d5249, 0.24], [0x85807a, 0.10], [0xe7e4da, 0.08]]   // [color sRGB, peso]
   },
   butterflies: {
-    tuftsPerButterfly: { "corr-herb": 26, "parche-herb": 300 },   // 1 polinizador cada N matas (en multi)
-    max: 16000,                // tope por escenario (solo se dibujan las celdas a < visDist de la cámara)
+    /* G3 (Mike): detalle de la escena, no protagonista. ~20 % de la cantidad anterior, mitad de tamaño, solo cerca
+       de la cámara (navegación manual); en el rasante (~76 m) apenas. A cambio, geometría con forma (18 tris, 2 pares de alas). */
+    tuftsPerButterfly: { "corr-herb": 130, "parche-herb": 1500 },   // 1 polinizador cada N matas (en multi): 5x más ralo que antes (26 / 300)
+    max: 4000,                 // tope por escenario (solo se dibujan las celdas a < visDist de la cámara)
     inicial: 0,                // fracción de multi en el escenario inicial (casi ninguno: 0 = ninguno)
-    cell: 320,                 // m · celda de instanciado (una InstancedMesh por celda)
-    visDist: [290, 400],       // m · se achican a 0 entre estas distancias a la cámara (y solo se dibujan las celdas dentro)
-    farBoost: 2.2,             // entre 60 y 260 m de la cámara crecen hasta ×2,2 (a 250 m una de 2,2 m mide ~20 px)
-    span: 2.2,                 // m · envergadura (escala estilizada)
-    alt: [2.4, 6.0],           // m · sobre el suelo: 0,5-2,5 m reales × GRASS_SCALE a medias (las matas miden 2-4,7 m: si vuelan más bajo quedan tapadas)
-    wander: [7, 16],           // m · radio de vuelo errático alrededor de la mata
-    palette: [[0xffd21f, 0.40], [0xff7d14, 0.35], [0xffffff, 0.25]]
+    cell: 120,                 // m · celda de instanciado (una InstancedMesh por celda; chica para descartar rápido las lejanas)
+    visDist: [115, 185],       // m · se achican a 0 entre estas distancias. Con maxZoom 17.8/pitch 80 el suelo visible más cercano está a ~125 m (al pie del cuadro): ahí se ven; en el rasante (~155 m al pie) apenas
+    farBoost: 1.8,             // entre 60 m y visDist[1] crecen hasta ×1,8 (antes ×2,2 hasta 260 m): a ~125 m (lo más cerca que llega la cámara) miden ~1,4 m = 15 px
+    span: 1.0,                 // m · envergadura media (antes 2,2; con la variación individual 0,8-1,3 ×)
+    alt: [1.6, 4.2],           // m · sobre el suelo (las matas miden 2-4,7 m; algunas vuelan entre ellas, otras por encima)
+    wander: [4, 10],           // m · radio de vuelo errático alrededor de la mata
+    palette: [[0xffc81e, 0.30], [0xf2761a, 0.30], [0xf4f1e6, 0.22], [0x4f8fe0, 0.18]]   // amarilla, naranja, blanca, azul
   }
 };
 /* Ajuste en caliente (solo ?debug/?qa): ?a5={"ratioInicial":0.5} se mezcla (superficial) sobre A5_FAUNA. */

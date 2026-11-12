@@ -6,9 +6,9 @@
      - AVES: bandadas de 8-25 en recorridos cerrados (Catmull-Rom) alrededor de parches leñosos,
        a 25-56 m sobre el suelo. Una sola InstancedMesh de 8 tris por ave; la CPU solo coloca cada
        ave (matriz) y el aleteo corre en el vertex shader (fase, frecuencia y planeo propios de cada ave).
-     - POLINIZADORES: mariposas de 2 quads (4 tris) sobre corr-herb y parche-herb, instanciadas por celda
+     - POLINIZADORES: mariposas de 18 tris (alas anterior y posterior con forma, G3) sobre corr-herb y parche-herb, instanciadas por celda
        (chunks.js). Todo el movimiento (vuelo errático, rumbo, aleteo) corre en el vertex shader; solo se
-       dibujan las celdas a menos de ~250 m de la cámara y se achican con la distancia (uCamPos, T1).
+       dibujan las celdas a menos de ~85 m de la cámara y se achican con la distancia (uCamPos, T1; G3: solo con la cámara muy cerca).
    Narrativa: en `inicial`, pocas aves (D-4: 1 de 4) y ningún polinizador; en `multi`, abundante.
    Reposo (T7): lazo acotado a quality.idleFps solo si hay fauna en cuadro; pausa con document.hidden;
    apagada en calidad Baja (fauna = 0); Media = 50 %. Tiempo: uniforms.uTime (lo congela __nav3d.freezeTime) y
@@ -245,16 +245,25 @@ function birdPose(fl, b, T, o = _o) {
 
 /* ============================ POLINIZADORES ============================ */
 
-/* Mariposa unitaria (envergadura 1 en X, nariz +Z): dos alas (quads) con bisagra en x = 0. */
+/* Mariposa unitaria (envergadura 1 en X, nariz +Z), 18 tris: por lado ala anterior (4 tris, punta apuntada) y
+   ala posterior (3 tris, lóbulo redondeado con cola), cuerpo en rombo y dos antenas. El color por vértice
+   (k) oscurece el borde y la raíz (nervadura/margen) y se multiplica por el color de instancia. */
 function butterflyGeometry() {
   const pos = [], col = [];
-  const tri = (a, b, c, k) => { pos.push(...a, ...b, ...c); for (let i = 0; i < 3; i++) col.push(k, k, k); };
+  const tri = (a, b, c) => { for (const v of [a, b, c]) { pos.push(v[0], 0, v[1]); col.push(v[2], v[2], v[2]); } };
   for (const s of [1, -1]) {
-    const rf = [0.03 * s, 0, 0.20], rb = [0.03 * s, 0, -0.20], tf = [0.5 * s, 0, 0.30], tb = [0.42 * s, 0, -0.28];
-    tri(rf, tf, rb, 1); tri(tf, tb, rb, 1);
+    const P = (x, z, k) => [x * s, z, k];
+    // ala anterior: borde de ataque recto, ápice, margen externo, base
+    const r0 = P(0.03, 0.10, 0.45), r1 = P(0.03, -0.03, 0.45), l1 = P(0.22, 0.17, 0.85), ap = P(0.48, 0.17, 0.22), o = P(0.45, 0.00, 0.40), t = P(0.30, -0.08, 0.75);
+    tri(r0, l1, r1); tri(l1, t, r1); tri(l1, ap, t); tri(ap, o, t);
+    // ala posterior: abanico desde la raíz, cola en el vértice trasero
+    const h0 = P(0.03, -0.03, 0.45), h1 = P(0.30, -0.06, 0.80), h2 = P(0.36, -0.19, 0.35), h3 = P(0.21, -0.31, 0.30), h4 = P(0.07, -0.21, 0.6);
+    tri(h0, h1, h2); tri(h0, h2, h3); tri(h0, h3, h4);
+    // antena
+    tri([-0.004 * s, 0.15, 0.1], [0.004 * s, 0.15, 0.1], [0.07 * s, 0.30, 0.1]);
   }
-  // cuerpo oscuro (franja fina entre las alas): lo distingue de un papelito
-  tri([-0.03, 0, 0.26], [0.03, 0, 0.26], [-0.03, 0, -0.24], 0.1); tri([0.03, 0, 0.26], [0.03, 0, -0.24], [-0.03, 0, -0.24], 0.1);
+  // cuerpo: rombo fino (cabeza-tórax-abdomen)
+  tri([0, 0.15, 0.08], [-0.028, 0.02, 0.08], [0.028, 0.02, 0.08]); tri([-0.028, 0.02, 0.08], [0, -0.30, 0.08], [0.028, 0.02, 0.08]);
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
@@ -267,7 +276,7 @@ attribute vec4 aS1;        // (fase de x, fase de z, fase de altura, fase de ale
 attribute vec4 aS2;        // (amplitud x, amplitud z, tamaño/frecuencia, altura) en 0..1
 uniform float uTime;
 uniform vec3 uCamPos;
-uniform vec3 uA5Vis;       // (cerca, lejos, crecimiento lejano): se achican a 0 entre cerca y lejos; entre 60 y 260 m crecen hasta ×z (se siguen leyendo)
+uniform vec3 uA5Vis;       // (cerca, lejos, crecimiento lejano): se achican a 0 entre cerca y lejos; entre 60 m y el límite lejano crecen hasta ×z (se siguen leyendo: la cámara no baja de ~125 m del suelo visible)
 uniform vec3 uA5B;         // (envergadura m, alt mínima m, alt máxima m)
 uniform vec2 uA5Wan;       // radio de vuelo errático (mín, máx) m
 uniform float uA5Grow;     // crecimiento del escenario (0..1): la fauna aparece con la vegetación
@@ -284,13 +293,18 @@ vec3 transformed = vec3(position);
   vec2 vel = vec2(A * w1 * cos(w1 * t + p1) + 0.35 * A * 2.3 * w1 * cos(2.3 * w1 * t + p2), B * w2 * cos(w2 * t + p2));
   float alt = mix(uA5B.y, uA5B.z, aS2.w) + 0.45 * sin(0.9 * t + p3);
   float yaw = atan(vel.x, vel.y);
-  float fr = 17.0 + 10.0 * aS2.z;                                      // aleteo ~3-4,5 Hz
-  float a = 0.30 + 0.85 * sin(fr * t + pf);                            // ángulo de las alas (rad)
+  float fr = 15.0 + 8.0 * aS2.z;                                       // aleteo ~2,5-3,7 Hz (con pausas de planeo)
+  float glide = smoothstep(0.55, 0.85, sin(0.7 * t + p3 * 2.0));        // 1 = alas abiertas casi quietas
+  float lagW = smoothstep(0.04, -0.14, position.z) * 0.55;              // el ala posterior se atrasa respecto de la anterior
+  float a = mix(0.25 + 1.0 * sin(fr * t + pf - lagW), 0.45 + 0.15 * sin(fr * 0.4 * t + pf), glide);   // ángulo de las alas (rad)
   float sx = position.x < 0.0 ? -1.0 : 1.0, ax = abs(position.x);
-  vec3 lp = vec3(sx * ax * cos(a), ax * sin(a), position.z);
+  float hw = clamp((ax - 0.03) / 0.02, 0.0, 1.0);                       // 0 en el cuerpo, 1 en las alas
+  vec3 lp = vec3(sx * (0.03 + (ax - 0.03) * cos(a) * hw + (ax - 0.03) * (1.0 - hw)), (ax - 0.03) * sin(a) * hw, position.z);
+  lp.y += 0.035 * sin(fr * t + pf) * (1.0 - glide);                       // el cuerpo cabecea con el aleteo
+  lp.z += 0.02 * hw * (1.0 - cos(a));                                    // las alas se adelantan un poco al subir
   float cy = cos(yaw), sy = sin(yaw);
   float dc = distance(uCamPos, home);
-  float sc = uA5B.x * (0.8 + 0.5 * aS2.z) * mix(1.0, uA5Vis.z, smoothstep(60.0, 260.0, dc)) * (1.0 - smoothstep(uA5Vis.x, uA5Vis.y, dc)) * smoothstep(0.35, 1.0, uA5Grow);
+  float sc = uA5B.x * (0.8 + 0.5 * aS2.z) * mix(1.0, uA5Vis.z, smoothstep(60.0, uA5Vis.y, dc)) * (1.0 - smoothstep(uA5Vis.x, uA5Vis.y, dc)) * smoothstep(0.35, 1.0, uA5Grow);
   transformed = vec3(lp.x * cy + lp.z * sy, lp.y, -lp.x * sy + lp.z * cy) * sc + vec3(off.x, alt, off.y);
 }
 `;
@@ -555,7 +569,7 @@ export default {
     const b = built[key]; if (!b || !hostCtx || !b.bfly.length) return null;
     const c = b.bfly.reduce((m, x) => (x.n > m.n ? x : m));
     const [lon, lat] = hostCtx.toLngLat(c.home[0], c.home[1]);
-    return { lon, lat, celdas: b.bfly.length, nCelda: c.n };
+    return { lon, lat, x: c.home[0], z: c.home[1], celdas: b.bfly.length, nCelda: c.n };
   },
 
   dispose() {
