@@ -103,12 +103,26 @@ on("quality", q => { fog.enabled = q.name !== "baja"; });
 
 /* `cam` = resultado de core/camera.js updateCamera(...) con rays (se pasa `matrix`);
    H = alto del canvas en px CSS. Devuelve `fog` (objeto reutilizado). */
-export function updateFog(cam, H) {
+const _qs = new URLSearchParams(location.search);
+const _noFogRelieve = (_qs.has("qa") || _qs.has("debug")) && _qs.get("fogrelieve") === "0";   // QA: ?fogrelieve=0 = niebla plana también con relieve (comparar antes/después)
+export function updateFog(cam, H, tr) {
   const r = cam.rays;
   if (!fog.enabled || !r) {
     fog.near = fog.far = uniforms.uFogNear.value = uniforms.uFogFar.value = 1e9;
+    uniforms.uFogMax.value = A1_FOG.max;   // A6 (G4): sale del modo relieve si la calidad apaga la niebla
     return fog;
   }
+  /* A6 (G4) · modo relieve: con terreno la niebla es la de MapLibre sobre la malla (por profundidad de vista, ver adFog en shaderlib.js):
+     near = cameraToCenterDistance + elevación·px/m / cos(pitch), far = farZ (px), opacidad por pitch (0 hasta 60°, 1 desde 70°).
+     Se avisa con uFogMax = -(1 + opacidad). `tr` = map.transform solo con terreno activo; si falta algún campo interno cae a la curva plana. */
+  if (tr && !_noFogRelieve && tr.farZ > 0 && tr._pixelPerMeter > 0 && tr.cameraToCenterDistance > 0) {
+    const pitch = tr.pitch, op = pitch < 60 ? 0 : pitch < 70 ? (pitch - 60) / 10 : 1;
+    const n = tr.cameraToCenterDistance + (tr.elevation || 0) * tr._pixelPerMeter / Math.cos(tr._pitch);
+    fog.near = uniforms.uFogNear.value = n; fog.far = uniforms.uFogFar.value = tr.farZ; fog.dHor = fog.far; fog.hNdc = 0;
+    uniforms.uFogMax.value = -(1 + op);
+    return fog;
+  }
+  uniforms.uFogMax.value = A1_FOG.max;
   const hNdc = cam.horizonPx / (H / 2);
   // rayo (este, norte, arriba; m) de la línea del sky al centro horizontal de la pantalla
   const dx = r.d0[0] + hNdc * r.dy[0], dy = r.d0[1] + hNdc * r.dy[1], dz = r.d0[2] + hNdc * r.dy[2];

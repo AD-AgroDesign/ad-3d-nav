@@ -14,7 +14,7 @@
                    fade: true               → uniforme propio del material (setFade(mat, v))
    El material debe ser MeshBasic/Lambert/Phong/Standard (necesitan <fog_fragment>). */
 import * as THREE from "three";
-import { A1_FOLIAGE } from "../core/config.js?v=20261113";
+import { A1_FOLIAGE, A6_TERRAIN } from "../core/config.js?v=20261113";
 import { uniforms } from "./lighting.js?v=20261113";
 
 /* ---------- GLSL ---------- */
@@ -24,8 +24,25 @@ import { uniforms } from "./lighting.js?v=20261113";
 export const GLSL_FOG_UNIFORMS = "uniform vec3 uFogColor;\nuniform float uFogNear;\nuniform float uFogFar;\nuniform float uFogMax;\n";
 export const GLSL_ADFOG =
   "float adFog(float d) {\n" +
+  /* A6 (G4): con relieve la niebla de MapLibre sobre la malla es otra curva (ver lighting.js updateFog, modo relieve): por profundidad
+     de vista z, no por distancia, y no llega al 100 % hasta el plano lejano. Si los objetos Three siguieran la curva plana saturarían
+     al color de la niebla mucho antes que el terreno (manchas blancas sobre las lomas). Aviso del modo: uFogMax < 0 (= -(1 + opacidad));
+     uFogNear/uFogFar pasan a ser near/far de la matriz de niebla de MapLibre en px. */
+  "  if (uFogMax < 0.0) {\n" +
+  "    float dp = uFogFar * (1.0 - uFogNear / max(1.0 / gl_FragCoord.w, 1.0)) / max(uFogFar - uFogNear, 1.0);\n" +
+  "    float k = clamp(max(dp - " + A6_TERRAIN.sky.fogGroundBlend.toFixed(3) + ", 0.0) / " + (1 - A6_TERRAIN.sky.fogGroundBlend).toFixed(3) + ", 0.0, 1.0);\n" +
+  "    return k * k * (-uFogMax - 1.0);\n" +
+  "  }\n" +
   "  float x = clamp((d - uFogNear) / max(uFogFar - uFogNear, 1.0), 0.0, 1.0);\n" +
   "  return x * x * (3.0 - 2.0 * x) * uFogMax;\n" +
+  "}\n" +
+  /* Parámetro de mezcla para mix(color, uFogColor, adFogT(color, t)): sin relieve es t (la mezcla de siempre, en espacio de salida);
+     con relieve MapLibre mezcla en lineal (gamma 2,2), así que se corrige t para que la luminancia resultante sea la de esa mezcla. */
+  "float adFogT(vec3 c, float t) {\n" +
+  "  if (uFogMax >= 0.0) return t;\n" +
+  "  float lc = dot(c, vec3(0.2126, 0.7152, 0.0722)), lf = dot(uFogColor, vec3(0.2126, 0.7152, 0.0722));\n" +
+  "  float tl = pow(mix(pow(lc, 2.2), pow(lf, 2.2), t), 1.0 / 2.2);\n" +
+  "  return abs(lf - lc) < 0.02 ? t : clamp((tl - lc) / (lf - lc), 0.0, 1.0);\n" +
   "}\n";
 
 /* Umbral Bayer 4x4 en [0,1) por píxel de pantalla (ordenado: sin parpadeo entre frames). */
@@ -89,7 +106,7 @@ function applyChunks(sh, o) {
     fs = fs
       .replace("#include <common>", "#include <common>\nvarying vec3 vAdWPos;\nuniform vec3 uCamPos;\n" + GLSL_FOG_UNIFORMS + GLSL_ADFOG)
       .replace("#include <fog_fragment>",
-        "gl_FragColor.rgb = mix(gl_FragColor.rgb, uFogColor, adFog(distance(vAdWPos, uCamPos)));");
+        "gl_FragColor.rgb = mix(gl_FragColor.rgb, uFogColor, adFogT(gl_FragColor.rgb, adFog(distance(vAdWPos, uCamPos))));");   // el prefijo mix(gl_FragColor.rgb, uFogColor lo busca shadows.js (patchGrassReceive)
   }
 
   if (o.srgbVC) {

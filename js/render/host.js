@@ -179,7 +179,7 @@ export const host = {
     /* Cámara real (T1): posición en metros de escena → uCamPos, compartido por niebla, LOD, agua… */
     const cam = this.camera3d = updateCamera(this.map, this.origin, this.scale, matrix);
     uniforms.uCamPos.value.set(cam.camPosScene[0], cam.camPosScene[1], cam.camPosScene[2]);
-    updateFog(cam, this.map.getCanvas().clientHeight);   // A1: uFogNear/uFogFar de este frame (lighting.js)
+    updateFog(cam, this.map.getCanvas().clientHeight, terrain.active ? this.map.transform : null);   // A6 (G4): con relieve, niebla de MapLibre (lighting.js). A1: uFogNear/uFogFar de este frame (lighting.js)
     const frame = { now, dt, camPosScene: uniforms.uCamPos.value, viewProj: this.camera.projectionMatrix,
                     camera: cam, quality: this.quality, preset: null };
     idleDriver.frame(now, uniforms.uTime.value);
