@@ -10,16 +10,16 @@
    Con ?qa nunca arranca el tour ni la cámara solos: el splash se saltea desde
    la API y el tour/órbita solo corren si se piden (startTour/startOrbit).
    ==================================================================== */
-import { HOME_VIEW, state } from "../core/state.js";
-import { featureCentroid, mulberry32, ringAreaHa } from "../core/geo.js";
-import { map } from "../map/style.js";
-import { setScenario } from "../map/scenario.js";
-import { getCamera } from "../core/camera.js";
-import { LEVELS, setQuality } from "../core/quality.js";
-import { host } from "../render/host.js";
-import { PRESET_NAMES, atm, presetName, setPreset, uniforms } from "../render/lighting.js";
-import { RAZANTE_CAM, corridorCenterline, makeFlight } from "../tour/flight.js";
-import { startOrbit, startTour, stopOrbit, stopTour } from "../tour/tour.js";
+import { HOME_VIEW, state } from "../core/state.js?v=20261113";
+import { featureCentroid, mulberry32, ringAreaHa } from "../core/geo.js?v=20261113";
+import { map } from "../map/style.js?v=20261113";
+import { setScenario } from "../map/scenario.js?v=20261113";
+import { getCamera } from "../core/camera.js?v=20261113";
+import { LEVELS, setQuality } from "../core/quality.js?v=20261113";
+import { host } from "../render/host.js?v=20261113";
+import { PRESET_NAMES, atm, presetName, setPreset, uniforms } from "../render/lighting.js?v=20261113";
+import { RAZANTE_CAM, corridorCenterline, makeFlight } from "../tour/flight.js?v=20261113";
+import { startOrbit, startTour, stopOrbit, stopTour } from "../tour/tour.js?v=20261113";
 
 (() => {
   const _q = new URLSearchParams(location.search);

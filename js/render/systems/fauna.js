@@ -14,14 +14,14 @@
    apagada en calidad Baja (fauna = 0); Media = 50 %. Tiempo: uniforms.uTime (lo congela __nav3d.freezeTime) y
    funciones cerradas del tiempo (sin integrar dt: T5 no aplica salvo en el lazo de reposo, que usa max(0, …)). */
 import * as THREE from "three";
-import { idleDriver } from "../idle.js";
-import { A5_FAUNA, TREE_SPECIES } from "../../core/config.js";
-import { state } from "../../core/state.js";
-import { quality } from "../../core/quality.js";
-import { uniforms } from "../lighting.js";
-import { patch } from "../shaderlib.js";
-import { terrain } from "../../terrain/terrain.js";
-import { cellSeed, chainShader, partitionCells, shuffleDet } from "./chunks.js";
+import { idleDriver } from "../idle.js?v=20261113";
+import { A5_FAUNA, TREE_SPECIES } from "../../core/config.js?v=20261113";
+import { state } from "../../core/state.js?v=20261113";
+import { quality } from "../../core/quality.js?v=20261113";
+import { uniforms } from "../lighting.js?v=20261113";
+import { patch } from "../shaderlib.js?v=20261113";
+import { terrain } from "../../terrain/terrain.js?v=20261113";
+import { cellSeed, chainShader, partitionCells, shuffleDet } from "./chunks.js?v=20261113";
 
 const C = A5_FAUNA, CB = C.birds, CF = C.butterflies;
 const TAU = Math.PI * 2;

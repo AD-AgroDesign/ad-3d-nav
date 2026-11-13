@@ -22,14 +22,14 @@
        document.hidden, y no repinta si el tiempo está congelado (freezeTime). Calidad Baja: sin malla (plano de MapLibre).
    T9: `*-agua-fill` queda con opacidad 0,001 (clic/popup); `*-agua-line` en config (0). En Baja se restauran (0,38 / 0,7). */
 import * as THREE from "three";
-import { A1_SKY, A4_WATER as CFG } from "../../core/config.js";
-import { HOME_VIEW, params } from "../../core/state.js";
-import { quality } from "../../core/quality.js";
-import { idleDriver } from "../idle.js";
-import { map } from "../../map/style.js";
-import { lights, uniforms } from "../lighting.js";
-import { GLSL_ADFOG, GLSL_FOG_UNIFORMS, scenarioFade } from "../shaderlib.js";
-import { dedupRing, triangulatePoly } from "./ground.js";
+import { A1_SKY, A4_WATER as CFG } from "../../core/config.js?v=20261113";
+import { HOME_VIEW, params } from "../../core/state.js?v=20261113";
+import { quality } from "../../core/quality.js?v=20261113";
+import { idleDriver } from "../idle.js?v=20261113";
+import { map } from "../../map/style.js?v=20261113";
+import { lights, uniforms } from "../lighting.js?v=20261113";
+import { GLSL_ADFOG, GLSL_FOG_UNIFORMS, scenarioFade } from "../shaderlib.js?v=20261113";
+import { dedupRing, triangulatePoly } from "./ground.js?v=20261113";
 
 const wanted = () => CFG.enabled && !((params.has("qa") || params.has("debug")) && params.get("agua") === "off");   // ?agua=off: solo ?qa/?debug
 

@@ -1,5 +1,5 @@
-import { DEBUG, params } from "../core/state.js";
-import { map } from "../map/style.js";
+import { DEBUG, params } from "../core/state.js?v=20261113";
+import { map } from "../map/style.js?v=20261113";
 
 /* Medidor de FPS (?fps o ?debug): cuenta frames dibujados por segundo.
    En reposo marca 0 porque el mapa no repinta — mirarlo en movimiento. */

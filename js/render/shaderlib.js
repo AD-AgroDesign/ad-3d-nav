@@ -14,8 +14,8 @@
                    fade: true               → uniforme propio del material (setFade(mat, v))
    El material debe ser MeshBasic/Lambert/Phong/Standard (necesitan <fog_fragment>). */
 import * as THREE from "three";
-import { A1_FOLIAGE } from "../core/config.js";
-import { uniforms } from "./lighting.js";
+import { A1_FOLIAGE } from "../core/config.js?v=20261113";
+import { uniforms } from "./lighting.js?v=20261113";
 
 /* ---------- GLSL ---------- */
 

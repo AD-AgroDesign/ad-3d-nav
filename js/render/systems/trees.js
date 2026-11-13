@@ -16,13 +16,13 @@
 
    Para A3 (sombras): ver `casters(scenarioKey)` abajo. */
 import * as THREE from "three";
-import { CHUNK_CELL_TREES, TREE_ALPHA_TEST, TREE_IMPOSTOR, TREE_IMPOSTOR_CULL, TREE_LOD_BAND, TREE_SPECIES, TREE_SWAY, WIND_IDLE_DIST } from "../../core/config.js";
-import { idleDriver } from "../idle.js";
-import { chainShader, partitionCells } from "./chunks.js";
-import { uniforms } from "../lighting.js";
+import { CHUNK_CELL_TREES, TREE_ALPHA_TEST, TREE_IMPOSTOR, TREE_IMPOSTOR_CULL, TREE_LOD_BAND, TREE_SPECIES, TREE_SWAY, WIND_IDLE_DIST } from "../../core/config.js?v=20261113";
+import { idleDriver } from "../idle.js?v=20261113";
+import { chainShader, partitionCells } from "./chunks.js?v=20261113";
+import { uniforms } from "../lighting.js?v=20261113";
 
 const _fr = new THREE.Frustum(), _sp = new THREE.Sphere();
-import { buildAtlas, buildImpostorAtlas, buildImpostorGeometry, buildProxy, buildSpecies } from "./treegen.js";
+import { buildAtlas, buildImpostorAtlas, buildImpostorGeometry, buildProxy, buildSpecies } from "./treegen.js?v=20261113";
 
 const built = {};   // scenarioKey → { cells, nearMat, farMat, counts, n }
 const SPECIES = Object.keys(TREE_SPECIES);
