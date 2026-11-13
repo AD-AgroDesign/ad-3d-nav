@@ -21,28 +21,30 @@ import { uniforms } from "./lighting.js?v=20261113";
 
 /* Curva de niebla compartida con la capa atmo-fog del suelo (render/atmo.js): ambas deben
    dar el mismo valor para la misma distancia o el horizonte se parte en dos. */
-export const GLSL_FOG_UNIFORMS = "uniform vec3 uFogColor;\nuniform float uFogNear;\nuniform float uFogFar;\nuniform float uFogMax;\n";
+export const GLSL_FOG_UNIFORMS = "uniform vec3 uFogColor;\nuniform float uFogNear;\nuniform float uFogFar;\nuniform float uFogMax;\nuniform vec4 uFogRel;\n";
 export const GLSL_ADFOG =
-  "float adFog(float d) {\n" +
-  /* A6 (G4): con relieve la niebla de MapLibre sobre la malla es otra curva (ver lighting.js updateFog, modo relieve): por profundidad
-     de vista z, no por distancia, y no llega al 100 % hasta el plano lejano. Si los objetos Three siguieran la curva plana saturarían
-     al color de la niebla mucho antes que el terreno (manchas blancas sobre las lomas). Aviso del modo: uFogMax < 0 (= -(1 + opacidad));
-     uFogNear/uFogFar pasan a ser near/far de la matriz de niebla de MapLibre en px. */
-  "  if (uFogMax < 0.0) {\n" +
-  "    float dp = uFogFar * (1.0 - uFogNear / max(1.0 / gl_FragCoord.w, 1.0)) / max(uFogFar - uFogNear, 1.0);\n" +
-  "    float k = clamp(max(dp - " + A6_TERRAIN.sky.fogGroundBlend.toFixed(3) + ", 0.0) / " + (1 - A6_TERRAIN.sky.fogGroundBlend).toFixed(3) + ", 0.0, 1.0);\n" +
-  "    return k * k * (-uFogMax - 1.0);\n" +
-  "  }\n" +
+  "float adFogFlat(float d) {\n" +
   "  float x = clamp((d - uFogNear) / max(uFogFar - uFogNear, 1.0), 0.0, 1.0);\n" +
   "  return x * x * (3.0 - 2.0 * x) * uFogMax;\n" +
   "}\n" +
+  /* A6 (G4-fix): con relieve la niebla de MapLibre sobre la malla es otra curva (por profundidad de vista z, no por distancia, y no llega al
+     100 % hasta el plano lejano). uFogRel = (near px, far px, opacidad por pitch, peso k): el valor final es la mezcla lineal de la curva plana
+     y la de relieve con peso k (0 = plana, 1 = relieve), así la niebla acompaña de forma continua la transición animada del relieve. */
+  "float adFog(float d) {\n" +
+  "  float ff = adFogFlat(d);\n" +
+  "  if (uFogRel.w <= 0.0) return ff;\n" +
+  "  float dp = uFogRel.y * (1.0 - uFogRel.x / max(1.0 / gl_FragCoord.w, 1.0)) / max(uFogRel.y - uFogRel.x, 1.0);\n" +
+  "  float k = clamp(max(dp - " + A6_TERRAIN.sky.fogGroundBlend.toFixed(3) + ", 0.0) / " + (1 - A6_TERRAIN.sky.fogGroundBlend).toFixed(3) + ", 0.0, 1.0);\n" +
+  "  return mix(ff, k * k * uFogRel.z, uFogRel.w);\n" +
+  "}\n" +
   /* Parámetro de mezcla para mix(color, uFogColor, adFogT(color, t)): sin relieve es t (la mezcla de siempre, en espacio de salida);
-     con relieve MapLibre mezcla en lineal (gamma 2,2), así que se corrige t para que la luminancia resultante sea la de esa mezcla. */
+     con relieve MapLibre mezcla en lineal (gamma 2,2), así que se corrige t (con peso k) para que la luminancia resultante sea la de esa mezcla. */
   "float adFogT(vec3 c, float t) {\n" +
-  "  if (uFogMax >= 0.0) return t;\n" +
+  "  if (uFogRel.w <= 0.0) return t;\n" +
   "  float lc = dot(c, vec3(0.2126, 0.7152, 0.0722)), lf = dot(uFogColor, vec3(0.2126, 0.7152, 0.0722));\n" +
   "  float tl = pow(mix(pow(lc, 2.2), pow(lf, 2.2), t), 1.0 / 2.2);\n" +
-  "  return abs(lf - lc) < 0.02 ? t : clamp((tl - lc) / (lf - lc), 0.0, 1.0);\n" +
+  "  float tc = abs(lf - lc) < 0.02 ? t : clamp((tl - lc) / (lf - lc), 0.0, 1.0);\n" +
+  "  return mix(t, tc, uFogRel.w);\n" +
   "}\n";
 
 /* Umbral Bayer 4x4 en [0,1) por píxel de pantalla (ordenado: sin parpadeo entre frames). */
@@ -92,6 +94,7 @@ function applyChunks(sh, o) {
     sh.uniforms.uFogNear = uniforms.uFogNear;
     sh.uniforms.uFogFar = uniforms.uFogFar;
     sh.uniforms.uFogMax = uniforms.uFogMax;
+    sh.uniforms.uFogRel = uniforms.uFogRel;
     vs = vs
       .replace("#include <common>", "#include <common>\nvarying vec3 vAdWPos;")
       .replace("#include <project_vertex>",

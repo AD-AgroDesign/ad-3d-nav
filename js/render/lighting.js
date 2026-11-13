@@ -36,6 +36,7 @@ export const uniforms = {
   uFogNear:   { value: 1e9 },                      // se recalculan cada frame en updateFog(); 1e9 = sin niebla
   uFogFar:    { value: 1e9 },
   uFogMax:    { value: A1_FOG.max },               // opacidad máxima de la niebla (horizonte)
+  uFogRel:    { value: new THREE.Vector4(1e9, 1e9, 0, 0) },   // A6 (G4-fix): niebla "con relieve" = (near px, far px, opacidad por pitch, peso k); peso 0 = curva plana pura
   uFade:      { value: 1 }                         // fade dither (A1): 1 = opaco
 };
 
@@ -105,22 +106,23 @@ on("quality", q => { fog.enabled = q.name !== "baja"; });
    H = alto del canvas en px CSS. Devuelve `fog` (objeto reutilizado). */
 const _qs = new URLSearchParams(location.search);
 const _noFogRelieve = (_qs.has("qa") || _qs.has("debug")) && _qs.get("fogrelieve") === "0";   // QA: ?fogrelieve=0 = niebla plana también con relieve (comparar antes/después)
-export function updateFog(cam, H, tr) {
+export function updateFog(cam, H, tr, kRel = 1) {
   const r = cam.rays;
+  uniforms.uFogRel.value.w = 0;   // por defecto curva plana pura (la capa atmo-fog llama sin `tr`)
   if (!fog.enabled || !r) {
     fog.near = fog.far = uniforms.uFogNear.value = uniforms.uFogFar.value = 1e9;
-    uniforms.uFogMax.value = A1_FOG.max;   // A6 (G4): sale del modo relieve si la calidad apaga la niebla
+    uniforms.uFogMax.value = A1_FOG.max;
     return fog;
   }
-  /* A6 (G4) · modo relieve: con terreno la niebla es la de MapLibre sobre la malla (por profundidad de vista, ver adFog en shaderlib.js):
-     near = cameraToCenterDistance + elevación·px/m / cos(pitch), far = farZ (px), opacidad por pitch (0 hasta 60°, 1 desde 70°).
-     Se avisa con uFogMax = -(1 + opacidad). `tr` = map.transform solo con terreno activo; si falta algún campo interno cae a la curva plana. */
-  if (tr && !_noFogRelieve && tr.farZ > 0 && tr._pixelPerMeter > 0 && tr.cameraToCenterDistance > 0) {
+  /* A6 (G4-fix): la niebla es SIEMPRE la curva plana (uFogNear/Far/Max, como antes) más, con terreno (`tr` = map.transform), la curva de
+     MapLibre sobre la malla en uFogRel (near = cameraToCenterDistance + elevación·px/m / cos(pitch), far = farZ en px, opacidad por pitch:
+     0 hasta 60°, 1 desde 70°) con peso kRel = k del relieve. El shader (adFog, shaderlib.js) mezcla las dos curvas con kRel: así la niebla se
+     interpola con continuidad al encender/apagar el relieve (antes saltaba de una a otra y el horizonte destellaba). */
+  const rel = tr && !_noFogRelieve && tr.farZ > 0 && tr._pixelPerMeter > 0 && tr.cameraToCenterDistance > 0;
+  if (rel) {
     const pitch = tr.pitch, op = pitch < 60 ? 0 : pitch < 70 ? (pitch - 60) / 10 : 1;
     const n = tr.cameraToCenterDistance + (tr.elevation || 0) * tr._pixelPerMeter / Math.cos(tr._pitch);
-    fog.near = uniforms.uFogNear.value = n; fog.far = uniforms.uFogFar.value = tr.farZ; fog.dHor = fog.far; fog.hNdc = 0;
-    uniforms.uFogMax.value = -(1 + op);
-    return fog;
+    uniforms.uFogRel.value.set(n, tr.farZ, op, kRel);
   }
   uniforms.uFogMax.value = A1_FOG.max;
   const hNdc = cam.horizonPx / (H / 2);
@@ -132,6 +134,7 @@ export function updateFog(cam, H, tr) {
   const near = Math.min(Math.max(A1_FOG.near * k, A1_FOG.nearK * k * cam.ctdM), far * A1_FOG.nearMaxFrac);
   fog.near = near; fog.far = far; fog.dHor = dHor; fog.hNdc = hNdc;
   uniforms.uFogNear.value = near; uniforms.uFogFar.value = far;
+  if (rel && kRel >= 1) { fog.near = uniforms.uFogRel.value.x; fog.far = fog.dHor = uniforms.uFogRel.value.y; fog.hNdc = 0; }   // consumidores JS (QA): con el relieve completo, la curva de relieve
   return fog;
 }
 

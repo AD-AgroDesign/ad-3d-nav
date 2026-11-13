@@ -319,8 +319,20 @@ function aplicarK(k, final = false) {
   if (map && terrain.hillshade && map.getLayer("hillshade")) {
     map.setPaintProperty("hillshade", "hillshade-exaggeration", (DBG && params.get("hse") ? parseFloat(params.get("hse")) : C.hillshade.exaggeration) * k);
   }
+  if (map && terrain.mesh) aplicarSky(map, k);
   for (const f of _stepFns) f(k, final);
   if (map) map.triggerRepaint();
+}
+
+/* Niebla del sky de MapLibre interpolada con k (G4-fix): de los valores "llanos" del estilo (k = 0) a los del relieve (k = 1). Antes se
+   cambiaba de golpe al crear/destruir la malla y el horizonte pegaba un destello blanco al encender/apagar. Las propiedades se pasan a
+   transición 0 (sin los 300 ms por defecto de MapLibre) para que sigan a k cuadro a cuadro. */
+function aplicarSky(map, k) {
+  if (!_skyPrev || !map.getSky) return;
+  const tr = map.style && map.style.sky && map.style.sky._transitionable;
+  if (tr && !tr._a6NoTr) { for (const n of ["fog-ground-blend", "horizon-fog-blend"]) tr.setTransition(n, { duration: 0, delay: 0 }); tr._a6NoTr = true; }
+  const lerp = (a, b) => (a ?? b) + (b - (a ?? b)) * k;
+  map.setSky({ ...map.getSky(), "fog-ground-blend": lerp(_skyPrev.g, C.sky.fogGroundBlend), "horizon-fog-blend": lerp(_skyPrev.h, C.sky.horizonFogBlend) });
 }
 
 /* Malla de MapLibre: se crea al empezar a encender (con exageración ~0) y se destruye al terminar de apagar (costo cero de ahí en más). */
@@ -330,15 +342,14 @@ function prenderMalla(map) {
   map.setTerrain({ source: "dem", exaggeration: Math.max(1e-3, terrain.k * terrain.exag) });
   terrain.mesh = true;
   ajustarCosto(map);
-  // niebla de MapLibre sobre la malla (la capa atmo-fog de A1 se apaga mientras haya malla: render/atmo.js)
-  if (map.getSky) map.setSky({ ...map.getSky(), "fog-ground-blend": C.sky.fogGroundBlend, "horizon-fog-blend": C.sky.horizonFogBlend });
+  aplicarSky(map, terrain.k);   // niebla de MapLibre sobre la malla, interpolada con k (la capa atmo-fog de A1 se apaga mientras haya malla: render/atmo.js)
 }
 function apagarMalla(map) {
   if (!terrain.mesh) return;
   if (map.getTerrain && map.getTerrain()) map.setTerrain(null);
   terrain.mesh = false;
   limitarEscala(map, 0);   // la barra de escala vuelve a refrescarse en cada 'move'
-  if (_skyPrev && map.getSky) map.setSky({ ...map.getSky(), "fog-ground-blend": _skyPrev.g, "horizon-fog-blend": _skyPrev.h });
+  if (_skyPrev && map.getSky) map.setSky({ ...map.getSky(), "fog-ground-blend": _skyPrev.g, "horizon-fog-blend": _skyPrev.h });   // k = 0: ya estaba igual (aplicarSky)
   if (map.getLayer("hillshade")) map.setLayoutProperty("hillshade", "visibility", "none");
 }
 

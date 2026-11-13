@@ -144,7 +144,7 @@ function multiplyMaterial(vs, fs, extraUniforms, defines) {
   const m = new THREE.ShaderMaterial({
     vertexShader: vs, fragmentShader: fs, defines: defines || {},
     uniforms: {
-      uCamPos: uniforms.uCamPos, uFogColor: uniforms.uFogColor, uFogNear: uniforms.uFogNear, uFogFar: uniforms.uFogFar, uFogMax: uniforms.uFogMax,
+      uCamPos: uniforms.uCamPos, uFogColor: uniforms.uFogColor, uFogNear: uniforms.uFogNear, uFogFar: uniforms.uFogFar, uFogMax: uniforms.uFogMax, uFogRel: uniforms.uFogRel,
       uA3Map: U.uA3Map, uA3VP: U.uA3VP, uA3P: U.uA3P, uA3Tint: U.uA3Tint, uA3Sun: U.uA3Sun, uA3Zone: U.uA3Zone, uA3Axes: U.uA3Axes, uA3Blob: U.uA3Blob,
       ...extraUniforms
     },
