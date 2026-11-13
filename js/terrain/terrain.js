@@ -120,12 +120,56 @@ function agregarFuenteYHillshade(map) {
   }
 }
 
+/* Ola 4 · 4.2: palancas de costo de la malla/RTT de MapLibre 4.7.1 (campos internos de map.terrain; si cambian, se ignoran sin romper). */
+function ajustarCosto(map) {
+  try {
+    const P = { ...C.perf };
+    if (DBG && params.get("rtt")) P.rttQuality = params.get("rtt") === "auto" ? "auto" : parseFloat(params.get("rtt"));
+    // "auto": 1 textura-px por px de pantalla (pixelRatio del mapa entre 1 y 2); MapLibre usa siempre 2 (4× los píxeles en pantallas 1×)
+    if (P.rttQuality === "auto") P.rttQuality = Math.min(2, Math.max(1, map.getPixelRatio ? map.getPixelRatio() : (window.devicePixelRatio || 1)));
+    if (DBG && params.get("mesh")) P.meshSize = parseInt(params.get("mesh"), 10);
+    if (DBG && params.get("pool")) P.rttPool = parseInt(params.get("pool"), 10);
+    const t = map.terrain, rtt = map.painter && map.painter.renderToTexture;
+    if (!t || !rtt || !rtt.pool) return;
+    if (DBG && params.has("scale")) P.scaleThrottleMs = parseInt(params.get("scale"), 10);
+    limitarEscala(map, P.scaleThrottleMs);
+    if (P.meshSize && !t._mesh) t.meshSize = P.meshSize;                       // la malla se crea en el primer frame
+    if (P.rttPool) rtt.pool._size = P.rttPool;                                  // texturas de RTT cacheadas (MapLibre: 30)
+    if (P.rttQuality && rtt.pool._objects.length === 0) {                       // el pool crea sus texturas a demanda
+      t.qualityFactor = P.rttQuality;
+      rtt.pool._tileSize = Math.round(t.sourceCache.tileSize * P.rttQuality);
+    }
+  } catch (e) { console.warn("A6: no se pudo ajustar el costo del terreno:", e.message || e); }
+}
+
+/* Ola 4 · 4.2: la ScaleControl de MapLibre llama 2 veces a map.unproject en CADA 'move' y, con terreno, cada unproject hace un
+   readPixels síncrono sobre el framebuffer de coordenadas del terreno: la CPU espera a la GPU 2 veces por frame y se pierde el
+   solapamiento CPU/GPU (en la HD 520 son ~46 ms/frame en órbita, perfil CDP). Se limita a una actualización cada `ms` ms (con la
+   última garantizada en 'moveend'). La barra de escala se ve igual, solo se refresca menos durante el movimiento. */
+function limitarEscala(map, ms) {
+  const ctl = (map._controls || []).find(c => c && c._onMove && c._container && c._container.classList.contains("maplibregl-ctrl-scale"));
+  if (!ctl || ctl._a6Throttled || !(ms > 0)) return;
+  const orig = ctl._onMove;
+  let last = 0, timer = 0;
+  const lim = () => {
+    const resto = ms - (performance.now() - last);
+    if (resto <= 0) { last = performance.now(); clearTimeout(timer); timer = 0; orig(); }
+    else if (!timer) timer = setTimeout(() => { timer = 0; last = performance.now(); orig(); }, resto);
+  };
+  const fin = () => { clearTimeout(timer); timer = 0; last = performance.now(); orig(); };   // al terminar un movimiento: valor exacto al instante
+  map.off("move", orig);
+  ctl._onMove = lim; ctl._a6Throttled = true;
+  map.on("move", lim);
+  map.on("moveend", fin);
+}
+
 /* Enciende/apaga la malla de terreno de MapLibre (null apaga). La exageración queda en terrain.exag. */
 export function setTerrain(map, on, exag = terrain.exag) {
   terrain.exag = exag;
   if (on) map.setTerrain({ source: "dem", exaggeration: exag });
   else if (map.getTerrain && map.getTerrain()) map.setTerrain(null);
   terrain.active = !!on && !!terrain.hf;
+  if (on) ajustarCosto(map);
   // niebla de MapLibre sobre la malla (la capa atmo-fog de A1 se apaga con terreno: render/atmo.js)
   if (terrain.active && map.getSky) map.setSky({ ...map.getSky(), "fog-ground-blend": C.sky.fogGroundBlend, "horizon-fog-blend": C.sky.horizonFogBlend });
 }
@@ -144,6 +188,7 @@ export async function initTerrain(map, bbox, data) {
     terrain.reason = `calidad ${quality.name}: terreno apagado (GPU integrada o nivel bajo; ?terreno=1 lo fuerza)`; return terrain;
   }
   if (!C.enabled && !C.hillshade.enabled) return terrain;
+  if (DBG && params.get("demz")) C.demZoom = parseInt(params.get("demz"), 10) || C.demZoom;   // ?demz=: zoom del DEM (fuente + heightAt), solo ?debug/?qa
   try {
     const m = 0.01;   // margen (°) para que el borde del campo no quede pegado al límite de la grilla
     terrain.hf = await loadHeightfield([bbox[0][0] - m, bbox[0][1] - m, bbox[1][0] + m, bbox[1][1] + m], { z: C.demZoom, url: C.demUrl });
