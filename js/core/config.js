@@ -313,7 +313,15 @@ export const A6_TERRAIN = {
      (que supone suelo plano) se apaga en los campos con terreno y se ajusta la niebla de MapLibre para que se parezca
      (fog-ground-blend: 0 = la niebla arranca en el centro de la vista, 1 = recién en el horizonte). */
   sky: { fogGroundBlend: 0.3, horizonFogBlend: 0.5 },
-  attribution: "Relieve: Terrain Tiles Mapzen/Tilezen en AWS (SRTM NASA/USGS, GMTED USGS)"
+  attribution: "Relieve: Terrain Tiles Mapzen/Tilezen en AWS (SRTM NASA/USGS, GMTED USGS)",
+  /* Ola 4 · 4.2: costo del terreno en movimiento (handoffs/a6-ola4.md). Interruptores sobre MapLibre 4.7.1 (campos internos, versión vendorizada).
+     Resultado de 4.2 (Intel HD 520, tour Chapa I-III-IV +41 → +12 ms): el costo no era el hillshade ni la malla sino (1) la ScaleControl
+     (2 readPixels síncronos por 'move'), (2) el caché de RTT de 30 texturas con 32-34 teselas visibles en rasante (se recreaban todas
+     por frame) y (3) texturas de 1024 px por tesela. Valores por defecto = los que convienen; los de MapLibre están entre paréntesis.
+     rttQuality: factor de la textura de render-a-textura de cada tesela de terreno ("auto" = pixelRatio del mapa entre 1 y 2; MapLibre: 2 → 1024 px por tesela de 512).
+     meshSize: lado de la grilla de la malla de terreno (MapLibre: 128 → 16 641 vértices por tesela). Con los valores de MapLibre no cambia nada.
+     rttPool: cantidad de texturas de RTT que MapLibre guarda en caché (30; 48 cubre los 32-34 tiles del rasante con pitch alto). scaleThrottleMs: tope de refresco de la barra de escala de MapLibre durante el movimiento (0 = sin tope, como MapLibre; hallazgo de 4.2: con terreno cada refresco hace 2 readPixels síncronos). En QA: ?scale= ?rtt= ?mesh= ?pool= ?demz= . */
+  perf: { rttQuality: "auto", meshSize: 128, rttPool: 48, scaleThrottleMs: 3000 }
 };
 /* === A6: fin === */
 
