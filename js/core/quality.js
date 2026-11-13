@@ -4,7 +4,7 @@
    Prioridad: ?calidad=<nivel> en la URL > localStorage ("ad_calidad") > detección.
    Consumidores: A1 (MSAA/pixelRatio), A2 (LOD), A3 (sombras), A4 (suelo/agua), A5 (fauna), A6 (terreno), idleDriver (render/idle.js). */
 import { IS_MOBILE } from "./config.js";
-import { emit } from "./events.js";
+import { emit, on } from "./events.js";
 
 export const LEVELS = ["ultra", "alta", "media", "baja"];
 
@@ -19,7 +19,7 @@ export const LEVELS = ["ultra", "alta", "media", "baja"];
      terrain         terreno 3D + hillshade (A6; true/false; "gpu" = sí salvo GPU integrada o de gama baja)
      idleFps         tope del lazo de animación en reposo (0 = apagado) */
 export const LEVEL_PARAMS = {
-  ultra: { msaa: true,  pixelRatioCap: 2,    grassDensity: 1,       grassLodDist: 1400, treeCardDist: 900, treeImpostorDist: Infinity, shadows: 4096, soil: "completo",   fauna: 1,   water: "shader", idleFps: 30, terrain: true },
+  ultra: { msaa: true,  pixelRatioCap: 2,    grassDensity: 1,       grassLodDist: 1400, treeCardDist: 900, treeImpostorDist: Infinity, shadows: 4096, soil: "completo",   fauna: 1,   water: "shader", idleFps: 30, terrain: "gpu" },   // Ola 4 4.2: terreno solo con GPU dedicada, igual que Alta (Mike 2026-11-12)
   alta:  { msaa: "gpu", pixelRatioCap: 1.5,  grassDensity: 1,       grassLodDist: 1000, treeCardDist: 600, treeImpostorDist: Infinity, shadows: 2048, soil: "completo",   fauna: 1,   water: "shader", idleFps: 30, terrain: "gpu" },
   media: { msaa: "gpu", pixelRatioCap: 1.25, grassDensity: "movil", grassLodDist: 600,  treeCardDist: 300, treeImpostorDist: 1500,     shadows: 1024, soil: "sin-surcos", fauna: 0.5, water: "shader", idleFps: 20, terrain: false },
   baja:  { msaa: false, pixelRatioCap: 1,    grassDensity: 0.5,     grassLodDist: 400,  treeCardDist: 0,   treeImpostorDist: 0,        shadows: 0,    soil: "apagado",    fauna: 0,   water: "plano",  idleFps: 0, terrain: false }
@@ -61,7 +61,7 @@ export function msaaEnabled(q) {
   return !(GPU_BAJA.test(g) || GPU_INTEGRADA.test(g));
 }
 
-/* A6 (G2, decisión de Mike 2026-11-11): terreno 3D + hillshade solo en Ultra y en Alta con GPU dedicada.
+/* A6 (G2, decisión de Mike 2026-11-11; Ola 4 4.2: también Ultra): terreno 3D + hillshade solo con GPU dedicada en Ultra y Alta.
    En la Intel HD 520 el terreno MapLibre costaba +10 a +85 ms por frame (a7 G2). Override solo de QA:
    ?gpu=integrada|dedicada (con ?qa) simula el tipo de GPU del headless (SwiftShader no es ninguno de los dos). */
 export function terrainEnabled(q) {
@@ -117,4 +117,77 @@ export function setQuality(name, opts = {}) {
      terrPrev !== terrainEnabled(quality));   // A6: el terreno se decide al cargar el campo
   if (needsReload && opts.reload !== false) location.reload();
   return true;
+}
+
+/* ============ Ola 4 4.2: Ultra se degrada sola a Alta si la máquina no aguanta ============
+   Mide el p50 del tiempo de frame SOLO con la cámara en movimiento (tour, órbita, arrastre), sin contar la carga ni el
+   reposo: descarta los primeros 10 s de la página, los primeros 6 s de movimiento acumulado (teselas, compilación de shaders)
+   y los frames de más de 250 ms (pestaña oculta, pausas). Ventana deslizante de 240 frames en movimiento, evaluada cada 60.
+   Si el p50 de la ventana supera 33 ms (< 30 fps) y el usuario está en Ultra, baja a Alta:
+     - en caliente: sombras (4096 → 2048), distancias de pasto y árboles, suelo, fauna (los sistemas escuchan "quality")
+       y pixelRatio vía map.setPixelRatio (tope de Alta, 1,5);
+     - para la próxima carga: el MSAA (se fija al crear el contexto, T3). Hasta recargar queda el del contexto actual.
+   Nunca recarga la página. Persiste "alta" en localStorage (la próxima carga ya arranca en Alta, sin MSAA forzado ni pixelRatio 2)
+   salvo que Ultra venga forzado por ?calidad= (esa URL no se persiste, igual que setQuality desde la URL).
+   Una sola vez por sesión: si el usuario vuelve a elegir Ultra a mano, no se lo vuelve a degradar.
+   Con ?qa NO corre, salvo ?autoq=1 (prueba). Solo con ?qa: ?autoqms=<ms> cambia el umbral y ?autoqfast=1 acorta las esperas. */
+const _AQ = new URLSearchParams(location.search);
+const AQ_QA = _AQ.has("qa");
+const AQ_ON = !AQ_QA || _AQ.get("autoq") === "1";
+const AQ_FAST = AQ_QA && _AQ.get("autoqfast") === "1";
+const AQ_THR = (AQ_QA && Number(_AQ.get("autoqms"))) || 33;
+const AQ_PAGE_MS = AQ_FAST ? 0 : 10000, AQ_WARM_MS = AQ_FAST ? 0 : 6000, AQ_WIN = AQ_FAST ? 60 : 240, AQ_STEP = AQ_FAST ? 20 : 60;
+export const autoQ = { on: AQ_ON, degraded: false, optOut: false, samples: 0, lastP50: null, thr: AQ_THR };
+
+const aq = { dts: [], moveMs: 0, since: 0, prev: null };
+
+function aqAviso() {
+  const sec = document.getElementById("quality-section");
+  if (!sec) return;
+  let el = document.getElementById("quality-aviso");
+  if (!el) { el = document.createElement("p"); el.id = "quality-aviso"; el.setAttribute("role", "status"); sec.appendChild(el); }
+  el.textContent = "Ultra no rinde en este equipo: pasamos a Alta.";
+  const sel = document.getElementById("quality-select");
+  if (sel) { sel.value = "alta"; sel.addEventListener("change", () => el.remove(), { once: true }); }
+}
+
+async function aqDegrade() {
+  if (autoQ.degraded || autoQ.optOut || quality.name !== "ultra") return;
+  autoQ.degraded = true;
+  const persist = quality.source !== "url";
+  setQuality("alta", { persist, reload: false });   // en caliente: sombras, pasto, árboles, suelo, fauna
+  quality.source = "auto";
+  try {   // pixelRatio en caliente (MapLibre 4.7.1 tiene map.setPixelRatio); el MSAA queda para la próxima carga
+    const { map } = await import("../map/style.js");
+    if (map.setPixelRatio) map.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality.pixelRatioCap));
+  } catch (e) { /* sin mapa: nada que ajustar */ }
+  aqAviso();
+  console.info("[calidad] Ultra → Alta automático (p50 " + (autoQ.lastP50 && autoQ.lastP50.toFixed(1)) + " ms > " + AQ_THR + " ms)");
+}
+
+function aqFrame(f) {
+  if (quality.name !== "ultra" || autoQ.degraded || autoQ.optOut) return;
+  /* Movimiento = cambió la matriz de vista del frame (cubre traslación, zoom, inclinación y giro; un repintado de
+     reposo por animación de fauna/agua la deja idéntica). */
+  const e = f.viewProj.elements, pm = aq.prev || (aq.prev = new Float64Array(16));
+  let d = 0;
+  for (let i = 0; i < 16; i++) { d += Math.abs(e[i] - pm[i]); pm[i] = e[i]; }
+  const moved = d > 1e-9;
+  if (!moved || document.hidden || !(f.dt > 0) || f.dt > 250 || f.now < AQ_PAGE_MS) return;
+  if (aq.moveMs < AQ_WARM_MS) { aq.moveMs += f.dt; return; }
+  aq.dts.push(f.dt);
+  if (aq.dts.length > AQ_WIN) aq.dts.shift();
+  autoQ.samples++;
+  if (aq.dts.length < AQ_WIN || ++aq.since < AQ_STEP) return;
+  aq.since = 0;
+  const s = aq.dts.slice().sort((a, b) => a - b);
+  autoQ.lastP50 = s[s.length >> 1];
+  /* Fuera del frame: el cambio recrea el shadow map y no puede pasar en medio del render del host. */
+  if (autoQ.lastP50 > AQ_THR) setTimeout(aqDegrade, 0);
+}
+
+if (AQ_ON) {
+  on("frame", aqFrame);
+  /* El usuario vuelve a elegir Ultra a mano tras una degradación: se respeta (no se lo vuelve a degradar). */
+  on("quality", q => { if (q.name === "ultra" && autoQ.degraded) autoQ.optOut = true; });
 }
