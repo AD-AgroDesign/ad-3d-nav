@@ -295,7 +295,9 @@ const _NB_OLD = { nearMul: 1, curvePow: 1, groundBlend: 0.3, horizonBlend: 0.5 }
 const _NB_NEW = { nearMul: 1.3, curvePow: 1.7, groundBlend: 0.45, horizonBlend: 0.36 };
 export const A6_NIEBLA = (() => {
   const q = new URLSearchParams(location.search);
-  const f = (q.has("qa") || q.has("debug")) && q.get("niebla") ? Math.min(1.5, Math.max(0.5, parseFloat(q.get("niebla")) || 1)) : 1;
+  /* Mike 2026-11-13: eligió ?niebla=0.5 → es el valor por defecto (doble reducción respecto de A6 G4-fix). ?niebla= sigue para comparar (0.25–1.5; 1.5 = la de antes). */
+  const NIEBLA_DEF = 0.5;
+  const f = (q.has("qa") || q.has("debug")) && q.get("niebla") ? Math.min(1.5, Math.max(0.25, parseFloat(q.get("niebla")) || NIEBLA_DEF)) : NIEBLA_DEF;
   const R = (1.5 - f) / 0.5;   // 0 = antes, 1 = valores nuevos, 2 = doble reducción
   const m = n => _NB_OLD[n] + (_NB_NEW[n] - _NB_OLD[n]) * R;
   return { factor: f, nearMul: Math.max(1, m("nearMul")), curvePow: Math.max(1, m("curvePow")), groundBlend: Math.min(0.85, m("groundBlend")), horizonBlend: Math.max(0.1, m("horizonBlend")) };
