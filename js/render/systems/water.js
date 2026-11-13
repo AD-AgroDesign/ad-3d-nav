@@ -315,7 +315,7 @@ const FS =
 const U = {   // uniforms comunes a los dos escenarios (compartidos por referencia con lighting.js donde existen)
   uCamPos: uniforms.uCamPos, uTime: uniforms.uTime,
   uSunDir: uniforms.uSunDir, uSunColor: uniforms.uSunColor, uHemiSky: uniforms.uHemiSky, uHemiGround: uniforms.uHemiGround,
-  uFogColor: uniforms.uFogColor, uFogNear: uniforms.uFogNear, uFogFar: uniforms.uFogFar, uFogMax: uniforms.uFogMax,
+  uFogColor: uniforms.uFogColor, uFogNear: uniforms.uFogNear, uFogFar: uniforms.uFogFar, uFogMax: uniforms.uFogMax, uFogRel: uniforms.uFogRel,
   uSunI: { value: 1 },
   uZenith: { value: new THREE.Color(A1_SKY.skyColor) },
   tWave: { value: null },

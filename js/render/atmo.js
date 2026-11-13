@@ -71,7 +71,8 @@ export const atmo = {
   render(gl, matrix) {
     if (!host.origin) return;                  // el host todavía no hizo onAdd (primer frame)
     const T = atm.tint, tinted = !NOTINT && (T[0] < 0.999 || T[1] < 0.999 || T[2] < 0.999);   // mediodía = sin pasada de color (costo 0)
-    const wantFog = !terrain.mesh;           // A6: con terreno la niebla es la de MapLibre (por profundidad real); este quad supone suelo plano y partiría el horizonte
+    const kFog = terrain.mesh ? 1 - terrain.k : 1;   // A6 (G4-fix): con relieve este quad (suelo plano) se funde con (1 - k) y entra la niebla de MapLibre; a k = 1 no dibuja
+    const wantFog = kFog > 0.002;
     if (!tinted && !wantFog) return;
     const H = this.map.getCanvas().clientHeight;
     /* Esta capa dibuja ANTES que la de vegetación: calcula la cámara y la niebla de este frame
@@ -103,7 +104,7 @@ export const atmo = {
       gl.uniform3f(u.uFogColor, c.r, c.g, c.b);
       gl.uniform1f(u.uFogNear, uniforms.uFogNear.value);
       gl.uniform1f(u.uFogFar, uniforms.uFogFar.value);
-      gl.uniform1f(u.uFogMax, uniforms.uFogMax.value);
+      gl.uniform1f(u.uFogMax, uniforms.uFogMax.value * kFog);
       gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     }

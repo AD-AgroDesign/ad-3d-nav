@@ -284,6 +284,22 @@ export const A4_WATER = {
 /* === A4: fin === */
 
 /* === A6: inicio === */
+/* Presencia de la niebla (2026-11-13, pedido de Mike: "podría ser excesiva"). UN solo lugar para ajustarla en Three (curva plana y curva de
+   relieve de lighting.js / shaderlib.js) y en MapLibre (sky fog-ground-blend y horizon-fog-blend con relieve). El horizonte NO se corta: la
+   niebla sigue llegando al 100 % en el horizonte (curva plana) / en el plano lejano (relieve); solo se corre hacia allá y pesa menos a media distancia.
+     nearMul   × el inicio de la niebla plana (near) y de su tope nearMaxFrac (1 = como antes)
+     curvePow  exponente sobre la curva plana (smoothstep^p · max): > 1 = menos niebla a media distancia, igual en el horizonte (1 = como antes)
+     groundBlend / horizonBlend   fog-ground-blend (la niebla de relieve arranca más lejos) y horizon-fog-blend (banda de bruma del cielo) con relieve
+   `?niebla=<f>` (solo con ?qa/?debug, 0,5-1,5): 1 = valores de abajo; 1,5 = como antes de este ajuste; 0,5 = el doble de reducción. */
+const _NB_OLD = { nearMul: 1, curvePow: 1, groundBlend: 0.3, horizonBlend: 0.5 };
+const _NB_NEW = { nearMul: 1.3, curvePow: 1.7, groundBlend: 0.45, horizonBlend: 0.36 };
+export const A6_NIEBLA = (() => {
+  const q = new URLSearchParams(location.search);
+  const f = (q.has("qa") || q.has("debug")) && q.get("niebla") ? Math.min(1.5, Math.max(0.5, parseFloat(q.get("niebla")) || 1)) : 1;
+  const R = (1.5 - f) / 0.5;   // 0 = antes, 1 = valores nuevos, 2 = doble reducción
+  const m = n => _NB_OLD[n] + (_NB_NEW[n] - _NB_OLD[n]) * R;
+  return { factor: f, nearMul: Math.max(1, m("nearMul")), curvePow: Math.max(1, m("curvePow")), groundBlend: Math.min(0.85, m("groundBlend")), horizonBlend: Math.max(0.1, m("horizonBlend")) };
+})();
 /* Terreno 3D real y sombreado de relieve: terrain/terrain.js + terrain/heightfield.js (A6-2).
    Diales y calibración: handoffs/a6-terreno.md. Fuente DEM: tiles "terrarium" de AWS (Mapzen/Tilezen
    Terrain Tiles, dataset abierto; en la zona sale de SRTM de 30 m). Autorizada por el dueño 2026-11-10. */
@@ -312,7 +328,7 @@ export const A6_TERRAIN = {
   /* Con terreno MapLibre aplica su PROPIA niebla sobre la malla (por profundidad real), así que la capa atmo-fog de A1
      (que supone suelo plano) se apaga en los campos con terreno y se ajusta la niebla de MapLibre para que se parezca
      (fog-ground-blend: 0 = la niebla arranca en el centro de la vista, 1 = recién en el horizonte). */
-  sky: { fogGroundBlend: 0.3, horizonFogBlend: 0.5 },
+  sky: { fogGroundBlend: A6_NIEBLA.groundBlend, horizonFogBlend: A6_NIEBLA.horizonBlend },   // ver A6_NIEBLA (arriba)
   attribution: "Relieve: Terrain Tiles (AWS) · SRTM y GMTED2010 cortesía del USGS · ETOPO1 NOAA/NCEI",   // G4: va en la fuente raster-dem "dem": solo aparece con el relieve cargado
   /* Ola 4 · 4.2: costo del terreno en movimiento (handoffs/a6-ola4.md). Interruptores sobre MapLibre 4.7.1 (campos internos, versión vendorizada).
      Resultado de 4.2 (Intel HD 520, tour Chapa I-III-IV +41 → +12 ms): el costo no era el hillshade ni la malla sino (1) la ScaleControl
