@@ -313,7 +313,7 @@ export const A6_TERRAIN = {
      (que supone suelo plano) se apaga en los campos con terreno y se ajusta la niebla de MapLibre para que se parezca
      (fog-ground-blend: 0 = la niebla arranca en el centro de la vista, 1 = recién en el horizonte). */
   sky: { fogGroundBlend: 0.3, horizonFogBlend: 0.5 },
-  attribution: "Relieve: Terrain Tiles Mapzen/Tilezen en AWS (SRTM NASA/USGS, GMTED USGS)",
+  attribution: "Relieve: Terrain Tiles (AWS) · SRTM y GMTED2010 cortesía del USGS · ETOPO1 NOAA/NCEI",   // G4: va en la fuente raster-dem "dem": solo aparece con el relieve cargado
   /* Ola 4 · 4.2: costo del terreno en movimiento (handoffs/a6-ola4.md). Interruptores sobre MapLibre 4.7.1 (campos internos, versión vendorizada).
      Resultado de 4.2 (Intel HD 520, tour Chapa I-III-IV +41 → +12 ms): el costo no era el hillshade ni la malla sino (1) la ScaleControl
      (2 readPixels síncronos por 'move'), (2) el caché de RTT de 30 texturas con 32-34 teselas visibles en rasante (se recreaban todas

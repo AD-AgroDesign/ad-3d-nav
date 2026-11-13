@@ -3,13 +3,13 @@
    sin cambios de geometría, colores, densidades, semillas ni orden de construcción (§4).
    Contrato: §6.3. */
 import * as THREE from "three";
-import { CHUNK_CELL_GRASS, GRASS_CLASSES, GRASS_AO, GRASS_LOD_BAND, GRASS_LOD_COMP_MAX, GRASS_LOD_FAR_MULT, GRASS_LOD_NEAR_MULT, GRASS_SCALE, WIND_IDLE_DIST } from "../../core/config.js";
-import { quality } from "../../core/quality.js";
-import { patch } from "../shaderlib.js";
-import { idleDriver } from "../idle.js";
-import { ChunkLod, addRank, applyAO, applyLod, cellSeed, partitionCells, shuffleDet } from "./chunks.js";
-import { map } from "../../map/style.js";
-import { uniforms } from "../lighting.js";
+import { CHUNK_CELL_GRASS, GRASS_CLASSES, GRASS_AO, GRASS_LOD_BAND, GRASS_LOD_COMP_MAX, GRASS_LOD_FAR_MULT, GRASS_LOD_NEAR_MULT, GRASS_SCALE, WIND_IDLE_DIST } from "../../core/config.js?v=20261113";
+import { quality } from "../../core/quality.js?v=20261113";
+import { patch } from "../shaderlib.js?v=20261113";
+import { idleDriver } from "../idle.js?v=20261113";
+import { ChunkLod, addRank, applyAO, applyLod, cellSeed, partitionCells, shuffleDet } from "./chunks.js?v=20261113";
+import { map } from "../../map/style.js?v=20261113";
+import { uniforms } from "../lighting.js?v=20261113";
 
 const _fr = new THREE.Frustum(), _sp = new THREE.Sphere();
 

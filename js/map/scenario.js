@@ -1,7 +1,7 @@
-import { state } from "../core/state.js";
-import { emit } from "../core/events.js";
-import { applyGrowth, applyOpacity } from "./layers.js";
-import { updatePanel } from "../ui/panel.js";
+import { state } from "../core/state.js?v=20261113";
+import { emit } from "../core/events.js?v=20261113";
+import { applyGrowth, applyOpacity } from "./layers.js?v=20261113";
+import { updatePanel } from "../ui/panel.js?v=20261113";
 
 export const easeOutCubic = x => 1 - Math.pow(1 - x, 3);
 

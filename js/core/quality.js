@@ -3,8 +3,8 @@
    pixelRatio se fijan al crear el contexto WebGL; cambiarlos requiere recargar).
    Prioridad: ?calidad=<nivel> en la URL > localStorage ("ad_calidad") > detección.
    Consumidores: A1 (MSAA/pixelRatio), A2 (LOD), A3 (sombras), A4 (suelo/agua), A5 (fauna), A6 (terreno), idleDriver (render/idle.js). */
-import { IS_MOBILE } from "./config.js";
-import { emit, on } from "./events.js";
+import { IS_MOBILE } from "./config.js?v=20261113";
+import { emit, on } from "./events.js?v=20261113";
 
 export const LEVELS = ["ultra", "alta", "media", "baja"];
 
@@ -158,7 +158,7 @@ async function aqDegrade() {
   setQuality("alta", { persist, reload: false });   // en caliente: sombras, pasto, árboles, suelo, fauna
   quality.source = "auto";
   try {   // pixelRatio en caliente (MapLibre 4.7.1 tiene map.setPixelRatio); el MSAA queda para la próxima carga
-    const { map } = await import("../map/style.js");
+    const { map } = await import("../map/style.js?v=20261113");
     if (map.setPixelRatio) map.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality.pixelRatioCap));
   } catch (e) { /* sin mapa: nada que ajustar */ }
   aqAviso();

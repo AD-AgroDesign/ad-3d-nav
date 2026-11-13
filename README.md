@@ -101,9 +101,24 @@ tour ni cámara automáticos); `?debug` expone `__nav3d`, `__map` y `__state` si
 `?agua=off`, `?a4=off`, `?fauna=0`, `?hillshade=0|1`, `?aa=0`, `?tm=` y `?exp=` (tone mapping), y los diales `?a1=`, `?a2=`, `?a3=`, `?a5=` (JSON). `?rasante=v1|v2|v3` (altura de la cámara del rasante) vale con `?qa`/`?debug` o con `?local` en un host de desarrollo.
 `?local` carga los datos de `data/` en vez de Supabase y solo funciona en `localhost`, `127.0.0.1`, `[::1]` y `*.localhost`.
 
+## Publicación (caché)
+
+GitHub Pages sirve con `Cache-Control: max-age=600`: sin versionar, un navegador puede mezclar módulos viejos y nuevos hasta 10 min.
+Antes de publicar:
+
+1. `node tools/stamp_version.mjs <VERSION>` (p. ej. la fecha, `20261113`). Pone `?v=<VERSION>` en todos los imports/exports/`import()`
+   relativos de `js/**/*.js` y en las referencias locales de `index.html` (`auth.js`, `app.js`, `style.css`, `maplibre-gl.css`).
+   Es idempotente (reemplaza la versión anterior) y no toca `vendor/` ni el importmap.
+2. `node tools/stamp_version.mjs --check` verifica que no haya mezcla (todos sellados, una sola versión). Un módulo importado con y sin
+   query serían dos instancias con estado duplicado, por eso es todo o nada.
+3. Commit y push. Si se agrega un `import` nuevo sin `?v=`, el `--check` lo marca.
+
+Los scripts de `tools/qa` que usan `import('/js/...')` desde la página agregan la versión de `app.js` solos.
+
 ## Fuentes de datos
 
 - Imagen satelital: Esri World Imagery (© Esri, Maxar, Earthstar Geographics)
+- Relieve (solo con terreno activo): Terrain Tiles en AWS; SRTM y GMTED2010 cortesía del USGS; ETOPO1 NOAA/NCEI
 - Capas de paisaje: equipo GIS de AgroDesign (WGS84 / EPSG:4326)
 
 ## Agregar otro campo

@@ -33,7 +33,7 @@
    customProgramCacheKey; propuesta a A1 en handoffs/a2-fade.md); solo exige que `#include <common>` y
    `#include <project_vertex>` sigan presentes en el vertex shader. */
 import * as THREE from "three";
-import { mulberry32 } from "../../core/geo.js";
+import { mulberry32 } from "../../core/geo.js?v=20261113";
 
 export function partitionCells(items, cell, getXZ) {
   const cells = new Map();
