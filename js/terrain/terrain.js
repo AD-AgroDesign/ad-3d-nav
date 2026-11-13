@@ -145,22 +145,22 @@ function ajustarCosto(map) {
 /* Ola 4 · 4.2: la ScaleControl de MapLibre llama 2 veces a map.unproject en CADA 'move' y, con terreno, cada unproject hace un
    readPixels síncrono sobre el framebuffer de coordenadas del terreno: la CPU espera a la GPU 2 veces por frame y se pierde el
    solapamiento CPU/GPU (en la HD 520 son ~46 ms/frame en órbita, perfil CDP). Se limita a una actualización cada `ms` ms (con la
-   última garantizada en 'moveend'). La barra de escala se ve igual, solo se refresca menos durante el movimiento. */
+   última 300 ms después de quedar quieta). La barra de escala se ve igual, solo se refresca menos durante el movimiento. */
 function limitarEscala(map, ms) {
   const ctl = (map._controls || []).find(c => c && c._onMove && c._container && c._container.classList.contains("maplibregl-ctrl-scale"));
   if (!ctl || ctl._a6Throttled || !(ms > 0)) return;
   const orig = ctl._onMove;
   let last = 0, timer = 0;
+  /* jumpTo/setBearing (órbita, tour) disparan move Y moveend en cada llamada: no sirve moveend. Se usa "reposo de 300 ms": mientras
+     haya movimiento continuo solo se refresca cada `ms`; 300 ms después del último 'move' se refresca con el valor exacto. */
   const lim = () => {
-    const resto = ms - (performance.now() - last);
-    if (resto <= 0) { last = performance.now(); clearTimeout(timer); timer = 0; orig(); }
-    else if (!timer) timer = setTimeout(() => { timer = 0; last = performance.now(); orig(); }, resto);
+    clearTimeout(timer);
+    if (performance.now() - last >= ms) { last = performance.now(); orig(); }
+    timer = setTimeout(() => { timer = 0; last = performance.now(); orig(); }, 300);
   };
-  const fin = () => { clearTimeout(timer); timer = 0; last = performance.now(); orig(); };   // al terminar un movimiento: valor exacto al instante
   map.off("move", orig);
   ctl._onMove = lim; ctl._a6Throttled = true;
   map.on("move", lim);
-  map.on("moveend", fin);
 }
 
 /* Enciende/apaga la malla de terreno de MapLibre (null apaga). La exageración queda en terrain.exag. */
