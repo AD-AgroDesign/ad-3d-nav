@@ -29,6 +29,7 @@ import { idleDriver } from "../idle.js?v=20261113";
 import { map } from "../../map/style.js?v=20261113";
 import { lights, uniforms } from "../lighting.js?v=20261113";
 import { GLSL_ADFOG, GLSL_FOG_UNIFORMS, scenarioFade } from "../shaderlib.js?v=20261113";
+import { GLSL_DECL, lowAt, withReliefU } from "../../terrain/terrain.js?v=20261113";   // A6 relieve en vivo
 import { dedupRing, triangulatePoly } from "./ground.js?v=20261113";
 
 const wanted = () => CFG.enabled && !((params.has("qa") || params.has("debug")) && params.get("agua") === "off");   // ?agua=off: solo ?qa/?debug
@@ -245,7 +246,7 @@ function buildGeometry(ctx, data, hasH) {
 /* ---------- material ---------- */
 const VS =
   "varying vec3 vWp;\n" +
-  "void main() {\n  vec4 w = modelMatrix * vec4(position, 1.0);\n  vWp = w.xyz;\n" +
+  "void main() {\n  vec4 w = modelMatrix * vec4(position, 1.0);\n  w.y -= a6Low(w.xz);\n  vWp = w.xyz;\n" +
   "  gl_Position = projectionMatrix * viewMatrix * w;\n}\n";
 
 /* uA = (escala capa 1, escala capa 2, pendiente, f0) · uB = (reflejo, exponente destello, intensidad destello, aplanado desde m)
@@ -331,7 +332,7 @@ const U = {   // uniforms comunes a los dos escenarios (compartidos por referenc
 };
 
 function makeMaterial(key, hasH, tex, sh) {
-  const m = new THREE.ShaderMaterial({ vertexShader: VS, fragmentShader: FS, uniforms: { ...U, uFade: scenarioFade[key] || { value: 1 },
+  const m = new THREE.ShaderMaterial({ vertexShader: hasH ? GLSL_DECL + VS : VS.replace("  w.y -= a6Low(w.xz);\n", ""), fragmentShader: FS, uniforms: { ...U, ...(hasH ? withReliefU({}) : {}), uFade: scenarioFade[key] || { value: 1 },
     tShore: { value: tex }, uSh: { value: new THREE.Vector4(sh.x0, sh.z0, 1 / (sh.W * sh.c), 1 / (sh.H * sh.c)) } } });
   m.uniforms.tWave.value = getWaveTex();
   m.side = THREE.DoubleSide;   // las astillas del earcut pueden quedar con el signo de área dudoso: no depender del culling
@@ -365,7 +366,7 @@ function applyModes() {
 }
 
 /* ---------- animación en reposo (T7): el repintado lo maneja el idleDriver único del host (render/idle.js) ---------- */
-const frustum = new THREE.Frustum(), tmpV = new THREE.Vector3();
+const frustum = new THREE.Frustum(), tmpV = new THREE.Vector3(), _wb = new THREE.Box3(), _wv = new THREE.Vector3();
 let inView = false;
 
 export default {
@@ -408,8 +409,10 @@ export default {
         const s = S[k];
         if (!s.mesh.visible || s.opacity <= 0.02) continue;
         for (const b of s.boxes) {
-          if (b.distanceToPoint(tmpV) > CFG.idleMaxDist) continue;
-          if (frustum.intersectsBox(b)) { inView = true; break outer; }
+          const lo = lowAt((b.min.x + b.max.x) / 2, (b.min.z + b.max.z) / 2);   // A6: caja bajada con el suelo (relieve en vivo)
+          const bb = lo ? _wb.copy(b).translate(_wv.set(0, -lo, 0)) : b;
+          if (bb.distanceToPoint(tmpV) > CFG.idleMaxDist) continue;
+          if (frustum.intersectsBox(bb)) { inView = true; break outer; }
         }
       }
     }

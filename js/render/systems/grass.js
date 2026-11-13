@@ -9,6 +9,7 @@ import { patch } from "../shaderlib.js?v=20261113";
 import { idleDriver } from "../idle.js?v=20261113";
 import { ChunkLod, addRank, applyAO, applyLod, cellSeed, partitionCells, shuffleDet } from "./chunks.js?v=20261113";
 import { map } from "../../map/style.js?v=20261113";
+import { lowAt } from "../../terrain/terrain.js?v=20261113";   // A6 relieve en vivo
 import { uniforms } from "../lighting.js?v=20261113";
 
 const _fr = new THREE.Frustum(), _sp = new THREE.Sphere();
@@ -171,7 +172,8 @@ export default {
       if (windNear) continue;
       for (const k of b.lod.chunks) {   // viento en reposo: ¿hay pasto en cuadro a menos de WIND_IDLE_DIST?
         if (!k.mesh.visible) continue;
-        if (Math.hypot(c.x - k.cx, c.y - k.cy, c.z - k.cz) - k.r < WIND_IDLE_DIST && _fr.intersectsSphere(_sp.set(_sp.center.set(k.cx, k.cy, k.cz), k.r))) { windNear = true; break; }
+        const kcy = k.cy - lowAt(k.cx, k.cz);   // A6: centro bajado
+        if (Math.hypot(c.x - k.cx, c.y - kcy, c.z - k.cz) - k.r < WIND_IDLE_DIST && _fr.intersectsSphere(_sp.set(_sp.center.set(k.cx, kcy, k.cz), k.r))) { windNear = true; break; }
       }
     }
     idleDriver.request("grass", windNear);

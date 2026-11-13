@@ -35,6 +35,10 @@
 import * as THREE from "three";
 import { mulberry32 } from "../../core/geo.js?v=20261113";
 
+/* A6 relieve en vivo: terrain.js (que importa este módulo) enchufa acá `low(x, z)` = metros que el suelo está bajado en (x, z) respecto de lo horneado
+   (0 con el relieve completo). ChunkLod mide la distancia con el centro del chunk ya bajado, igual que lo dibujan los shaders. */
+export const reliefHook = { low: null };
+
 export function partitionCells(items, cell, getXZ) {
   const cells = new Map();
   for (const it of items) {
@@ -141,7 +145,7 @@ export class ChunkLod {
   update(cam, near, far, band) {
     let vis = 0;
     for (const c of this.chunks) {
-      const d = Math.hypot(cam.x - c.cx, cam.y - c.cy, cam.z - c.cz) - c.r;
+      const d = Math.hypot(cam.x - c.cx, cam.y - (c.cy - (reliefHook.low ? reliefHook.low(c.cx, c.cz) : 0)), cam.z - c.cz) - c.r;   // A6: centro bajado (relieve en vivo)
       const keep = lodKeep(d, near, far);
       if (keep <= 0) { c.mesh.visible = false; continue; }
       c.mesh.visible = true;

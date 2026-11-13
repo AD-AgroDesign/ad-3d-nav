@@ -33,7 +33,7 @@ import { uniforms } from "../lighting.js?v=20261113";
 import { GLSL_ADFOG, GLSL_FOG_UNIFORMS, scenarioFade } from "../shaderlib.js?v=20261113";
 import { chainShader } from "./chunks.js?v=20261113";
 import trees from "./trees.js?v=20261113";
-import { growthU, patchGrowth, terrain } from "../../terrain/terrain.js?v=20261113";   // A6: receptor y casters sobre el relieve
+import { GLSL_DECL, fitSpheres, growthU, patchGrowth, terrain, withReliefU } from "../../terrain/terrain.js?v=20261113";   // A6: receptor y casters sobre el relieve
 
 const URL = new URLSearchParams(location.search);
 const MODE = (URL.has("qa") || URL.has("debug")) ? URL.get("sombras") : null;   // solo ?qa/?debug: ?sombras=0 apaga todo · ?sombras=blobs solo blobs
@@ -94,6 +94,9 @@ const RECV_FS =
   "  gl_FragColor = vec4(f, 1.0);\n" +
   "}\n";
 
+/* A6 relieve en vivo: variantes con la resta (1-k)·g del suelo (terrain.js, GLSL_DECL). Las usa el build cuando hay terreno estructural. */
+const RECV_VS_R = GLSL_DECL + RECV_VS.replace("vec4 w = modelMatrix * vec4(position, 1.0);", "vec4 w = modelMatrix * vec4(position, 1.0);\n  w.y -= a6Low(w.xz);");
+
 /* Blobs: decal elíptico por árbol. instanceMatrix = traslación (base del árbol) + escala (R, H, R). */
 const BLOB_VS =
   "uniform vec4 uA3Sun;\nuniform vec4 uA3Zone;\nuniform vec4 uA3Axes;\nuniform vec4 uA3Blob;\nuniform vec2 uA3G;\n" +
@@ -131,6 +134,10 @@ const BLOB_FS =
   "  f = mix(f, vec3(1.0), adFog(distance(vW, uCamPos)));\n" +
   "  gl_FragColor = vec4(f, 1.0);\n" +
   "}\n";
+
+const BLOB_VS_R = GLSL_DECL + BLOB_VS.replace("vec3 base = instanceMatrix[3].xyz;", "vec3 base = instanceMatrix[3].xyz;\n  base.y -= a6Low(base.xz);");
+
+const withRel = u => (terrain.active ? withReliefU(u) : u);
 
 /* Multiplicar el framebuffer: resultado = destino × salida. Alfa intacto. */
 function multiplyMaterial(vs, fs, extraUniforms, defines) {
@@ -304,7 +311,7 @@ function updateBox(frame) {
 
   // snapping al texel en el espacio de la luz: el centro salta de a texels enteros → las sombras no "nadan"
   const texX = 2 * h / size, texY = 2 * h * sinEl / size;
-  _c.set(cx, terrain.active ? ctxRef.heightAtScene(cx, cz) : 0, cz);   // A6: el centro de la caja a la altura del suelo (con terreno el suelo no está en y = 0)
+  _c.set(cx, terrain.active ? ctxRef.heightAtScene(cx, cz) * terrain.k : 0, cz);   // A6: el centro de la caja a la altura del suelo (con terreno el suelo no está en y = 0; × k: relieve en vivo)
   const px = _c.dot(_right), py = _c.dot(_upL);
   const dpx = Math.round(px / texX) * texX - px, dpy = Math.round(py / texY) * texY - py;
   _c.addScaledVector(_right, dpx).addScaledVector(_upL, dpy);   // centro de la cámara (3D, no necesariamente en el suelo)
@@ -387,7 +394,7 @@ export default {
     const group = new THREE.Group();
     if (!ENABLED) { S[key] = null; return { object3d: group, materials: [] }; }
     const casters = trees.casters(key);
-    const recvMat = multiplyMaterial(RECV_VS, RECV_FS, { uFade: scenarioFade[key] }, { SOFT_PCF: CFG.soft ? "true" : "false" });
+    const recvMat = multiplyMaterial(terrain.active ? RECV_VS_R : RECV_VS, RECV_FS, withRel({ uFade: scenarioFade[key] }), { SOFT_PCF: CFG.soft ? "true" : "false" });
     // A6: con terreno el receptor es una grilla (alturas por caja, ver updateBox) con depth test; sin terreno el plano de siempre
     const recv = new THREE.Mesh(terrain.active ? new THREE.PlaneGeometry(2, 2, GRID, GRID).rotateX(-Math.PI / 2) : new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2), recvMat);
     if (terrain.active) { recvMat.depthTest = true; recvMat.polygonOffset = true; recvMat.polygonOffsetFactor = -2; recvMat.polygonOffsetUnits = -4; }
@@ -396,9 +403,10 @@ export default {
     let blobs = null, cs = { group: new THREE.Group(), list: [], mats: [] };
     if (casters) {
       cs = buildCasters(key, casters);
+      if (terrain.active && terrain.k < 1) fitSpheres(cs.group);   // A6 relieve en vivo: arranca apagado
       blobs = buildBlobs(casters);
       if (blobs) {
-        blobs.material = multiplyMaterial(BLOB_VS, BLOB_FS, { uFade: scenarioFade[key], uA3G: { value: terrain.active ? new THREE.Vector2(0, 1) : new THREE.Vector2(1, 0) } });
+        blobs.material = multiplyMaterial(terrain.active ? BLOB_VS_R : BLOB_VS, BLOB_FS, withRel({ uFade: scenarioFade[key], uA3G: { value: terrain.active ? new THREE.Vector2(0, 1) : new THREE.Vector2(1, 0) } }));
         if (terrain.active) { blobs.material.depthTest = true; blobs.material.polygonOffset = true; blobs.material.polygonOffsetFactor = -2; blobs.material.polygonOffsetUnits = -4; }
         blobs.userData.g = key;
         group.add(blobs);
@@ -425,6 +433,14 @@ export default {
   },
 
   onQuality() { ensureTarget(); dirty = true; },
+
+  /* A6 relieve en vivo: en cada paso de la transición el suelo y los árboles cambian de altura (los shaders restan (1-k)·g), así que el mapa de
+     sombras y su caja (centro a la altura del suelo × k) se rehacen en cada paso. Solo dura lo que la transición (~1,2 s). */
+  setRelief() {
+    if (!terrain.active) return;
+    for (const k in S) if (S[k]) fitSpheres(S[k].casters.group);   // esferas de culling de la cámara de sombra, bajadas con el suelo
+    box.on = false; dirty = true;
+  },
 
   update(frame) {
     if (!ENABLED) return;

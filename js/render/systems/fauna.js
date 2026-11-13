@@ -20,7 +20,7 @@ import { state } from "../../core/state.js?v=20261113";
 import { quality } from "../../core/quality.js?v=20261113";
 import { uniforms } from "../lighting.js?v=20261113";
 import { patch } from "../shaderlib.js?v=20261113";
-import { terrain } from "../../terrain/terrain.js?v=20261113";
+import { lowAt, terrain } from "../../terrain/terrain.js?v=20261113";
 import { cellSeed, chainShader, partitionCells, shuffleDet } from "./chunks.js?v=20261113";
 
 const C = A5_FAUNA, CB = C.birds, CF = C.butterflies;
@@ -458,7 +458,7 @@ export default {
         for (let i = 0; i < n; i++) {
           const [fl, bd] = b.slots[i];
           const o = birdPose(fl, bd, T);
-          const d = Math.hypot(o.p[0] - cam.x, o.p[1] - cam.y, o.p[2] - cam.z);
+          const d = Math.hypot(o.p[0] - cam.x, o.p[1] - lowAt(o.p[0], o.p[2]) - cam.y, o.p[2] - cam.z);   // A6: ave bajada con el suelo (relieve en vivo)
           const sc = bd.span * Math.min(CB.farBoost, Math.max(1, d / CB.boostFrom)) * (1 - smooth(CB.maxDist[0], CB.maxDist[1], d)) * grow, k = i * 16;
           arr[k] = o.r[0] * sc; arr[k + 1] = o.r[1] * sc; arr[k + 2] = o.r[2] * sc; arr[k + 3] = 0;
           arr[k + 4] = o.u[0] * sc; arr[k + 5] = o.u[1] * sc; arr[k + 6] = o.u[2] * sc; arr[k + 7] = 0;
@@ -470,13 +470,14 @@ export default {
       }
       /* polinizadores: solo las celdas cercanas; el resto de la animación es de shader */
       for (const c of b.bfly) {
-        const d = Math.hypot(cam.x - c.cx, cam.y - c.cy, cam.z - c.cz);
+        const ccy = c.cy - lowAt(c.cx, c.cz);   // A6: centro bajado con el suelo
+        const d = Math.hypot(cam.x - c.cx, cam.y - ccy, cam.z - c.cz);
         const show = d < CF.visDist[1] + c.rad;
         c.mesh.visible = show;
         c.mesh.count = Math.ceil(c.n * Math.min(1, f));
         if (show && b.grow.value > 0.4) {
           chunksVis++;
-          if (inView(vp, c.cx, c.cy + 2, c.cz, 1.3 + c.rad / Math.max(d, 1))) bflyVis += c.mesh.count;
+          if (inView(vp, c.cx, ccy + 2, c.cz, 1.3 + c.rad / Math.max(d, 1))) bflyVis += c.mesh.count;
         }
       }
     }

@@ -19,6 +19,7 @@ import * as THREE from "three";
 import { CHUNK_CELL_TREES, TREE_ALPHA_TEST, TREE_IMPOSTOR, TREE_IMPOSTOR_CULL, TREE_LOD_BAND, TREE_SPECIES, TREE_SWAY, WIND_IDLE_DIST } from "../../core/config.js?v=20261113";
 import { idleDriver } from "../idle.js?v=20261113";
 import { chainShader, partitionCells } from "./chunks.js?v=20261113";
+import { lowAt } from "../../terrain/terrain.js?v=20261113";   // A6 relieve en vivo: centro de celda bajado
 import { uniforms } from "../lighting.js?v=20261113";
 
 const _fr = new THREE.Frustum(), _sp = new THREE.Sphere();
@@ -251,12 +252,13 @@ export default {
       if (!b.group.visible) continue;
       let near = 0, far = 0;
       for (const e of b.cells) {
-        const d = Math.hypot(c.x - e.cx, c.y - e.cy, c.z - e.cz), dmin = d - e.r, dmax = d + e.r;
+        const ecy = e.cy - lowAt(e.cx, e.cz);   // A6: con relieve parcial el centro de la celda está más abajo que lo horneado
+        const d = Math.hypot(c.x - e.cx, c.y - ecy, c.z - e.cz), dmin = d - e.r, dmax = d + e.r;
         const nv = L.y > 0 && dmin < L.y, fv = dmax > L.x && dmin < L.w;
         for (const m of e.near) m.visible = nv;
         e.far.visible = e.imp.visible = fv;
         if (nv) near++; if (fv) far++;
-        if (nv && !windNear && dmin < WIND_IDLE_DIST && _fr.intersectsSphere(_sp.set(_sp.center.set(e.cx, e.cy, e.cz), e.r))) windNear = true;
+        if (nv && !windNear && dmin < WIND_IDLE_DIST && _fr.intersectsSphere(_sp.set(_sp.center.set(e.cx, ecy, e.cz), e.r))) windNear = true;
       }
       b.nearCells = near; b.farCells = far;
     }

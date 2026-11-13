@@ -35,7 +35,7 @@ import { HOME_VIEW, params } from "../../core/state.js?v=20261113";
 import { quality } from "../../core/quality.js?v=20261113";
 import { map } from "../../map/style.js?v=20261113";
 import { chainShader } from "./chunks.js?v=20261113";
-import { extOpacityProp } from "../../terrain/terrain.js?v=20261113";   // A6: relieve
+import { extOpacityProp, GLSL_DECL, withReliefU } from "../../terrain/terrain.js?v=20261113";   // A6: relieve
 
 /* ---------- parámetros efectivos (config + URL) ---------- */
 const DBG = params.has("qa") || params.has("debug");
@@ -349,13 +349,15 @@ function makeGroundMaterial(ctx, key, hasH, dTex, dmap) {
   const SC = [nu(0.7), nu(4), nu(25)];
   chainShader(m, hasH ? "a4ground-n" : "a4ground", sh => {
     Object.assign(sh.uniforms, U);
+    if (hasH) withReliefU(sh.uniforms);   // A6 relieve en vivo: textura de alturas y factor k (terrain.js)
     sh.vertexShader = sh.vertexShader
       .replace("#include <common>",
-        "#include <common>\nattribute vec2 aG;\n" + (hasH ? "attribute vec3 aNrm;\n" : "") + "uniform float uAlp[" + MAXC + "];\nuniform vec3 uDry[" + MAXC + "];\nuniform vec3 uGrn[" + MAXC + "];\n" +
+        "#include <common>\n" + (hasH ? GLSL_DECL : "") + "attribute vec2 aG;\n" + (hasH ? "attribute vec3 aNrm;\n" : "") + "uniform float uAlp[" + MAXC + "];\nuniform vec3 uDry[" + MAXC + "];\nuniform vec3 uGrn[" + MAXC + "];\n" +
         "varying vec3 vWp;\nflat varying vec3 vDry;\nflat varying vec3 vGrn;\nvarying vec2 vInf;")   // vInf: edge (franja AO), alfa de clase
-      .replace("#include <beginnormal_vertex>", hasH ? "vec3 objectNormal = aNrm;" : "vec3 objectNormal = vec3(0.0, 1.0, 0.0);")   // A6: con terreno, normal del relieve
+      .replace("#include <beginnormal_vertex>", hasH ? "vec3 objectNormal = normalize(vec3(aNrm.x * uA6K, aNrm.y, aNrm.z * uA6K));" : "vec3 objectNormal = vec3(0.0, 1.0, 0.0);")   // A6: con terreno, normal del relieve
       .replace("#include <begin_vertex>",
         "vec3 transformed = vec3(position);\n" +
+        (hasH ? "transformed.y -= a6Low(transformed.xz);\n" : "") +   // A6 relieve en vivo: baja (1-k)·g(x,z) (todo horneado con relieve completo)
         "int ci = int(aG.x + 0.5);\n" +
         "vWp = (modelMatrix * vec4(transformed, 1.0)).xyz;\n" +
         "vDry = uDry[ci]; vGrn = uGrn[ci]; vInf = vec2(aG.y, uAlp[ci]);");
@@ -444,12 +446,14 @@ function makeFurrowMaterial(ctx, hasH) {
       uW: { value: new THREE.Vector4(F.rowW[0], F.rowW[1], F.bandW[0], F.bandW[1]) },
       uBandAmp: { value: F.bandAmp },
       uTram: { value: new THREE.Vector4(F.tramPeriod, F.tramGauge, F.tramWidth, F.tramAmp) },
-      uTramFade: { value: new THREE.Vector2(F.tramFade[0], F.tramFade[1]) }
+      uTramFade: { value: new THREE.Vector2(F.tramFade[0], F.tramFade[1]) },
+      ...(hasH ? withReliefU({}) : {})   // A6 relieve en vivo
     },
-    vertexShader:
+    vertexShader: (hasH ? GLSL_DECL : "") +
       "attribute vec3 aRow;\nvarying vec3 vRow;\nvarying vec3 vWp;\n" +
-      "void main() {\n  vRow = aRow;\n  vWp = (modelMatrix * vec4(position, 1.0)).xyz;\n" +
-      "  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);\n}",
+      "void main() {\n  vRow = aRow;\n  vec3 pL = position;\n" + (hasH ? "  pL.y -= a6Low(pL.xz);\n" : "") +
+      "  vWp = (modelMatrix * vec4(pL, 1.0)).xyz;\n" +
+      "  gl_Position = projectionMatrix * modelViewMatrix * vec4(pL, 1.0);\n}",
     fragmentShader:
       "precision highp float;\nvarying vec3 vRow;\nvarying vec3 vWp;\nuniform vec3 uCamPos;\nuniform float uFadeS;\n" +
       "uniform vec4 uRow;\nuniform vec4 uW;\nuniform float uBandAmp;\nuniform vec4 uTram;\nuniform vec2 uTramFade;\n" + GLSL_NOISE_TEX +
