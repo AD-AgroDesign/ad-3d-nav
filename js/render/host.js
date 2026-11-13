@@ -28,7 +28,7 @@ import trees from "./systems/trees.js?v=20261113";
 import grass from "./systems/grass.js?v=20261113";
 import ground from "./systems/ground.js?v=20261113";   // A4: suelo por shader + surcos
 import water from "./systems/water.js?v=20261113";   // A4: agua por shader
-import { growthU, heightAt, patchGrowth, terrain } from "../terrain/terrain.js?v=20261113";   // A6: relieve (heightAt real; terrain.active)
+import { bindReliefFrame, fitSpheres, growthU, heightAt, onReliefStep, patchGrowth, terrain } from "../terrain/terrain.js?v=20261113";   // A6: relieve (heightAt real; terrain.active)
 import shadows from "./systems/shadows.js?v=20261113";   // A3: sombras de árboles (pase propio + receptor + blobs)
 import fauna from "./systems/fauna.js?v=20261113";   // A5: aves y polinizadores
 
@@ -76,6 +76,7 @@ export const host = {
       .scale(new THREE.Vector3(this.scale, -this.scale, this.scale))
       .multiply(new THREE.Matrix4().makeRotationX(Math.PI / 2));
     this.origin = origin;
+    bindReliefFrame(origin.x, origin.y, this.scale);   // A6 relieve en vivo: textura de alturas + afín escena→píxel para los shaders (a6Low)
 
     const s = this.scale;
     const ctx = {
@@ -116,6 +117,8 @@ export const host = {
       this.setOpacity(key, key === "inicial" ? 1 : 0);
       this.scene.add(group);
     }
+
+    if (terrain.active && terrain.k < 1) fitSpheres(this.scene);   // A6: el relieve arranca apagado: esferas de culling bajadas
 
     /* Three r170 sube texturas 3D/array vacías al crear el renderer; con UNPACK_FLIP_Y o
        UNPACK_PREMULTIPLY_ALPHA en true (estado que deja MapLibre en el contexto compartido)
@@ -165,7 +168,7 @@ export const host = {
      en CADA frame (E cambia al mover el centro). La Y de escena es la altura absoluta × exageración
      (= heightAt), no hace falta restar la altura del centro del campo. Sin terreno E = 0 y la matriz es la de siempre. */
   sceneMatrix(matrix) {
-    const E = terrain.active ? (this.map.transform.elevation || 0) : 0;
+    const E = terrain.mesh ? (this.map.transform.elevation || 0) : 0;   // A6 relieve en vivo: solo mientras la malla de MapLibre está prendida
     this.l.elements[14] = -E * this.scale;   // traslación Z (mercator) de this.l: -E·metros→mercator
     return new THREE.Matrix4().fromArray(matrix).multiply(this.l);
   },
@@ -179,7 +182,7 @@ export const host = {
     /* Cámara real (T1): posición en metros de escena → uCamPos, compartido por niebla, LOD, agua… */
     const cam = this.camera3d = updateCamera(this.map, this.origin, this.scale, matrix);
     uniforms.uCamPos.value.set(cam.camPosScene[0], cam.camPosScene[1], cam.camPosScene[2]);
-    updateFog(cam, this.map.getCanvas().clientHeight, terrain.active ? this.map.transform : null);   // A6 (G4): con relieve, niebla de MapLibre (lighting.js). A1: uFogNear/uFogFar de este frame (lighting.js)
+    updateFog(cam, this.map.getCanvas().clientHeight, terrain.mesh ? this.map.transform : null);   // A6 (G4): con relieve, niebla de MapLibre (lighting.js). A1: uFogNear/uFogFar de este frame (lighting.js)
     const frame = { now, dt, camPosScene: uniforms.uCamPos.value, viewProj: this.camera.projectionMatrix,
                     camera: cam, quality: this.quality, preset: null };
     idleDriver.frame(now, uniforms.uTime.value);
@@ -209,6 +212,8 @@ export const host = {
 };
 
 on("quality", q => host.setQuality(q));
+/* A6 relieve en vivo: cada paso del factor k llega a los sistemas que lo necesiten fuera de los shaders (hoy: sombras). */
+onReliefStep((k, fin) => { if (host.scene) fitSpheres(host.scene); for (const sys of host.systems) if (sys.setRelief) sys.setRelief(k, fin); });
 host.register(trees);
 host.register(grass);
 host.register(ground);   // A4

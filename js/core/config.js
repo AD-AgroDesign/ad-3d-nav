@@ -321,7 +321,10 @@ export const A6_TERRAIN = {
      rttQuality: factor de la textura de render-a-textura de cada tesela de terreno ("auto" = pixelRatio del mapa entre 1 y 2; MapLibre: 2 → 1024 px por tesela de 512).
      meshSize: lado de la grilla de la malla de terreno (MapLibre: 128 → 16 641 vértices por tesela). Con los valores de MapLibre no cambia nada.
      rttPool: cantidad de texturas de RTT que MapLibre guarda en caché (30; 48 cubre los 32-34 tiles del rasante con pitch alto). scaleThrottleMs: tope de refresco de la barra de escala de MapLibre durante el movimiento (0 = sin tope, como MapLibre; hallazgo de 4.2: con terreno cada refresco hace 2 readPixels síncronos). En QA: ?scale= ?rtt= ?mesh= ?pool= ?demz= . */
-  perf: { rttQuality: "auto", meshSize: 128, rttPool: 48, scaleThrottleMs: 3000 }
+  perf: { rttQuality: "auto", meshSize: 128, rttPool: 48, scaleThrottleMs: 3000 },
+  /* Relieve en vivo (2026-11-13, handoffs/a6-relieve-vivo.md). transitionMs: duración (smoothstep) de encender/apagar. safetyMs: umbral del p50
+     de frame en movimiento con el relieve activo, por encima del cual se apaga solo (mismo criterio que la autodegradación de Ultra, quality.js). */
+  relief: { transitionMs: 1200, safetyMs: 33 }
 };
 /* === A6: fin === */
 

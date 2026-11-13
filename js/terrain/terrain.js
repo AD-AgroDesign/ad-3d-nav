@@ -12,18 +12,34 @@
      mismo zoom de DEM (A6_TERRAIN.demZoom) y la convención de píxel "esquina" (heightfield.js).
 
    Fuente y licencia: ver config.js (A6_TERRAIN) y handoffs/a6-terreno.md. */
+import * as THREE from "three";
 import { A1_CAMPOS, A1_SUN, A6_TERRAIN as C } from "../core/config.js?v=20261113";
+import { emit, on } from "../core/events.js?v=20261113";
 import { pointInPolygon, ringBBox } from "../core/geo.js?v=20261113";
 import { params, state } from "../core/state.js?v=20261113";
 import { quality, terrainEnabled } from "../core/quality.js?v=20261113";
-import { chainShader } from "../render/systems/chunks.js?v=20261113";
+import { chainShader, reliefHook } from "../render/systems/chunks.js?v=20261113";
 import { loadHeightfield } from "./heightfield.js?v=20261113";
 
 const DBG = params.has("debug") || params.has("qa");
 
-/* Estado público. `info` queda para el handoff/QA (window.__terrain con ?debug/?qa). */
+/* Estado público. `info` queda para el handoff/QA (window.__terrain con ?debug/?qa).
+   Relieve en vivo (2026-11-13): el relieve se prende y apaga SIN recargar, con transición. Niveles:
+     - `available`  el campo admite relieve (no es llano y el DEM cargó). Decide la UI (conmutador).
+     - `active`     ESTRUCTURAL: los sistemas Three se armaron con alturas (heightAt real horneado) y las capas drapeadas son `fill`.
+                    Vale `available` y no cambia en toda la sesión: lo que cambia en vivo es `k`, no la estructura.
+     - `on` / `k`   relieve pedido (bool) y factor vigente 0..1 (la exageración efectiva = exag·k). Con k = 0 la escena Three queda
+                    plana (los shaders restan (1-k)·altura del suelo, ver GLSL_DECL) y con `mesh` en false MapLibre no paga la malla.
+     - `mesh`       la malla de terreno de MapLibre está prendida (map.setTerrain). Con k = 0 estable se apaga (setTerrain(null)). */
 export const terrain = {
-  active: false,      // terreno 3D encendido (heightAt real, malla MapLibre, matriz corregida)
+  active: false,      // ESTRUCTURAL: Three con alturas horneadas + capas drapeadas (no cambia en caliente; ver arriba)
+  available: false,   // el campo admite relieve (no llano, DEM cargado)
+  on: false,          // relieve pedido (destino de la transición)
+  k: 0,               // factor de relieve vigente 0..1 (animado)
+  mesh: false,        // malla de terreno de MapLibre prendida
+  animating: false,
+  autoOff: false,     // la red de seguridad lo apagó en esta sesión
+  unavailable: "",    // motivo cuando available = false: "llano" | "sin-dem"
   exag: 1,            // exageración vigente
   hf: null,           // Heightfield (null si no se pudo cargar el DEM)
   hillshade: false,   // capa de sombreado de relieve agregada
@@ -33,7 +49,9 @@ export const terrain = {
 };
 if (DBG) window.__terrain = terrain;
 
-/* Altura del suelo (m de escena) en lon/lat. Sin terreno: 0 (los campos llanos quedan idénticos). */
+/* Altura del suelo (m de escena) en lon/lat con el relieve COMPLETO (k = 1): es la que se HORNEA en los sistemas Three.
+   Sin terreno estructural: 0 (los campos llanos quedan idénticos). El factor vivo `k` NO se aplica acá: lo restan los shaders
+   (a6Low en GLSL_DECL), para que apagar el relieve no obligue a reconstruir nada. */
 export function heightAt(lon, lat) {
   return terrain.active && terrain.hf ? terrain.hf.heightAt(lon, lat) * terrain.exag : 0;
 }
@@ -53,28 +71,127 @@ export const extOpacityProp = () => (terrain.active ? "fill-opacity" : "fill-ext
    Aproximación conocida: el impostor lejano (copa de 32 tris, centrado en la copa) se achata alrededor de su
    centro en vez de su base: dura 1,8 s y a más de 480 m (sub-píxel), lo cual no se ve. */
 export const growthU = { inicial: { value: 1 }, multi: { value: 1 } };
+
+/* ---------- Relieve vivo en los shaders (relieve encendido/apagado sin reconstruir) ----------
+   Todo lo que está horneado en Three trae la altura COMPLETA del suelo (y = g·exag + offsets). Para mostrar el relieve al
+   factor k (0..1) el shader RESTA (1-k)·g(x,z), con g leída de una textura R32F con la grilla del DEM (la MISMA que heightAt, con la
+   misma interpolación bilineal y el mismo recorte al borde: coincide al 1e-3 m). Con k = 1 no se resta nada (rama por uniforme) y con
+   k = 0 todo queda exactamente a y = offsets, como antes de que existiera el relieve. Sirve para instancias (se resta de la traslación
+   de la instancia: base del árbol/mata, un único g por instancia, el árbol no se deforma) y para vértices en coordenadas de mundo
+   (suelo, surcos, agua, receptor de sombras).
+     uA6H  textura de alturas del DEM (m, sin exagerar)      uA6P  afín escena→píxel de la grilla: fx = x·P.x + P.y ; fy = z·P.z + P.w
+     uA6L  (1-k)·exag = metros a restar por metro de DEM      uA6K  k (para atenuar normales: la pendiente escala con k) */
+export const reliefU = { uA6H: { value: null }, uA6P: { value: new THREE.Vector4(1, 0, 1, 0) }, uA6L: { value: 0 }, uA6K: { value: 1 } };
+export const GLSL_DECL = `
+#ifndef A6_RELIEF
+#define A6_RELIEF
+uniform sampler2D uA6H;
+uniform vec4 uA6P;
+uniform float uA6L;
+uniform float uA6K;
+float a6Hf(vec2 xz) {
+  ivec2 sz = textureSize(uA6H, 0);
+  vec2 f = clamp(vec2(xz.x * uA6P.x + uA6P.y, xz.y * uA6P.z + uA6P.w), vec2(0.0), vec2(sz) - 1.0001);
+  ivec2 i = ivec2(floor(f));
+  vec2 t = f - vec2(i);
+  float a = texelFetch(uA6H, i, 0).r, b = texelFetch(uA6H, i + ivec2(1, 0), 0).r;
+  float c = texelFetch(uA6H, i + ivec2(0, 1), 0).r, d = texelFetch(uA6H, i + ivec2(1, 1), 0).r;
+  return mix(mix(a, b, t.x), mix(c, d, t.x), t.y);
+}
+float a6Low(vec2 xz) { return uA6L > 0.0001 ? uA6L * a6Hf(xz) : 0.0; }
+#endif
+`;
+/* Materiales estándar de Three con instancias (árboles, pasto, fauna, casters de sombra): `instanceMatrix` pasa a ser una función que
+   devuelve la matriz con la traslación Y ya bajada. Así lo toman solos el proyecto, la normal, el viento, el LOD por distancia, la
+   niebla y la sombra del pasto (todos leen instanceMatrix). La función cachea el resultado por vértice. */
+const GLSL_INST = `
+#ifdef USE_INSTANCING
+mat4 a6Im; bool a6ImOk = false;
+mat4 a6Inst() { if (!a6ImOk) { a6Im = instanceMatrix; a6Im[3].y -= a6Low(a6Im[3].xz); a6ImOk = true; } return a6Im; }
+#define instanceMatrix a6Inst()
+#endif
+`;
+/* Une los uniforms del relieve a los de un shader. */
+export const withReliefU = u => Object.assign(u, reliefU);
+
 export function patchGrowth(mat, key) {
   chainShader(mat, "a6grow", sh => {
     sh.uniforms.uA6Grow = growthU[key];
+    withReliefU(sh.uniforms);
     sh.vertexShader = sh.vertexShader
-      .replace("#include <common>", "#include <common>\nuniform float uA6Grow;")
+      .replace("#include <common>", "#include <common>\nuniform float uA6Grow;\n" + GLSL_DECL + GLSL_INST)
       .replace("#include <begin_vertex>", "#include <begin_vertex>\ntransformed.y *= uA6Grow;");
   });
 }
 
+/* Para materiales con shader propio (suelo): solo agrega la declaración y los uniforms; la resta la escribe quien lo usa. */
+export function patchReliefDecl(mat, tag) {
+  chainShader(mat, tag || "a6rel", sh => {
+    withReliefU(sh.uniforms);
+    sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\n" + GLSL_DECL);
+  });
+}
 
-/* ---------- decisión de activación ---------- */
+/* Espejo en JS de a6Low (GLSL_DECL): metros que el suelo está bajado en (x, z) de escena respecto de lo horneado = (1-k)·exag·DEM(x, z). 0 con
+   el relieve completo (rápido) o sin terreno. Lo usan las decisiones por CPU que miden distancias contra posiciones horneadas (LOD por celda,
+   viento en reposo, fauna, agua) para que coincidan con lo que dibujan los shaders. */
+export function lowAt(x, z) {
+  const hf = terrain.hf;
+  if (!terrain.active || !hf || terrain.k >= 0.9999) return 0;
+  const P = reliefU.uA6P.value;
+  const fx = Math.min(Math.max(x * P.x + P.y, 0), hf.w - 1.0001), fy = Math.min(Math.max(z * P.z + P.w, 0), hf.h - 1.0001);
+  const i = Math.floor(fx), j = Math.floor(fy), tx = fx - i, ty = fy - j, g = hf.data, w = hf.w, k = j * w + i;
+  const h = (g[k] * (1 - tx) + g[k + 1] * tx) * (1 - ty) + (g[k + w] * (1 - tx) + g[k + w + 1] * tx) * ty;
+  return (1 - terrain.k) * terrain.exag * h;
+}
+reliefHook.low = lowAt;
+
+/* Esferas envolventes de las InstancedMesh (frustum culling de Three): están calculadas con las alturas horneadas, así que con relieve parcial
+   quedarían muy por encima de lo dibujado y el culling descartaría objetos visibles al borde de la pantalla. Se bajan con el suelo en el centro de
+   cada esfera (+ holgura mientras k < 1 por el desnivel dentro de la celda). Idempotente: guarda la esfera horneada en userData. */
+export function fitSpheres(root, slackM = 15) {
+  if (!terrain.active) return;
+  const k = terrain.k;
+  root.traverse(o => {
+    if (!o.isInstancedMesh) return;
+    if (!o.boundingSphere) o.computeBoundingSphere();
+    const bs = o.boundingSphere, u = o.userData;
+    if (u.a6by === undefined) { u.a6by = bs.center.y; u.a6r = bs.radius; }
+    bs.center.y = u.a6by - lowAt(bs.center.x, bs.center.z);
+    bs.radius = u.a6r + slackM * (1 - k);
+  });
+}
+
+/* Textura de alturas + afín escena→píxel. La llama el host en onAdd (origen y metros→mercator de la escena). */
+export function bindReliefFrame(originX, originY, scale) {
+  const hf = terrain.hf;
+  if (!terrain.active || !hf) return;
+  if (!reliefU.uA6H.value) {
+    const t = new THREE.DataTexture(hf.data, hf.w, hf.h, THREE.RedFormat, THREE.FloatType);
+    t.internalFormat = "R32F"; t.minFilter = t.magFilter = THREE.NearestFilter; t.generateMipmaps = false; t.flipY = false;
+    t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; t.unpackAlignment = 4; t.needsUpdate = true;
+    reliefU.uA6H.value = t;
+  }
+  const K = 256 * Math.pow(2, hf.z), off = hf.pixelCenter ? 0.5 : 0;   // mercator normalizado → píxel global del DEM (lonLatToPixel)
+  reliefU.uA6P.value.set(scale * K, originX * K - hf.px0 - off, scale * K, originY * K - hf.py0 - off);
+  reliefU.uA6L.value = (1 - terrain.k) * terrain.exag; reliefU.uA6K.value = terrain.k;
+}
+
+
+/* ---------- disponibilidad del relieve ----------
+   Devuelve { available, why }: ¿el campo admite relieve? (no si es llano). Es la regla de siempre (?terreno= URL > campo.terreno >
+   A6_TERRAIN.campos > automática); lo que cambió es que "ON/OFF inicial" ya no sale de acá sino de la preferencia (ver initTerrain). */
 function decidir(stats) {
   const campo = state.campo || {};
   const url = params.get("terreno");
-  if (url === "1" || url === "0") return { on: url === "1", why: "URL ?terreno=" + url };
-  if (!C.enabled) return { on: false, why: "A6_TERRAIN.enabled = false" };
-  if (typeof campo.terreno === "boolean") return { on: campo.terreno, why: "campo.terreno = " + campo.terreno };
+  if (url === "1" || url === "0") return { available: url === "1", why: "URL ?terreno=" + url };
+  if (!C.enabled) return { available: false, why: "A6_TERRAIN.enabled = false" };
+  if (typeof campo.terreno === "boolean") return { available: campo.terreno, why: "campo.terreno = " + campo.terreno };
   const cfg = C.campos[campo.id];
-  if (cfg && typeof cfg.terreno === "boolean") return { on: cfg.terreno, why: "config del campo (A6_TERRAIN.campos)" };
+  if (cfg && typeof cfg.terreno === "boolean") return { available: cfg.terreno, why: "config del campo (A6_TERRAIN.campos)" };
   const a = C.auto;
-  const on = stats.desvioResidual > a.desvioResidual || stats.pendienteP95 > a.pendienteP95;
-  return { on, why: `auto: desvío residual ${stats.desvioResidual.toFixed(2)} m (umbral ${a.desvioResidual}), pendiente p95 ${stats.pendienteP95.toFixed(2)} % (umbral ${a.pendienteP95})` };
+  const available = stats.desvioResidual > a.desvioResidual || stats.pendienteP95 > a.pendienteP95;
+  return { available, why: `auto: desvío residual ${stats.desvioResidual.toFixed(2)} m (umbral ${a.desvioResidual}), pendiente p95 ${stats.pendienteP95.toFixed(2)} % (umbral ${a.pendienteP95})` };
 }
 
 /* Máscara "adentro de algún polígono del campo" (como en la calibración del spike). */
@@ -147,47 +264,198 @@ function ajustarCosto(map) {
    solapamiento CPU/GPU (en la HD 520 son ~46 ms/frame en órbita, perfil CDP). Se limita a una actualización cada `ms` ms (con la
    última 300 ms después de quedar quieta). La barra de escala se ve igual, solo se refresca menos durante el movimiento. */
 function limitarEscala(map, ms) {
-  const ctl = (map._controls || []).find(c => c && c._onMove && c._container && c._container.classList.contains("maplibregl-ctrl-scale"));
-  if (!ctl || ctl._a6Throttled || !(ms > 0)) return;
+  const ctl = (map._controls || []).find(c => c && c._container && c._container.classList.contains("maplibregl-ctrl-scale") && (c._onMove || c._a6Orig));
+  if (!ctl) return;
+  if (!(ms > 0)) {   // restaurar (el relieve se apagó en vivo: la barra vuelve a refrescarse en cada 'move', como en MapLibre)
+    if (ctl._a6Orig) { map.off("move", ctl._onMove); clearTimeout(ctl._a6Timer); ctl._onMove = ctl._a6Orig; map.on("move", ctl._a6Orig); delete ctl._a6Orig; }
+    return;
+  }
+  if (ctl._a6Orig) return;
   const orig = ctl._onMove;
-  let last = 0, timer = 0;
+  let last = 0;
   /* jumpTo/setBearing (órbita, tour) disparan move Y moveend en cada llamada: no sirve moveend. Se usa "reposo de 300 ms": mientras
      haya movimiento continuo solo se refresca cada `ms`; 300 ms después del último 'move' se refresca con el valor exacto. */
   const lim = () => {
-    clearTimeout(timer);
+    clearTimeout(ctl._a6Timer);
     if (performance.now() - last >= ms) { last = performance.now(); orig(); }
-    timer = setTimeout(() => { timer = 0; last = performance.now(); orig(); }, 300);
+    ctl._a6Timer = setTimeout(() => { ctl._a6Timer = 0; last = performance.now(); orig(); }, 300);
   };
   map.off("move", orig);
-  ctl._onMove = lim; ctl._a6Throttled = true;
+  ctl._a6Orig = orig; ctl._onMove = lim;
   map.on("move", lim);
 }
 
-/* Enciende/apaga la malla de terreno de MapLibre (null apaga). La exageración queda en terrain.exag. */
-export function setTerrain(map, on, exag = terrain.exag) {
-  terrain.exag = exag;
-  if (on) map.setTerrain({ source: "dem", exaggeration: exag });
-  else if (map.getTerrain && map.getTerrain()) map.setTerrain(null);
-  terrain.active = !!on && !!terrain.hf;
-  if (on) ajustarCosto(map);
-  // niebla de MapLibre sobre la malla (la capa atmo-fog de A1 se apaga con terreno: render/atmo.js)
-  if (terrain.active && map.getSky) map.setSky({ ...map.getSky(), "fog-ground-blend": C.sky.fogGroundBlend, "horizon-fog-blend": C.sky.horizonFogBlend });
+/* ---------- Relieve en vivo: malla, factor k y transición ---------- */
+let _map = null, _skyPrev = null, _animTok = 0;
+const _stepFns = [];
+/* Los sistemas Three que dependan de k fuera de los shaders (hoy: la caja del mapa de sombras) se enteran por acá. fn(k, final). */
+export const onReliefStep = fn => { _stepFns.push(fn); return () => { const i = _stepFns.indexOf(fn); if (i >= 0) _stepFns.splice(i, 1); }; };
+const _listeners = new Set();
+/* Callback de estado (además del evento "relief:state" del bus): fn(estado). Devuelve la función para desuscribirse. */
+export const onRelief = fn => { _listeners.add(fn); return () => _listeners.delete(fn); };
+export const reliefState = () => ({ active: terrain.on, available: terrain.available, reason: terrain.available ? "" : terrain.unavailable, k: terrain.k, animating: terrain.animating, autoOff: terrain.autoOff });
+function emitirEstado() {
+  const st = reliefState();
+  for (const f of _listeners) { try { f(st); } catch (e) { console.warn("A6 onRelief:", e); } }
+  emit("relief:state", st);
 }
+const smooth01 = p => p * p * (3 - 2 * p);
+
+/* Aplica el factor k de relieve a TODO a la vez (un solo paso de JS, así MapLibre y Three quedan sincronizados en el mismo frame):
+     · exageración de la malla de MapLibre (map.terrain.exaggeration: setTerrain por frame recrearía la malla y el caché de RTT) y la
+       elevación del centro de la vista (map.transform.elevation): la cámara sube con el suelo del centro, así la vista no pega un salto vertical;
+     · uniformes de los shaders Three (resta (1-k)·g) y los sistemas que escuchan onReliefStep;
+     · intensidad del hillshade. */
+function aplicarK(k, final = false) {
+  const map = _map;
+  terrain.k = k;
+  reliefU.uA6K.value = k; reliefU.uA6L.value = (1 - k) * terrain.exag;
+  if (map && terrain.mesh && map.terrain) {
+    const t = map.terrain, tr = map.transform;
+    t.exaggeration = Math.max(1e-3, k * terrain.exag);
+    tr.minElevationForCurrentTile = t.getMinTileElevationForLngLatZoom(tr.center, tr.tileZoom);
+    tr.elevation = t.getElevationForLngLatZoom(tr.center, tr.tileZoom);
+  }
+  if (map && terrain.hillshade && map.getLayer("hillshade")) {
+    map.setPaintProperty("hillshade", "hillshade-exaggeration", (DBG && params.get("hse") ? parseFloat(params.get("hse")) : C.hillshade.exaggeration) * k);
+  }
+  for (const f of _stepFns) f(k, final);
+  if (map) map.triggerRepaint();
+}
+
+/* Malla de MapLibre: se crea al empezar a encender (con exageración ~0) y se destruye al terminar de apagar (costo cero de ahí en más). */
+function prenderMalla(map) {
+  if (terrain.mesh) return;
+  if (!_skyPrev && map.getSky) { const sk = map.getSky() || {}; _skyPrev = { g: sk["fog-ground-blend"], h: sk["horizon-fog-blend"] }; }
+  map.setTerrain({ source: "dem", exaggeration: Math.max(1e-3, terrain.k * terrain.exag) });
+  terrain.mesh = true;
+  ajustarCosto(map);
+  // niebla de MapLibre sobre la malla (la capa atmo-fog de A1 se apaga mientras haya malla: render/atmo.js)
+  if (map.getSky) map.setSky({ ...map.getSky(), "fog-ground-blend": C.sky.fogGroundBlend, "horizon-fog-blend": C.sky.horizonFogBlend });
+}
+function apagarMalla(map) {
+  if (!terrain.mesh) return;
+  if (map.getTerrain && map.getTerrain()) map.setTerrain(null);
+  terrain.mesh = false;
+  limitarEscala(map, 0);   // la barra de escala vuelve a refrescarse en cada 'move'
+  if (_skyPrev && map.getSky) map.setSky({ ...map.getSky(), "fog-ground-blend": _skyPrev.g, "horizon-fog-blend": _skyPrev.h });
+  if (map.getLayer("hillshade")) map.setLayoutProperty("hillshade", "visibility", "none");
+}
+
+/* Espera (tope `ms`) a que las teselas DEM de la vista estén cargadas: si no, el relieve "crecería" sobre una malla vacía. */
+function esperarDem(map, ms) {
+  return new Promise(res => {
+    const t0 = performance.now();
+    const chk = () => { if (!map.isSourceLoaded || map.isSourceLoaded("dem") || performance.now() - t0 > ms) res(); else setTimeout(chk, 60); };
+    chk();
+  });
+}
+
+function animarK(target, ms) {
+  const from = terrain.k, tok = ++_animTok;
+  const dur = ms * Math.abs(target - from);
+  return new Promise(res => {
+    if (!(dur > 16) || document.hidden) { aplicarK(target, true); res(true); return; }
+    const t0 = performance.now();
+    const step = now => {
+      if (tok !== _animTok) { res(false); return; }   // lo pisó otro pedido
+      const p = Math.min(1, (now - t0) / dur);
+      aplicarK(from + (target - from) * smooth01(p), p >= 1);
+      if (p < 1) requestAnimationFrame(step); else res(true);
+    };
+    requestAnimationFrame(step);
+  });
+}
+
+/* API pública (async). on: encender/apagar; animate (true): el relieve crece/se hunde en ~1,2 s (A6_TERRAIN.relief.transitionMs), con
+   smoothstep y todo sincronizado; false = salto directo. opts.auto: lo pidió la red de seguridad. Devuelve el estado final. */
+export async function setRelief(on_, { animate = true, auto = false } = {}) {
+  const map = _map;
+  if (!map || !terrain.available || !terrain.active) return reliefState();
+  on_ = !!on_;
+  if (on_ === terrain.on && !terrain.animating && terrain.k === (on_ ? 1 : 0)) return reliefState();
+  terrain.on = on_;
+  if (!on_ && auto) terrain.autoOff = true;
+  const ms = !animate ? 0 : DBG && params.get("reliefms") ? parseFloat(params.get("reliefms")) : C.relief.transitionMs;
+  terrain.animating = true;
+  emitirEstado();
+  if (on_) {
+    agregarFuenteYHillshade(map);
+    if (map.getLayer("hillshade")) map.setLayoutProperty("hillshade", "visibility", "visible");
+    prenderMalla(map);
+    aplicarK(terrain.k);   // fija exageración/elevación con el k actual (puede venir de un apagado a medias)
+    await esperarDem(map, 6000);
+    if (!terrain.on) { terrain.animating = false; return reliefState(); }   // lo apagaron mientras cargaba
+    _warmReset();
+  }
+  const fin = await animarK(on_ ? 1 : 0, ms);
+  if (!fin) return reliefState();   // otro pedido tomó el mando: él cierra el estado
+  if (!on_) apagarMalla(map);
+  terrain.animating = false;
+  emitirEstado();
+  return reliefState();
+}
+
+/* Solo QA (?debug/?qa): fija el factor k a mano (malla prendida) sin animar, para capturar cuadros intermedios reproducibles. */
+export function qaSetK(k) {
+  if (!DBG || !_map || !terrain.active) return;
+  terrain.animating = false; _animTok++;
+  if (k > 0) prenderMalla(_map);
+  aplicarK(k, true);
+  if (k <= 0) apagarMalla(_map);
+}
+
+/* ---------- red de seguridad ----------
+   Con el relieve activo (estable, sin transición), si el p50 del tiempo de frame EN MOVIMIENTO supera ~33 ms lo apaga con transición y emite
+   "relief:auto-off" (A1 muestra el aviso). Mismo criterio que la autodegradación de Ultra (core/quality.js): descarta los primeros 10 s de la
+   página, los primeros 6 s de movimiento acumulado y los frames > 250 ms; ventana de 240 frames en movimiento evaluada cada 60. Una vez por
+   sesión: si el usuario vuelve a encenderlo, no se apaga de nuevo. Con ?qa NO corre salvo ?reliefsafe=1 (?reliefms2=<ms> umbral, ?reliefsafefast=1 espera corta). */
+const AQ_QA = params.has("qa");
+const SAFE_ON = !AQ_QA || params.get("reliefsafe") === "1";
+const SAFE_FAST = AQ_QA && params.get("reliefsafefast") === "1";
+const SAFE_THR = (AQ_QA && Number(params.get("reliefms2"))) || C.relief.safetyMs;
+const SAFE_PAGE_MS = SAFE_FAST ? 0 : 10000, SAFE_WARM_MS = SAFE_FAST ? 0 : 6000, SAFE_WIN = SAFE_FAST ? 60 : 240, SAFE_STEP = SAFE_FAST ? 20 : 60;
+export const safety = { on: SAFE_ON, fired: false, samples: 0, lastP50: null, thr: SAFE_THR };
+const sf = { dts: [], moveMs: 0, since: 0, prev: new Float64Array(16) };
+function _warmReset() { sf.dts.length = 0; sf.moveMs = 0; sf.since = 0; }
+function safetyFrame(f) {
+  const e = f.viewProj.elements;
+  if (!terrain.on || terrain.animating || terrain.k < 1 || safety.fired || terrain.autoOff) { for (let i = 0; i < 16; i++) sf.prev[i] = e[i]; return; }
+  let d = 0;
+  for (let i = 0; i < 16; i++) { d += Math.abs(e[i] - sf.prev[i]); sf.prev[i] = e[i]; }
+  if (!(d > 1e-9) || document.hidden || !(f.dt > 0) || f.dt > 250 || f.now < SAFE_PAGE_MS) return;
+  if (sf.moveMs < SAFE_WARM_MS) { sf.moveMs += f.dt; return; }
+  sf.dts.push(f.dt); if (sf.dts.length > SAFE_WIN) sf.dts.shift();
+  safety.samples++;
+  if (sf.dts.length < SAFE_WIN || ++sf.since < SAFE_STEP) return;
+  sf.since = 0;
+  const q = sf.dts.slice().sort((a, b) => a - b);
+  safety.lastP50 = q[q.length >> 1];
+  if (safety.lastP50 > SAFE_THR) setTimeout(autoOff, 0);   // fuera del render del host
+}
+async function autoOff() {
+  if (safety.fired || !terrain.on) return;
+  safety.fired = true;
+  const reason = "fluidez: p50 " + safety.lastP50.toFixed(1) + " ms > " + SAFE_THR + " ms en movimiento";
+  console.info("[relieve] apagado automático (" + reason + ")");
+  await setRelief(false, { animate: true, auto: true });
+  emit("relief:auto-off", { reason });
+}
+if (SAFE_ON) on("frame", safetyFrame);
 
 /* Carga el DEM del campo, decide y deja todo listo ANTES de armar las capas de escenario y el host.
    bbox = state.bbox ([[oeste,sur],[este,norte]]); data = FeatureCollection del escenario inicial (máscara de las
-   estadísticas). Si el DEM no carga (sin red, bloqueo), el campo sigue como siempre (terreno y hillshade apagados). */
+   estadísticas). Si el DEM no carga (sin red, bloqueo), el campo sigue como siempre (terreno y hillshade apagados).
+   Relieve en vivo: el DEM se carga SIEMPRE (salvo ?terreno=0): hace falta para saber si el campo admite relieve y para tener las alturas
+   horneadas (los sistemas Three se arman con relieve completo y el factor k los aplana en vivo). El estado inicial (on/off) sale de:
+   ?terreno=1/0 > preferencia guardada (localStorage ad_relieve, la escribe A1) > terrainEnabled(quality) (default del nivel). */
 export async function initTerrain(map, bbox, data) {
   const t0 = performance.now();
+  _map = map;
   /* ?terreno=0 apaga TODO lo de A6 (terreno, hillshade y hasta la descarga del DEM): el visor queda idéntico al de antes
      del terreno (sirve de interruptor de comparación). ?hillshade=0|1 fuerza solo el sombreado de relieve. */
-  if (params.get("terreno") === "0") { terrain.reason = "URL ?terreno=0 (todo apagado)"; return terrain; }
-  /* G2: según calidad (quality.terrain): en integradas y en Media/Baja NO se descarga el DEM ni hay hillshade ni terreno
-     (visor idéntico al de antes de A6, heightAt = 0). ?terreno=1 en la URL lo fuerza igual. */
-  if (params.get("terreno") !== "1" && !terrainEnabled(quality)) {
-    terrain.reason = `calidad ${quality.name}: terreno apagado (GPU integrada o nivel bajo; ?terreno=1 lo fuerza)`; return terrain;
-  }
-  if (!C.enabled && !C.hillshade.enabled) return terrain;
+  if (params.get("terreno") === "0") { terrain.reason = "URL ?terreno=0 (todo apagado)"; terrain.unavailable = "sin-dem"; emitirEstado(); return terrain; }
+  if (!C.enabled && !C.hillshade.enabled) { terrain.unavailable = "sin-dem"; emitirEstado(); return terrain; }
   if (DBG && params.get("demz")) C.demZoom = parseInt(params.get("demz"), 10) || C.demZoom;   // ?demz=: zoom del DEM (fuente + heightAt), solo ?debug/?qa
   try {
     const m = 0.01;   // margen (°) para que el borde del campo no quede pegado al límite de la grilla
@@ -196,19 +464,33 @@ export async function initTerrain(map, bbox, data) {
     terrain.stats = terrain.hf.reliefStats({ mask: maskDe(data), baselineM: C.auto.baselineM });
     const d = decidir(terrain.stats);
     terrain.reason = d.why;
+    terrain.available = d.available;
+    if (!d.available) terrain.unavailable = "llano";
     const campoCfg = C.campos[(state.campo || {}).id] || {};
     let exag = campoCfg.exag ?? C.exaggeration;
     if (DBG && params.get("exag")) exag = parseFloat(params.get("exag")) || exag;
     terrain.exag = exag;
-    agregarFuenteYHillshade(map);
-    setTerrain(map, d.on, exag);
+    const url = params.get("terreno");
+    let pref = null; try { const v = localStorage.getItem("ad_relieve"); pref = v === "1" ? true : v === "0" ? false : null; } catch (e) { /* sin localStorage */ }
+    const quiere = url === "1" ? true : pref !== null ? pref : terrainEnabled(quality);
+    const onIni = d.available && quiere;
+    terrain.on = onIni;
+    terrain.active = d.available;   // estructural: ya con alturas horneadas aunque arranque apagado
+    terrain.k = onIni ? 1 : 0;
+    reliefU.uA6L.value = (1 - terrain.k) * exag; reliefU.uA6K.value = terrain.k;
+    // hillshade: como siempre en campos llanos con calidad que lo admite; en campos con relieve solo si arranca encendido (si no, al encender)
+    if (onIni || (!d.available && (url === "1" || terrainEnabled(quality)))) agregarFuenteYHillshade(map);
+    if (onIni) prenderMalla(map);
   } catch (e) {
     console.warn("A6: no se pudo cargar el relieve (DEM); el campo queda sin terreno:", e.message || e);
-    terrain.hf = null; terrain.active = false; terrain.reason = "error DEM: " + (e.message || e);
+    terrain.hf = null; terrain.active = false; terrain.available = false; terrain.on = false; terrain.k = 0; terrain.reason = "error DEM: " + (e.message || e);
+    terrain.unavailable = "sin-dem";
     if (map.getLayer("hillshade")) map.removeLayer("hillshade");
     if (map.getSource("dem")) map.removeSource("dem");
     if (map.getSource("dem-hs")) map.removeSource("dem-hs");
   }
   terrain.loadMs = Math.round(performance.now() - t0);
+  _warmReset();
+  emitirEstado();
   return terrain;
 }

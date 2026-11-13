@@ -71,7 +71,7 @@ export const atmo = {
   render(gl, matrix) {
     if (!host.origin) return;                  // el host todavía no hizo onAdd (primer frame)
     const T = atm.tint, tinted = !NOTINT && (T[0] < 0.999 || T[1] < 0.999 || T[2] < 0.999);   // mediodía = sin pasada de color (costo 0)
-    const wantFog = !terrain.active;           // A6: con terreno la niebla es la de MapLibre (por profundidad real); este quad supone suelo plano y partiría el horizonte
+    const wantFog = !terrain.mesh;           // A6: con terreno la niebla es la de MapLibre (por profundidad real); este quad supone suelo plano y partiría el horizonte
     if (!tinted && !wantFog) return;
     const H = this.map.getCanvas().clientHeight;
     /* Esta capa dibuja ANTES que la de vegetación: calcula la cámara y la niebla de este frame
