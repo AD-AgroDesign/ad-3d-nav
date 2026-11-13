@@ -492,5 +492,7 @@ export async function initTerrain(map, bbox, data) {
   terrain.loadMs = Math.round(performance.now() - t0);
   _warmReset();
   emitirEstado();
+  // solo QA (?debug/?qa): ?reliefoff=<ms> apaga el relieve en vivo (con transición) a los <ms> ms de cargar (medir el costo "después de apagar")
+  if (DBG && params.has("reliefoff") && terrain.on) setTimeout(() => setRelief(false, { animate: true }), Number(params.get("reliefoff")) || 0);
   return terrain;
 }
