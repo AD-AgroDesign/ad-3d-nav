@@ -4,17 +4,22 @@ import { setScenario } from "../map/scenario.js?v=20261113";
 import { map } from "../map/style.js?v=20261113";
 import { quality, setQuality } from "../core/quality.js?v=20261113";
 import { startOrbit, startTour, stopOrbit, stopTour } from "../tour/tour.js?v=20261113";
+import { armarQualityDD } from "./quality-dd.js?v=20261113";
 
 /* ---------- Selector de calidad (P-7): hoy sin efectos visibles ---------- */
 const qualitySel = document.getElementById("quality-select");
 qualitySel.value = quality.name;
 qualitySel.addEventListener("change", () => setQuality(qualitySel.value));
+armarQualityDD();   // ORQ G4: menú con la estética de la plataforma sobre el select oculto
 
 /* ---------- UI ---------- */
 document.getElementById("sw-inicial").addEventListener("click", () => setScenario("inicial"));
 document.getElementById("sw-multi").addEventListener("click", () => setScenario("multi"));
 document.getElementById("btn-panel").addEventListener("click", () =>
   document.getElementById("panel").classList.toggle("collapsed"));
+/* ORQ G4 (pedido de Mike): en el celular, una cruz en el propio panel también lo cierra (el ☰ sigue igual). */
+document.getElementById("panel-close").addEventListener("click", () =>
+  document.getElementById("panel").classList.add("collapsed"));
 document.getElementById("btn-tour").addEventListener("click", () =>
   state.tour.running ? stopTour() : startTour());
 document.getElementById("btn-orbit").addEventListener("click", () =>

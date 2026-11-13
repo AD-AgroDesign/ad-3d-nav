@@ -455,3 +455,69 @@ html, body { height: 100%; overflow: hidden; background: var(--ad-green-dark); }
 #relieve-nota { flex: 0 0 100%; margin: 6px 0 0; font-size: 11px; line-height: 1.35; opacity: .7; }
 .quality-fade { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 1; pointer-events: none; z-index: 1; }
 /* === A1: fin === */
+
+/* === ORQ G4 (pedidos de Mike 2026-11-13): inicio === */
+/* "Hora del día" y "Relieve del terreno" con el mismo formato que el título "Calidad" (#panel h3) */
+#quality-section .hora-label, #relieve-fila .relieve-label {
+  font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px;
+  color: var(--ad-gold); opacity: 1;
+}
+#quality-section .hora-label { margin: 14px 0 8px; }
+/* Desplegable de calidad (js/ui/quality-dd.js): calcado del selector de campos del header; el <select> queda oculto */
+#quality-select.quality-select-oculto { display: none; }
+#quality-dd { position: relative; }
+#quality-btn {
+  position: relative; display: flex; align-items: center; min-width: 104px; height: 30px;
+  padding: 0 28px 0 12px; border-radius: 8px; cursor: pointer;
+  background: rgba(230,185,61,.12); color: var(--ad-cream); font: inherit; font-size: 12.5px; font-weight: 700;
+  border: 1px solid rgba(230,185,61,.6);
+}
+#quality-btn:hover { background: rgba(230,185,61,.2); }
+#quality-btn:focus-visible { outline: 2px solid var(--ad-gold); outline-offset: 2px; }
+#quality-btn .dd-caret {
+  position: absolute; right: 9px; top: 50%; transform: translateY(-50%);
+  color: var(--ad-gold); font-size: 11px; transition: transform .25s;
+}
+#quality-dd.open .dd-caret { transform: translateY(-50%) rotate(180deg); }
+#quality-menu {
+  position: absolute; top: calc(100% + 6px); right: 0; min-width: 140px; z-index: 40;
+  list-style: none; padding: 4px 0;
+  background: var(--ad-green-dark); border: 1px solid rgba(230,185,61,.45); border-radius: 10px;
+  box-shadow: 0 14px 40px rgba(0,0,0,.5);
+  opacity: 0; visibility: hidden; transform: translateY(-6px); transition: all .22s ease;
+}
+#quality-dd.open #quality-menu { opacity: 1; visibility: visible; transform: translateY(0); }
+#quality-menu li {
+  display: flex; align-items: center; gap: 10px; padding: 9px 14px; cursor: pointer;
+  color: var(--ad-cream); font-size: 13px; border-bottom: 1px solid rgba(255,255,255,.05);
+}
+#quality-menu li:last-child { border-bottom: none; }
+#quality-menu li:hover { background: var(--ad-green-mid); }
+#quality-menu li .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: rgba(244,241,230,.35); }
+#quality-menu li.selected .dot { background: var(--ad-gold); }
+#quality-menu li .dd-name { flex: 1; }
+#quality-menu li .check { color: var(--ad-gold); font-weight: 700; visibility: hidden; }
+#quality-menu li.selected .check { visibility: visible; }
+/* Mike: la calidad elegida en dorado, como la hora elegida y el relieve activo */
+#quality-current { color: var(--ad-gold); }
+#quality-menu li.selected { color: var(--ad-gold); font-weight: 700; background: rgba(230,185,61,.12); }
+/* El panel recorta lo que desborda (overflow-y): el menú de calidad se abre hacia arriba si no entra abajo */
+#quality-dd.arriba #quality-menu { top: auto; bottom: calc(100% + 6px); }
+/* Cruz para cerrar el panel: solo en el celular (en escritorio el panel se cierra con ☰) */
+#panel-close { display: none; }
+@media (max-width: 830px) {
+  #panel-close {
+    display: flex; align-items: center; justify-content: center;
+    position: sticky; top: 8px; float: right; z-index: 2; margin: 8px 8px -36px 0;
+    width: 28px; height: 28px; padding: 0; border-radius: 50%;
+    border: 1px solid rgba(255,255,255,.18); background: rgba(0,0,0,.35);
+    color: var(--ad-cream); font-size: 18px; line-height: 1; cursor: pointer;
+  }
+  #panel-close:hover, #panel-close:active { background: rgba(230,185,61,.25); color: var(--ad-gold); }
+  #panel #scenario-desc { padding-right: 44px; }
+}
+/* Los menús cerrados no atrapan clics: el ✓ del ítem elegido tiene visibility: visible y, aun con el menú invisible,
+   tapaba lo que quedara debajo (en el celular, justo la cruz del panel). Vale para el de campos y el de calidad. */
+#campo-menu, #quality-menu { pointer-events: none; }
+#campo-dd.open #campo-menu, #quality-dd.open #quality-menu { pointer-events: auto; }
+/* === ORQ G4: fin === */

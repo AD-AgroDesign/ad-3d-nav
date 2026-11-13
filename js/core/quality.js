@@ -199,7 +199,7 @@ function aqAviso() {
   if (!el) { el = document.createElement("p"); el.id = "quality-aviso"; el.setAttribute("role", "status"); sec.appendChild(el); }
   el.textContent = "Ultra no rinde en este equipo: pasamos a Alta.";
   const sel = document.getElementById("quality-select");
-  if (sel) { sel.value = "alta"; sel.addEventListener("change", () => el.remove(), { once: true }); }
+  if (sel) { sel.value = "alta"; sel.dispatchEvent(new Event("ad:sync")); sel.addEventListener("change", () => el.remove(), { once: true }); }
 }
 
 async function aqDegrade() {
