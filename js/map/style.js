@@ -76,7 +76,7 @@ export const map = new maplibregl.Map({
      repintado forzado en reposo disparaba 5-8 frames extra por ese fundido (fauna/agua en el lazo acotado). */
   fadeDuration: 0,
   /* A1 (1.3, A): antialias y pixelRatio según el nivel de calidad. Se fijan al crear el contexto
-     (T3): cambiar de nivel recarga la página (quality.js CONTEXT_PARAMS_ACTIVE). msaa "gpu" (Alta, Media):
+     (T3): el antialias queda el del arranque aunque cambie el nivel (sin recarga, quality.js setQuality); el pixelRatio sí se ajusta en caliente. msaa "gpu" (Alta, Media):
      sí, salvo GPU integrada o de gama baja (msaaEnabled en quality.js; ORQ 2026-11-10). */
   antialias: msaaEnabled(QUALITY) && !(/[?&](qa|debug)/.test(location.search) && new URLSearchParams(location.search).get("aa") === "0"),   // ?aa=0: solo para comparar capturas, y solo con ?qa/?debug
   pixelRatio: Math.min(window.devicePixelRatio || 1, QUALITY.pixelRatioCap)

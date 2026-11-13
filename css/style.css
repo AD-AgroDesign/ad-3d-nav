@@ -443,4 +443,15 @@ html, body { height: 100%; overflow: hidden; background: var(--ad-green-dark); }
 #hora-btns .hora-btn:focus-visible { outline: 2px solid var(--ad-gold); outline-offset: -2px; }
 /* 4.2: aviso de degradación automática Ultra -> Alta (una línea, discreto) */
 #quality-aviso { flex: 0 0 100%; margin: 6px 0 0; font-size: 11px; line-height: 1.35; opacity: .7; }
+/* conmutadores sin recarga (2026-11-13): switch "Relieve del terreno" (js/ui/relief-ui.js) y fundido cruzado de calidad (core/quality.js) */
+#relieve-fila { flex: 0 0 100%; display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
+#relieve-fila .relieve-label { font-size: 11px; opacity: .7; }
+#relieve-sw { position: relative; width: 34px; height: 18px; padding: 0; border-radius: 9px; border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.08); cursor: pointer; transition: background .15s, border-color .15s; }
+#relieve-sw .relieve-knob { position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--ad-cream); transition: transform .15s, background .15s; }
+#relieve-sw[aria-checked="true"] { background: rgba(230, 185, 61, 0.28); border-color: var(--ad-gold); }
+#relieve-sw[aria-checked="true"] .relieve-knob { transform: translateX(16px); background: var(--ad-gold); }
+#relieve-sw:disabled { opacity: .4; cursor: default; }
+#relieve-sw:focus-visible { outline: 2px solid var(--ad-gold); outline-offset: 2px; }
+#relieve-nota { flex: 0 0 100%; margin: 6px 0 0; font-size: 11px; line-height: 1.35; opacity: .7; }
+.quality-fade { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 1; pointer-events: none; z-index: 1; }
 /* === A1: fin === */

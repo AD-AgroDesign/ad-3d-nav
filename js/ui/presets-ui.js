@@ -4,6 +4,7 @@
    acá solo se arma el DOM, se escucha "preset" (lo emite lighting.js, también desde la API de QA) y se actualiza la URL.
    D-5: el tour NO cambia de modo solo; lo elige el usuario. */
 import { on } from "../core/events.js?v=20261113";
+import { armarRelieve } from "./relief-ui.js?v=20261113";   // conmutador "Relieve del terreno" (debajo de la hora)
 import { PRESET_NAMES, presetName, setPreset } from "../render/lighting.js?v=20261113";
 
 const ICONOS = {
@@ -49,3 +50,4 @@ function url(name) {
 
 on("preset", ({ name }) => { marcar(name); url(name); });
 armar();
+armarRelieve();   // el conmutador de relieve va debajo de la hora

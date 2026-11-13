@@ -1,6 +1,7 @@
 /* ============ Niveles de calidad (§6.4) ============
    Ultra / Alta / Media / Baja. Se resuelven ANTES de crear el Map (T3: antialias y
-   pixelRatio se fijan al crear el contexto WebGL; cambiarlos requiere recargar).
+   pixelRatio se fijan al crear el contexto WebGL). Desde 2026-11-13 el cambio de nivel NO recarga: pixelRatio va en caliente
+   (map.setPixelRatio) y el MSAA queda el del arranque hasta la próxima carga (ver setQuality).
    Prioridad: ?calidad=<nivel> en la URL > localStorage ("ad_calidad") > detección.
    Consumidores: A1 (MSAA/pixelRatio), A2 (LOD), A3 (sombras), A4 (suelo/agua), A5 (fauna), A6 (terreno), idleDriver (render/idle.js). */
 import { IS_MOBILE } from "./config.js?v=20261113";
@@ -16,11 +17,12 @@ export const LEVELS = ["ultra", "alta", "media", "baja"];
      treeCardDist    follaje en tarjetas hasta esa distancia; treeImpostorDist: impostor desde ahí
      shadows         tamaño del shadow map (0 = sombras blob actuales)
      soil / fauna / water   suelo por shader, fauna, agua por shader
-     terrain         terreno 3D + hillshade (A6; true/false; "gpu" = sí salvo GPU integrada o de gama baja)
+     terrain         relieve por defecto del nivel (A6; true/false; "salvo-baja" = sí salvo GPU de gama baja). El usuario lo pisa con el
+                     conmutador "Relieve del terreno" (localStorage ad_relieve), en cualquier nivel
      idleFps         tope del lazo de animación en reposo (0 = apagado) */
 export const LEVEL_PARAMS = {
-  ultra: { msaa: true,  pixelRatioCap: 2,    grassDensity: 1,       grassLodDist: 1400, treeCardDist: 900, treeImpostorDist: Infinity, shadows: 4096, soil: "completo",   fauna: 1,   water: "shader", idleFps: 30, terrain: "gpu" },   // Ola 4 4.2: terreno solo con GPU dedicada, igual que Alta (Mike 2026-11-12)
-  alta:  { msaa: "gpu", pixelRatioCap: 1.5,  grassDensity: 1,       grassLodDist: 1000, treeCardDist: 600, treeImpostorDist: Infinity, shadows: 2048, soil: "completo",   fauna: 1,   water: "shader", idleFps: 30, terrain: "gpu" },
+  ultra: { msaa: true,  pixelRatioCap: 2,    grassDensity: 1,       grassLodDist: 1400, treeCardDist: 900, treeImpostorDist: Infinity, shadows: 4096, soil: "completo",   fauna: 1,   water: "shader", idleFps: 30, terrain: "salvo-baja" },   // conmutadores (Mike 2026-11-13): relieve por defecto salvo GPU de gama baja
+  alta:  { msaa: "gpu", pixelRatioCap: 1.5,  grassDensity: 1,       grassLodDist: 1000, treeCardDist: 600, treeImpostorDist: Infinity, shadows: 2048, soil: "completo",   fauna: 1,   water: "shader", idleFps: 30, terrain: "salvo-baja" },
   media: { msaa: "gpu", pixelRatioCap: 1.25, grassDensity: "movil", grassLodDist: 600,  treeCardDist: 300, treeImpostorDist: 1500,     shadows: 1024, soil: "sin-surcos", fauna: 0.5, water: "shader", idleFps: 20, terrain: false },
   baja:  { msaa: false, pixelRatioCap: 1,    grassDensity: 0.5,     grassLodDist: 400,  treeCardDist: 0,   treeImpostorDist: 0,        shadows: 0,    soil: "apagado",    fauna: 0,   water: "plano",  idleFps: 0, terrain: false }
 };
@@ -61,16 +63,27 @@ export function msaaEnabled(q) {
   return !(GPU_BAJA.test(g) || GPU_INTEGRADA.test(g));
 }
 
-/* A6 (G2, decisión de Mike 2026-11-11; Ola 4 4.2: también Ultra): terreno 3D + hillshade solo con GPU dedicada en Ultra y Alta.
-   En la Intel HD 520 el terreno MapLibre costaba +10 a +85 ms por frame (a7 G2). Override solo de QA:
-   ?gpu=integrada|dedicada (con ?qa) simula el tipo de GPU del headless (SwiftShader no es ninguno de los dos). */
-export function terrainEnabled(q) {
-  if (q.terrain !== "gpu") return !!q.terrain;
+/* Relieve (A6) — conmutadores sin recarga (Mike 2026-11-13). Preferencia del usuario en localStorage "ad_relieve" ("1"/"0");
+   sin preferencia vale el default del nivel de calidad (quality.terrain). Una GPU integrada común ya NO apaga el relieve:
+   solo la gama baja conocida (GPU_BAJA) lo deja apagado por defecto. Override solo de QA: ?gpu=baja (con ?qa) simula esa GPU. */
+const LS_RELIEVE = "ad_relieve";
+export function reliefPref() {
+  try { const v = localStorage.getItem(LS_RELIEVE); return v === "1" ? true : v === "0" ? false : null; } catch (e) { return null; }
+}
+export function setReliefPref(on) {
+  try { if (on === null) localStorage.removeItem(LS_RELIEVE); else localStorage.setItem(LS_RELIEVE, on ? "1" : "0"); } catch (e) { /* sin localStorage */ }
+}
+/* Default del nivel (sin preferencia del usuario). */
+export function terrainDefault(q) {
+  if (q.terrain !== "salvo-baja") return !!q.terrain;
   const sim = new URLSearchParams(location.search);
-  if (sim.has("qa") && sim.get("gpu") === "dedicada") return true;
-  if (sim.has("qa") && sim.get("gpu") === "integrada") return false;
-  const g = gpuName();
-  return !(GPU_BAJA.test(g) || GPU_INTEGRADA.test(g));
+  if (sim.has("qa") && sim.get("gpu") === "baja") return false;
+  return !GPU_BAJA.test(gpuName());
+}
+/* ¿Debe haber relieve ahora? Preferencia del usuario si existe; si no, el default del nivel. */
+export function terrainEnabled(q) {
+  const p = reliefPref();
+  return p === null ? terrainDefault(q) : p;
 }
 
 /* Detección inicial: IS_MOBILE, deviceMemory, hardwareConcurrency y GPU. */
@@ -97,26 +110,64 @@ export function resolveQuality() {
   return quality;
 }
 
-/* Cuando A1 conecte antialias/pixelRatio al crear el Map, poner esto en true: entonces
-   un cambio de nivel que modifique esos parámetros recarga la página (T3). Hoy no
-   afectan nada visible, así que no hay motivo para recargar. */
-export const CONTEXT_PARAMS_ACTIVE = true;   // A1 1.3: style.js ya conecta antialias/pixelRatio
+/* Cambio de nivel SIN recarga (Mike 2026-11-13). Qué pasa en caliente:
+     - sombras, pasto, árboles, suelo, fauna, agua e idleFps: los sistemas escuchan "quality" (igual que en la autodegradación);
+     - pixelRatio: map.setPixelRatio (applyPixelRatio);
+     - relieve: core/relief.js escucha "quality" y llama a setRelief de A6 (animado);
+     - MSAA: se fija al crear el contexto WebGL (T3) y NO se puede cambiar sin recrearlo. Queda el del arranque hasta la próxima
+       carga (que ya arranca con el del nivel guardado). En integradas y gama baja ya está apagado (msaaEnabled), así que casi no se nota.
+   opts.persist (true): lo recuerda en localStorage; opts.fade (por defecto = persist, o sea el selector del panel sí y la API de QA no): fundido cruzado de ~0,6 s
+   desde la imagen previa del canvas. Devuelve false si el nombre no es válido. */
+export const FADE_MS = 600;
+let _applying = Promise.resolve();
+export const qualityIdle = () => _applying;   // solo QA: espera a que termine el pixelRatio y el fundido
 
-/* Cambia el nivel en caliente. Devuelve false si el nombre no es válido.
-   opts.persist (true): lo recuerda en localStorage; opts.reload (true): permite la
-   recarga cuando CONTEXT_PARAMS_ACTIVE y cambian msaa/pixelRatioCap. */
+export async function applyPixelRatio() {
+  try {
+    const { map } = await import("../map/style.js?v=20261113");
+    if (map.setPixelRatio) map.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality.pixelRatioCap));
+  } catch (e) { /* sin mapa: nada que ajustar */ }
+}
+
 export function setQuality(name, opts = {}) {
   name = String(name).toLowerCase();
   if (!LEVELS.includes(name)) return false;
-  const prev = { ...quality }, terrPrev = terrainEnabled(quality);
+  const fade = (opts.fade ?? opts.persist !== false) && !(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+  /* El relieve hace su propia transición (A6): si este cambio lo enciende o apaga, no se le suma el fundido. */
+  const reliefCambia = terrainEnabled(quality) !== (reliefPref() === null ? terrainDefault(LEVEL_PARAMS[name]) : reliefPref());
+  const snap = fade && !reliefCambia ? fadeCapture() : null;
   Object.assign(quality, { name, ...LEVEL_PARAMS[name], source: "usuario" });
   if (opts.persist !== false) lsSet(name);
   emit("quality", quality);
-  const needsReload = CONTEXT_PARAMS_ACTIVE &&
-    (prev.msaa !== quality.msaa || prev.pixelRatioCap !== quality.pixelRatioCap ||
-     terrPrev !== terrainEnabled(quality));   // A6: el terreno se decide al cargar el campo
-  if (needsReload && opts.reload !== false) location.reload();
+  _applying = applyPixelRatio().then(() => fadeRun(snap));
   return true;
+}
+
+/* ---- fundido cruzado: copia del canvas del mapa en un overlay que se desvanece (no bloquea clicks ni tapa la UI) ---- */
+function fadeCapture() {
+  try {
+    const host = document.getElementById("map"), src = host && host.querySelector("canvas.maplibregl-canvas");
+    if (!src || !src.width) return null;
+    document.querySelectorAll(".quality-fade").forEach(n => n.remove());
+    const c = document.createElement("canvas");
+    c.className = "quality-fade"; c.width = src.width; c.height = src.height; c.setAttribute("aria-hidden", "true");
+    c.getContext("2d").drawImage(src, 0, 0);   // preserveDrawingBuffer: true (map/style.js): el buffer sigue legible
+    host.appendChild(c);
+    return c;
+  } catch (e) { return null; }
+}
+async function fadeRun(c) {
+  if (!c || !c.isConnected) return;
+  try {
+    const { map } = await import("../map/style.js?v=20261113");
+    /* el mapa ya muestra el nivel nuevo: se espera un frame con él antes de empezar a desvanecer */
+    await new Promise(r => { const t = setTimeout(r, 400); map.once("render", () => { clearTimeout(t); r(); }); map.triggerRepaint(); });
+    await new Promise(r => requestAnimationFrame(() => r()));
+    c.style.transition = "opacity " + FADE_MS + "ms ease-out";
+    c.style.opacity = "0";
+    await new Promise(r => setTimeout(r, FADE_MS + 60));
+  } catch (e) { /* sin mapa */ }
+  c.remove();
 }
 
 /* ============ Ola 4 4.2: Ultra se degrada sola a Alta si la máquina no aguanta ============
@@ -155,12 +206,8 @@ async function aqDegrade() {
   if (autoQ.degraded || autoQ.optOut || quality.name !== "ultra") return;
   autoQ.degraded = true;
   const persist = quality.source !== "url";
-  setQuality("alta", { persist, reload: false });   // en caliente: sombras, pasto, árboles, suelo, fauna
+  setQuality("alta", { persist, fade: false });   // en caliente: sombras, pasto, árboles, suelo, fauna, pixelRatio; el MSAA queda hasta la próxima carga
   quality.source = "auto";
-  try {   // pixelRatio en caliente (MapLibre 4.7.1 tiene map.setPixelRatio); el MSAA queda para la próxima carga
-    const { map } = await import("../map/style.js?v=20261113");
-    if (map.setPixelRatio) map.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality.pixelRatioCap));
-  } catch (e) { /* sin mapa: nada que ajustar */ }
   aqAviso();
   console.info("[calidad] Ultra → Alta automático (p50 " + (autoQ.lastP50 && autoQ.lastP50.toFixed(1)) + " ms > " + AQ_THR + " ms)");
 }
