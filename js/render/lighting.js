@@ -4,7 +4,7 @@
    para todo lo que todavía nadie consume (§6.3). Los materiales los toman por
    referencia (shaderlib.patch), así que cambiar `.value` los actualiza a todos. */
 import * as THREE from "three";
-import { A1_CAMPOS, A1_FOG, A1_HORAS, A1_LIGHT, A1_RASTER, A1_RENDER, A1_SKY, A1_SUN, A3_SHADOWS } from "../core/config.js?v=20261113";
+import { A1_CAMPOS, A1_FOG, A1_HORAS, A1_LIGHT, A1_RASTER, A1_RENDER, A1_SKY, A1_SUN, A3_SHADOWS, A6_NIEBLA } from "../core/config.js?v=20261113";
 import { emit, on } from "../core/events.js?v=20261113";
 import { quality } from "../core/quality.js?v=20261113";
 
@@ -131,7 +131,7 @@ export function updateFog(cam, H, tr, kRel = 1) {
   const dHor = dz < -1e-6 ? (-cam.altitudeM / dz) * Math.hypot(dx, dy, dz) : 1e9;   // sin tope si el rayo no baja
   const far = dHor * A1_FOG.farFrac;
   const k = atm.fogK;   // modo de hora: < 1 = niebla más densa (empieza más cerca)
-  const near = Math.min(Math.max(A1_FOG.near * k, A1_FOG.nearK * k * cam.ctdM), far * A1_FOG.nearMaxFrac);
+  const near = Math.min(Math.max(A1_FOG.near * k, A1_FOG.nearK * k * cam.ctdM) * A6_NIEBLA.nearMul, far * Math.min(0.9, A1_FOG.nearMaxFrac * A6_NIEBLA.nearMul));   // A6_NIEBLA: la niebla arranca más lejos (config.js)
   fog.near = near; fog.far = far; fog.dHor = dHor; fog.hNdc = hNdc;
   uniforms.uFogNear.value = near; uniforms.uFogFar.value = far;
   if (rel && kRel >= 1) { fog.near = uniforms.uFogRel.value.x; fog.far = fog.dHor = uniforms.uFogRel.value.y; fog.hNdc = 0; }   // consumidores JS (QA): con el relieve completo, la curva de relieve

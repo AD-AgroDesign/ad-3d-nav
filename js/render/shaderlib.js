@@ -14,7 +14,7 @@
                    fade: true               → uniforme propio del material (setFade(mat, v))
    El material debe ser MeshBasic/Lambert/Phong/Standard (necesitan <fog_fragment>). */
 import * as THREE from "three";
-import { A1_FOLIAGE, A6_TERRAIN } from "../core/config.js?v=20261113";
+import { A1_FOLIAGE, A6_NIEBLA, A6_TERRAIN } from "../core/config.js?v=20261113";
 import { uniforms } from "./lighting.js?v=20261113";
 
 /* ---------- GLSL ---------- */
@@ -25,7 +25,7 @@ export const GLSL_FOG_UNIFORMS = "uniform vec3 uFogColor;\nuniform float uFogNea
 export const GLSL_ADFOG =
   "float adFogFlat(float d) {\n" +
   "  float x = clamp((d - uFogNear) / max(uFogFar - uFogNear, 1.0), 0.0, 1.0);\n" +
-  "  return x * x * (3.0 - 2.0 * x) * uFogMax;\n" +
+  "  return pow(x * x * (3.0 - 2.0 * x), " + A6_NIEBLA.curvePow.toFixed(3) + ") * uFogMax;\n" +
   "}\n" +
   /* A6 (G4-fix): con relieve la niebla de MapLibre sobre la malla es otra curva (por profundidad de vista z, no por distancia, y no llega al
      100 % hasta el plano lejano). uFogRel = (near px, far px, opacidad por pitch, peso k): el valor final es la mezcla lineal de la curva plana
