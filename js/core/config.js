@@ -230,9 +230,29 @@ export const A4_GROUND = {
   noise: { fine: 0.10, mid: 0.13, coarse: 0.16 },   // amplitud de luminancia por escala (≈0,7 m / 4 m / 25 m)
   edgeAO: { width: 1.8, strength: 0.38 },           // m de la franja oscura hacia adentro y oscurecimiento máximo
   reveal: { soft: 0.10, jitter: 0.10 },             // suavidad del frente de revelado y ruido del frente
+  /* G5 (pasto de corredores y parches, 2026-11-14): corr-herb y parche-herb se pintan con una textura de suelo generada en runtime (canvas 2D,
+     pintores del boceto spikes/pasto.html: gris verdoso moteado, sombras entre matas, puntos celestes de achicoria y pocos blancos, violetas,
+     amarillos y rosados). Es lo que se ve más allá del radio de las plantas de A2 (R = 450/350/200 m) y en calidad Baja (sin plantas). La
+     textura se muestrea en coordenadas de MUNDO (periodo `period` m, mipmaps + anisotropía), una 2.ª vez rotada a `detailPeriod` m para
+     romper la repetición (suma solo la desviación respecto de la media: no cambia el color promedio). Diales de calibración:
+       gain  [corr, parche]  multiplicador de albedo RGB (calibrado contra el boceto: promedio de las plantas desde el dron / promedio del suelo = 0,76 0,85 1,0)
+       tint                  amplitud del viraje seco/verde por ruido de 25 m (±)
+       noiseK                fracción de la modulación de luminancia (n2, n3) que se conserva sobre la textura (el moteado ya lo da la textura)
+       border/borderW        tinte multiplicativo (más verde) de la franja de borde junto al cultivo y cuánto se aplica (0 = nada)
+       aoK                   fracción de la fuerza del AO de borde que se conserva (la franja ya no es solo oscura: es verde)
+     Calidad Baja (`lowSoil`): sin plantas, el suelo NO se apaga: variante "simple" = una sola muestra de textura de 512², sin 2.ª muestra de
+     detalle, sin ruido fino y sin la franja de AO (setDrawRange a las tapas). Ver handoffs/a4-pasto.md. */
+  tex: {
+    enabled: true,           // ?a4tex=0 (solo ?qa/?debug) vuelve al color plano anterior para comparar
+    period: 16, detailPeriod: 27, detailAmp: 0.55,   // m
+    gain: [[0.73, 0.90, 0.86], [0.74, 0.88, 0.95]], tint: 0.05, noiseK: 0.55,
+    border: [0.80, 1.16, 0.70], borderW: 0.85, aoK: 0.5,
+    size: { full: 1024, lite: 512 }
+  },
+  lowSoil: true,             // Baja ya no dibuja plantas: el suelo (variante "simple") cubre corredor y parche en vez de apagarse
   classes: {
-    "corr-herb":   { color: "#6b5d38", dry: "#75653a", green: "#655d38", alpha: 1.0,  tune: [0.54, 0.62, 1.02] },
-    "parche-herb": { color: "#4d5c33", dry: "#565e34", green: "#485c34", alpha: 1.0,  tune: [0.61, 0.75, 1.06] },
+    "corr-herb":   { color: "#6b5d38", dry: "#75653a", green: "#655d38", alpha: 1.0,  tune: [0.54, 0.62, 1.02], tex: "corr" },     // G5: color/dry/green quedan de respaldo (?a4tex=0); el aspecto lo da la textura `tex`
+    "parche-herb": { color: "#4d5c33", dry: "#565e34", green: "#485c34", alpha: 1.0,  tune: [0.61, 0.75, 1.06], tex: "parche" },
     "bajo":        { color: "#6f8a72", dry: "#788a70", green: "#6b8a76", alpha: 1.0,  tune: [0.62, 0.75, 0.52] },
     "parche-le":   { color: "#2e5026", dry: "#34502a", green: "#2b5028", alpha: 0.45, tune: [1.0, 1.08, 1.28] },
     "corr-le":     { color: "#2e5026", dry: "#34502a", green: "#2b5028", alpha: 0.45, tune: [1.04, 1.10, 1.26] }
@@ -249,7 +269,10 @@ export const A4_FURROWS = {
   tramPeriod: 28, tramGauge: 2.8, tramWidth: 0.5, tramAmp: 0.16,   // huellas de pulverizadora
   rowFade: [350, 900],           // m · tope por distancia de los surcos (la frecuencia en pantalla suele apagarlos antes)
   tramFade: [700, 1500],         // m · huellas
-  classes: ["agri", "zona1", "zona2", "zona3"]
+  classes: ["agri", "zona1", "zona2", "zona3"],
+  /* G5: dial por calidad. false = sin surcos en ese nivel (aunque `soil` sea "completo"). Hoy siguen en Ultra/Alta; se decide con la
+     medición de A7 (paso 4 de PLAN_PASTO). Media ya no los dibuja (soil "sin-surcos") y Baja tampoco. ?surcos=1|0 (solo QA) pisa esto. */
+  byQuality: { ultra: true, alta: true, media: false, baja: false }
 };
 /* Agua (M, Ola 3): render/systems/water.js. Base = #3f7fb5 (leyenda, §4): NO se cambia; somero/profundo son variantes
    de la misma tonalidad. Todo lo demás (ondulación, fresnel, destello, orilla) es textura de render, no dato. */

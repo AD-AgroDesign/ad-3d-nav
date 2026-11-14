@@ -35,6 +35,7 @@ import { HOME_VIEW, params } from "../../core/state.js?v=20261113";
 import { quality } from "../../core/quality.js?v=20261113";
 import { map } from "../../map/style.js?v=20261113";
 import { chainShader } from "./chunks.js?v=20261113";
+import { mulberry32 } from "../../core/geo.js?v=20261113";
 import { extOpacityProp, GLSL_DECL, withReliefU } from "../../terrain/terrain.js?v=20261113";   // A6: relieve
 
 /* ---------- parámetros efectivos (config + URL) ---------- */
@@ -43,6 +44,7 @@ const furrowsWanted = () => {
   const q = DBG ? params.get("surcos") : null;   // solo ?qa/?debug
   return q === "0" ? false : q === "1" ? true : A4_FURROWS.enabled;
 };
+const texWanted = () => A4_GROUND.tex.enabled && !(DBG && params.get("a4tex") === "0");   // ?a4tex=0: solo ?qa/?debug (color plano anterior)
 const groundWanted = () => A4_GROUND.enabled && !(DBG && params.get("a4") === "off")   // ?a4=off: solo ?qa/?debug;
 
 /* ---------- ruido: textura generada en runtime (a4-g2) ----------
@@ -78,6 +80,77 @@ function getNoiseTex() {
 /* Muestreo en GLSL: u = metros / (tamaño de celda × NOISE_C). */
 const GLSL_NOISE_TEX = "uniform sampler2D tNoise;\n";
 const nu = cell => (1 / (cell * NOISE_C)).toFixed(7);
+
+/* ---------- texturas de suelo del corredor y del parche (G5) ----------
+   Pintores de spikes/pasto.html (`corrTex`) en un canvas 2D, sin red. Misma paleta que los pintores de las plantas del boceto, para que el
+   promedio del suelo coincida con el de las plantas de A2 vistas de lejos. Sin costura: cada mancha se dibuja también desplazada ±S cuando
+   cruza el borde. sRGB (la GPU decodifica a lineal; los mipmaps promedian en lineal). Costo: ~2 canvas de 1024² (full) o 512² (lite, Baja);
+   se hace UNA vez en el primer build y se rehace solo si el nivel cambia de tamaño (onQuality). */
+const TEX_SEED = { corr: 77, parche: 91 };
+const SOIL_PAINT = {
+  corr(c, S, r) {   // corredor: mezcla de plantas del PLAN_PASTO §1 (38 % gramíneas, 22 % achicoria, 20 % estrato bajo, 16 % alfalfa, 4 % meliloto)
+    c.fillStyle = "#66704f"; c.fillRect(0, 0, S, S);
+    return [
+      [900, 10, 34, ["#5a6444", "#737d58", "#7d875f", "#6a7550"]],
+      [380, 8, 22, ["#465034", "#4d5839"]],                         // sombras entre matas
+      [2600, 2, 7, ["#56613f", "#74805a", "#808a62", "#8e9670", "#6c7a4a"]],
+      [1500, 1, 2.4, ["#8ea4e0", "#7f98dc", "#9fb2ea"]],            // achicoria
+      [250, 1, 2, ["#dcdbcf", "#e4e3d8"]],                          // melilotos y trébol blanco
+      [350, 1, 2, ["#8a6cc0", "#7a5cb0"]],                          // alfalfa
+      [200, 1, 1.8, ["#d9c446", "#c4507f"]]                         // lotus y trébol rojo
+    ];
+  },
+  parche(c, S, r) {   // pastizal (PLAN_PASTO §5.1: ~70 % gramíneas, 18 % estrato bajo, 6 % achicoria, 4 % alfalfa, 2 % meliloto): más verde/pajizo, menos azul
+    c.fillStyle = "#5b6a41"; c.fillRect(0, 0, S, S);
+    return [
+      [900, 10, 34, ["#52623a", "#667548", "#6f7c4c", "#5d6d42"]],
+      [380, 8, 22, ["#3f4c2e", "#46532f"]],
+      [2600, 2, 7, ["#4f6236", "#6a7a4a", "#7c8750", "#5b7038", "#5f7340"]],
+      [900, 3, 9, ["#8f9160", "#9a9660", "#a39a62"]],               // paja / espigas secas
+      [400, 1, 2.4, ["#8ea4e0", "#7f98dc"]],                        // achicoria (6 %)
+      [60, 1, 2, ["#dcdbcf"]],
+      [90, 1, 2, ["#8a6cc0", "#7a5cb0"]],
+      [190, 1, 1.8, ["#d9c446", "#c4507f", "#e2e0d2"]]
+    ];
+  }
+};
+function paintSoilTex(kind, size) {
+  const cv = document.createElement("canvas"); cv.width = cv.height = size;
+  const c = cv.getContext("2d"), r = mulberry32(TEX_SEED[kind]), sc = size / 1024;
+  const blobs = SOIL_PAINT[kind](c, size, r);
+  /* fill() por mancha: con Path2D por color todo junto es ~13x MAS lento (rasteriza miles de subcaminos solapados). */
+  for (const [n, rmin, rmax, cols] of blobs) for (let i = 0; i < n; i++) {
+    const x = r() * size, y = r() * size, rr = Math.max((rmin + r() * (rmax - rmin)) * sc, 0.6), ry = Math.max(rr * (0.7 + r() * 0.5), 0.6), a = r() * 3, col = cols[Math.floor(r() * cols.length)];
+    const e = Math.max(rr, ry) + 1;
+    c.fillStyle = col;
+    for (const dx of [-size, 0, size]) for (const dy of [-size, 0, size]) {
+      const px = x + dx, py = y + dy;
+      if (px + e < 0 || px - e > size || py + e < 0 || py - e > size) continue;
+      c.beginPath(); c.ellipse(px, py, rr, ry, a, 0, 6.2832); c.fill();
+    }
+  }
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace; tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = size >= 1024 ? 8 : 2; tex.generateMipmaps = true; tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter;
+  return { tex };
+}
+const SOIL = { size: 0, corr: null, parche: null };
+let texMs = 0;
+function ensureSoilTex(lite) {
+  const size = lite ? A4_GROUND.tex.size.lite : A4_GROUND.tex.size.full;
+  if (SOIL.size === size) return SOIL;
+  const t0 = performance.now();
+  for (const k of ["corr", "parche"]) {
+    const o = paintSoilTex(k, size);
+    if (SOIL[k]) {   // cambio de tamaño en caliente: se reemplaza la textura en los uniforms vivos
+      SOIL[k].tex.dispose();
+      for (const key in S) { const u = S[key].gMat.userData.a4u; u["t_" + k].value = o.tex; }
+    }
+    SOIL[k] = o;
+  }
+  SOIL.size = size; texMs = Math.round(performance.now() - t0);
+  return SOIL;
+}
 
 /* ---------- geometría ---------- */
 const MAXC = 8;   // clases de suelo máximas en los uniform arrays
@@ -329,12 +402,14 @@ function makeGroundMaterial(ctx, key, hasH, dTex, dmap) {
   m.blendSrcAlpha = THREE.ZeroFactor; m.blendDstAlpha = THREE.OneFactor;
   ctx.shaderlib.patch(m, { fog: true, fade: key });
 
-  const dry = [], grn = [], alp = [];
+  const dry = [], grn = [], alp = [], sel = [];
+  const TX = A4_GROUND.tex, soil = ensureSoilTex(lite());
   for (let i = 0; i < MAXC; i++) {
     const c = A4_GROUND.classes[CLASS_LIST[i]];
     const tn = c && c.tune ? c.tune : [1, 1, 1];
     dry.push(new THREE.Color(c ? c.dry : "#000000").multiply(new THREE.Color(...tn))); grn.push(new THREE.Color(c ? c.green : "#000000").multiply(new THREE.Color(...tn)));
     alp.push(c ? c.alpha : 1);
+    sel.push(c && texWanted() ? (c.tex === "corr" ? 1 : c.tex === "parche" ? 2 : 0) : 0);   // G5: 0 = color plano (dry/green), 1 = textura de corredor, 2 = de parche
   }
   const U = {
     uDry: { value: dry }, uGrn: { value: grn }, uAlp: { value: alp },
@@ -342,7 +417,14 @@ function makeGroundMaterial(ctx, key, hasH, dTex, dmap) {
     tDepth: { value: dTex }, uDMap: { value: new THREE.Vector4(dmap.x0, dmap.z0, 1 / (dmap.W * dmap.c), 1 / (dmap.H * dmap.c)) },
     uNoise: { value: new THREE.Vector3(A4_GROUND.noise.fine, A4_GROUND.noise.mid, A4_GROUND.noise.coarse) },
     uAO: { value: new THREE.Vector2(A4_GROUND.edgeAO.width, A4_GROUND.edgeAO.strength) },
-    uSoft: { value: new THREE.Vector2(A4_GROUND.reveal.soft, A4_GROUND.reveal.jitter) }
+    uSoft: { value: new THREE.Vector2(A4_GROUND.reveal.soft, A4_GROUND.reveal.jitter) },
+    // G5: texturas de corredor/parche (ver bloque A4_GROUND.tex en config.js)
+    uTexSel: { value: sel }, t_corr: { value: soil.corr.tex }, t_parche: { value: soil.parche.tex },
+    uTexK: { value: new THREE.Vector4(1 / TX.period, 1 / TX.detailPeriod, TX.detailAmp, TX.noiseK) },
+    uTexP: { value: new THREE.Vector4(TX.tint, TX.aoK, TX.borderW, 0) },
+    uTexGainC: { value: new THREE.Vector3(...TX.gain[0]) }, uTexGainP: { value: new THREE.Vector3(...TX.gain[1]) },
+    uBorder: { value: new THREE.Vector3(...TX.border) },
+    uLite: { value: lite() ? 1 : 0 }
   };
   m.userData.a4u = U;
   // Rotaciones por escala (R, R², R³ de 36,87°) para que las 3 octavas no compartan ejes.
@@ -352,28 +434,51 @@ function makeGroundMaterial(ctx, key, hasH, dTex, dmap) {
     if (hasH) withReliefU(sh.uniforms);   // A6 relieve en vivo: textura de alturas y factor k (terrain.js)
     sh.vertexShader = sh.vertexShader
       .replace("#include <common>",
-        "#include <common>\n" + (hasH ? GLSL_DECL : "") + "attribute vec2 aG;\n" + (hasH ? "attribute vec3 aNrm;\n" : "") + "uniform float uAlp[" + MAXC + "];\nuniform vec3 uDry[" + MAXC + "];\nuniform vec3 uGrn[" + MAXC + "];\n" +
-        "varying vec3 vWp;\nflat varying vec3 vDry;\nflat varying vec3 vGrn;\nvarying vec2 vInf;")   // vInf: edge (franja AO), alfa de clase
+        "#include <common>\n" + (hasH ? GLSL_DECL : "") + "attribute vec2 aG;\n" + (hasH ? "attribute vec3 aNrm;\n" : "") + "uniform float uAlp[" + MAXC + "];\nuniform vec3 uDry[" + MAXC + "];\nuniform vec3 uGrn[" + MAXC + "];\nuniform float uTexSel[" + MAXC + "];\n" +
+        "varying vec3 vWp;\nflat varying vec3 vDry;\nflat varying vec3 vGrn;\nflat varying float vTex;\nvarying vec2 vInf;")   // vInf: edge (franja AO), alfa de clase
       .replace("#include <beginnormal_vertex>", hasH ? "vec3 objectNormal = normalize(vec3(aNrm.x * uA6K, aNrm.y, aNrm.z * uA6K));" : "vec3 objectNormal = vec3(0.0, 1.0, 0.0);")   // A6: con terreno, normal del relieve
       .replace("#include <begin_vertex>",
         "vec3 transformed = vec3(position);\n" +
         (hasH ? "transformed.y -= a6Low(transformed.xz);\n" : "") +   // A6 relieve en vivo: baja (1-k)·g(x,z) (todo horneado con relieve completo)
         "int ci = int(aG.x + 0.5);\n" +
         "vWp = (modelMatrix * vec4(transformed, 1.0)).xyz;\n" +
-        "vDry = uDry[ci]; vGrn = uGrn[ci]; vInf = vec2(aG.y, uAlp[ci]);");
+        "vTex = uTexSel[ci]; vDry = uDry[ci]; vGrn = uGrn[ci]; vInf = vec2(aG.y, uAlp[ci]);");
     sh.fragmentShader = sh.fragmentShader
       .replace("#include <common>",
-        "#include <common>\nvarying vec3 vWp;\nflat varying vec3 vDry;\nflat varying vec3 vGrn;\nvarying vec2 vInf;\n" +
+        "#include <common>\nvarying vec3 vWp;\nflat varying vec3 vDry;\nflat varying vec3 vGrn;\nflat varying float vTex;\nvarying vec2 vInf;\n" +
+        "uniform sampler2D t_corr;\nuniform sampler2D t_parche;\nuniform vec4 uTexK;\nuniform vec4 uTexP;\nuniform vec3 uTexGainC;\nuniform vec3 uTexGainP;\nuniform vec3 uBorder;\nuniform float uLite;\n" +
         "uniform sampler2D tDepth;\nuniform vec4 uDMap;\nuniform float uGrow;\nuniform float uGain;\nuniform vec3 uNoise;\nuniform vec2 uAO;\nuniform vec2 uSoft;\n" + GLSL_NOISE_TEX)
       .replace("vec4 diffuseColor = vec4( diffuse, opacity );",
         "vec2 adP = vWp.xz;\n" +
-        "float n1 = texture2D(tNoise, mat2(0.80, -0.60, 0.60, 0.80) * adP * " + SC[0] + ").r;\n" +
+        "vec2 adPx = dFdx(adP), adPy = dFdy(adP);\n" +   // derivadas fuera de las ramas (textureGrad dentro de if: uniforme por primitiva, pero asi no depende del compilador)
         "float n2 = texture2D(tNoise, mat2(0.28, -0.96, 0.96, 0.28) * adP * " + SC[1] + " + vec2(0.37, 0.11)).g;\n" +
         "float n3 = texture2D(tNoise, mat2(-0.352, -0.936, 0.936, -0.352) * adP * " + SC[2] + " + vec2(0.71, 0.53)).b;\n" +
-        "float gmix = smoothstep(0.30, 0.70, n3 * 0.65 + n2 * 0.35);\n" +   // parches de pasto seco ↔ verde
-        "vec3 adCol = mix(vDry, vGrn, gmix);\n" +
-        "adCol *= (1.0 + 2.0 * (uNoise.x * (n1 - 0.5) + uNoise.y * (n2 - 0.5) + uNoise.z * (n3 - 0.5))) * uGain;\n" +
-        "adCol *= 1.0 - uAO.y * smoothstep(0.0, 1.0, vInf.x);\n" +               // AO de borde (franja)
+        "float gmix = smoothstep(0.30, 0.70, n3 * 0.65 + n2 * 0.35);\n" +   // parches de pasto seco <-> verde
+        "vec3 adCol;\n" +
+        "float aoK = 1.0;\n" +
+        "if (vTex > 0.5) {\n" +                                              // G5: corredor / parche con textura de suelo
+        "  vec2 uvA = adP * uTexK.x, dAx = adPx * uTexK.x, dAy = adPy * uTexK.x;\n" +
+        "  vec3 tx;\n" +
+        "  if (vTex < 1.5) tx = textureGrad(t_corr, uvA, dAx, dAy).rgb; else tx = textureGrad(t_parche, uvA, dAx, dAy).rgb;\n" +
+        "  if (uLite < 0.5) {\n" +                                            // 2.a muestra, rotada y a otra escala: rompe la repeticion; suma solo la desviacion (promedio intacto)
+        "    mat2 R = mat2(0.87, -0.50, 0.50, 0.87);\n" +
+        "    vec2 uvB = R * adP * uTexK.y + vec2(0.31, 0.77), dBx = R * adPx * uTexK.y, dBy = R * adPy * uTexK.y;\n" +
+        "    vec3 tb = vTex < 1.5 ? textureGrad(t_corr, uvB, dBx, dBy).rgb : textureGrad(t_parche, uvB, dBx, dBy).rgb;\n" +
+        "    vec3 mn = vTex < 1.5 ? textureLod(t_corr, vec2(0.5), 10.0).rgb : textureLod(t_parche, vec2(0.5), 10.0).rgb;\n" +
+        "    tx += (tb - mn) * uTexK.z;\n" +
+        "  }\n" +
+        "  adCol = max(tx, vec3(0.0)) * (vTex < 1.5 ? uTexGainC : uTexGainP);\n" +
+        "  adCol *= mix(vec3(1.0 + uTexP.x, 1.0 + 0.3 * uTexP.x, 1.0 - 1.5 * uTexP.x), vec3(1.0 - 0.6 * uTexP.x, 1.0, 1.0 + 0.5 * uTexP.x), gmix);\n" +   // seco <-> verde
+        "  adCol *= (1.0 + 2.0 * uTexK.w * (uNoise.y * (n2 - 0.5) + uNoise.z * (n3 - 0.5))) * uGain;\n" +
+        "  adCol *= mix(vec3(1.0), uBorder, uTexP.z * smoothstep(0.0, 1.0, vInf.x));\n" +   // borde verde junto al cultivo (franja de AO)
+        "  aoK = uTexP.y;\n" +
+        "} else {\n" +
+        "  float n1 = 0.5;\n" +
+        "  if (uLite < 0.5) n1 = texture2D(tNoise, mat2(0.80, -0.60, 0.60, 0.80) * adP * " + SC[0] + ").r;\n" +
+        "  adCol = mix(vDry, vGrn, gmix);\n" +
+        "  adCol *= (1.0 + 2.0 * (uNoise.x * (n1 - 0.5) + uNoise.y * (n2 - 0.5) + uNoise.z * (n3 - 0.5))) * uGain;\n" +
+        "}\n" +
+        "adCol *= 1.0 - uAO.y * aoK * smoothstep(0.0, 1.0, vInf.x);\n" +       // AO de borde (franja)
         "float adM = 1.0;\n" +
         "if (uGrow < 0.999) {\n" +                                                 // revelado desde el eje
         "  float span = 1.0 + uSoft.x + uSoft.y;\n" +
@@ -499,8 +604,14 @@ function makeFurrowMaterial(ctx, hasH) {
 /* ---------- el sistema ---------- */
 const S = {};            // scenarioKey → { group, gMesh, fMesh, gMat, fMat, opacity, info }
 const LAYER_OFF = { herbExt: 0.001, woody: 0.001, pattern: 0 };
-let active = groundWanted() && quality.soil !== "apagado";
-let furrowsOn = furrowsWanted() && quality.soil === "completo";
+/* Modo de suelo por calidad: "completo" | "sin-surcos" | "simple" | "apagado". "simple" = Baja con A4_GROUND.lowSoil (Baja ya no dibuja
+   plantas: el suelo la cubre, sin 2.a muestra de textura, sin ruido fino y sin franja de AO). quality.js sigue diciendo soil: "apagado" para
+   Baja; la traduccion vive aca para no tocar archivos ajenos (pedido opcional: renombrar a "simple" en quality.js). */
+const soilMode = q => (q.soil === "apagado" && A4_GROUND.lowSoil ? "simple" : q.soil);
+const lite = () => soilMode(quality) === "simple";
+const furrowsFor = q => furrowsWanted() && soilMode(q) === "completo" && !(!(DBG && params.has("surcos")) && A4_FURROWS.byQuality[q.name] === false);
+let active = groundWanted() && soilMode(quality) !== "apagado";
+let furrowsOn = furrowsFor(quality);
 
 const pfx = key => (key === "inicial" ? "ini" : "multi");
 const setPaint = (id, prop, v) => { if (map.getLayer(id)) map.setPaintProperty(id, prop, v); };
@@ -524,6 +635,8 @@ function syncMapLayers(key) {
 function applyModes() {
   for (const k in S) {
     S[k].gMesh.visible = active;
+    S[k].gMat.userData.a4u.uLite.value = lite() ? 1 : 0;
+    S[k].gMesh.geometry.setDrawRange(0, lite() ? S[k].info.topTris * 3 : Infinity);   // simple: sin la franja de AO (sus triangulos van despues de las tapas)
     if (S[k].fMesh) S[k].fMesh.visible = active && furrowsOn;
     syncMapLayers(k);
   }
@@ -583,8 +696,9 @@ export default {
   },
 
   onQuality(q) {
-    active = groundWanted() && q.soil !== "apagado";
-    furrowsOn = furrowsWanted() && q.soil === "completo";
+    active = groundWanted() && soilMode(q) !== "apagado";
+    furrowsOn = furrowsFor(q);
+    if (active && Object.keys(S).length) ensureSoilTex(soilMode(q) === "simple");   // textura 512 en Baja, 1024 en el resto
     applyModes();
   },
 
@@ -592,7 +706,7 @@ export default {
     for (const k in S) { S[k].gMesh.geometry.dispose(); S[k].gMat.dispose(); S[k].dTex.dispose(); S[k].fMesh.geometry.dispose(); S[k].fMat.dispose(); }
   },
 
-  stats(key) { return S[key] ? { suelo: S[key].info } : {}; }
+  stats(key) { return S[key] ? { suelo: { ...S[key].info, texMs, texSize: SOIL.size, modo: soilMode(quality) } } : {}; }
 };
 
 /* A4 (water.js reutiliza la triangulación del suelo) */
