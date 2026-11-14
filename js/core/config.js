@@ -245,7 +245,7 @@ export const A4_GROUND = {
   tex: {
     enabled: true,           // ?a4tex=0 (solo ?qa/?debug) vuelve al color plano anterior para comparar
     period: 16, detailPeriod: 27, detailAmp: 0.55,   // m
-    gain: [[0.77, 0.88, 0.92], [0.74, 0.88, 0.95]], tint: 0.05, noiseK: 0.55,
+    gain: [[0.73, 0.90, 0.86], [0.74, 0.88, 0.95]], tint: 0.05, noiseK: 0.55,
     border: [0.80, 1.16, 0.70], borderW: 0.85, aoK: 0.5,
     size: { full: 1024, lite: 512 }
   },
