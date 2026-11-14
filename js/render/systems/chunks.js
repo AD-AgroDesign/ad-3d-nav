@@ -9,8 +9,8 @@
      cellSeed(ix, iz, salt) → entero  semilla estable por celda/clase.
      lodKeep(d, near, far) → 0..1   fracción de instancias que sobrevive a distancia d
          (1 - smoothstep(near, far, d); idéntica a la del shader de applyLod).
-     applyLod(material, camUniform, lodUniform)   encadena (no pisa) el onBeforeCompile del
-         material con el raleo/encogimiento por instancia. Requiere, en la geometría de la malla,
+     applyLod(material, camUniform, lodUniform[, opts])   encadena (no pisa) el onBeforeCompile del
+         material con el raleo/encogimiento por instancia (opts.keep = otra curva de raleo en GLSL, G5). Requiere, en la geometría de la malla,
          el atributo instanciado `aRank` (ver addRank). lodUniform.value = Vector4(near, far, band, compMax).
      addRank(geometry, n)   agrega aRank = (i+0.5)/n; las instancias de la celda deben estar en
          orden aleatorio, así el raleo es uniforme.
@@ -80,9 +80,12 @@ export function addRank(geometry, n) {
   geometry.setAttribute("aRank", new THREE.InstancedBufferAttribute(a, 1));
 }
 
-const LOD_GLSL = `{
+/* Curva de raleo por defecto (la de siempre): 1 hasta `near`, 0 desde `far`. G5 (pasto): applyLod acepta otra curva (`opts.keep`). */
+const LOD_KEEP_DEFAULT = "1.0 - smoothstep(uA2Lod.x, uA2Lod.y, lodD)";
+const lodGlsl = keepExpr => `{
   vec3 lodP = vec3(instanceMatrix[3].x, instanceMatrix[3].y, instanceMatrix[3].z);   // A6: y = altura del suelo (con terreno; sin terreno es 0, igual que antes)
-  float lodKeep = 1.0 - smoothstep(uA2Lod.x, uA2Lod.y, distance(uA2Cam, lodP));
+  float lodD = distance(uA2Cam, lodP);
+  float lodKeep = ${keepExpr};
   float lodS = clamp((lodKeep * (1.0 + uA2Lod.z) - aRank) / uA2Lod.z, 0.0, 1.0);
   float lodC = min(uA2Lod.w, inversesqrt(max(lodKeep, 1e-3)));
   transformed *= lodS * vec3(lodC, sqrt(lodC), lodC);
@@ -109,13 +112,16 @@ export function chainShader(material, tag, fn) {
   return material;
 }
 
-export function applyLod(material, camUniform, lodUniform) {
-  return chainShader(material, "a2lod", sh => {
+/* opts (opcional, G5): { keep: expresión GLSL de la fracción que sobrevive en función de `lodD` (distancia a la cámara) y de uA2Lod,
+   tag: texto que distingue el programa en la caché }. Sin opts: la curva de siempre (idéntica a la anterior). */
+export function applyLod(material, camUniform, lodUniform, opts) {
+  const keep = (opts && opts.keep) || LOD_KEEP_DEFAULT;
+  return chainShader(material, opts && opts.keep ? "a2lod-" + (opts.tag || "x") : "a2lod", sh => {
     sh.uniforms.uA2Cam = camUniform;
     sh.uniforms.uA2Lod = lodUniform;
     sh.vertexShader = sh.vertexShader
       .replace("#include <common>", "#include <common>\nattribute float aRank;\nuniform vec3 uA2Cam;\nuniform vec4 uA2Lod;")
-      .replace("#include <project_vertex>", LOD_GLSL + "#include <project_vertex>");
+      .replace("#include <project_vertex>", lodGlsl(keep) + "#include <project_vertex>");
   });
 }
 

@@ -120,6 +120,45 @@ export const TREE_BAKE = { interior: 0.18, bottom: 0.14, trunk: 0.22 };   // ocl
    vegetación EN CUADRO a menos de WIND_IDLE_DIST m (distancia a la esfera de la celda). Rasante (~76 m) y de cerca: se
    mueve; vistas altas/cenitales (> ~250 m del follaje más cercano): no. Tope quality.idleFps (0 = apagado). */
 export const WIND_IDLE_DIST = 250;
+/* G5 · Pasto de corredores y parches (render/systems/grass.js + grassgen.js). Plan: realismo/PLAN_PASTO.md. Reemplaza las matas de GRASS_CLASSES
+   (que quedan solo para el gancho ?pasto=viejo hasta aprobar la hoja G5).
+     cell       lado (m) de la celda de generación bajo demanda, en coordenadas de escena
+     density    plantas por m² con cobertura total (3,2); el factor por calidad la multiplica
+     types      uno por tile del atlas (orden de grassgen.js): asp = ancho/alto de la tarjeta, h = rango de altura real (m)
+     mix        proporción de plantas por clase, por tile (se modula con ruido de mundo cada `patchM` m, como en el boceto)
+     scale      [×cerca, ×lejos, hasta m (cerca), desde m (lejos)]: rampa de escala en GPU (nunca llega a la altura de un árbol)
+     fadeFrom   las plantas desaparecen entre fadeFrom·R y R (después solo queda el suelo de A4)
+     nearM      hasta esa distancia (m) densidad completa; de ahí raleo por rango (aRank, chunks.js applyLod) ∝ (nearM/d)^lodPow (la escala ×2 y la desaparición en R compensan)
+     byQuality  R (m) y factor de densidad por nivel; Baja = sin plantas (el suelo lo resuelve A4)
+     budgetMs   tiempo máximo (ms) de generación por cuadro (siempre se genera al menos 1 celda si hay pendientes)
+     maxCells   tope de celdas cacheadas por escenario (se reciclan las más lejanas)
+     tiers      fracciones de la secuencia de candidatos que se generan según la distancia (las lejanas tienen menos instancias) */
+export const A2_PASTO = {
+  cell: 50, density: 3.2, patchM: 9,
+  types: [
+    { name: "gramíneas A",  asp: 1.0, h: [0.55, 0.95] },
+    { name: "gramíneas B",  asp: 1.0, h: [0.55, 0.95] },
+    { name: "achicoria",    asp: 0.9, h: [0.8, 1.2] },
+    { name: "melilotos",    asp: 0.8, h: [0.8, 1.2] },
+    { name: "alfalfa",      asp: 1.0, h: [0.6, 0.9] },
+    { name: "estrato bajo", asp: 2.0, h: [0.25, 0.4] }
+  ],
+  //             grA   grB   achi  meli  alfa  bajo
+  mix: {
+    "corr-herb":   [0.38, 0.00, 0.22, 0.04, 0.16, 0.20],   // gramíneas A 38 %, achicoria 22 %, bajo 20 %, alfalfa 16 %, meliloto 4 %
+    "parche-herb": [0.35, 0.35, 0.06, 0.02, 0.04, 0.18]    // gramíneas ~70 % (mitad A, mitad B), bajo ~18 %, achicoria ~6 %, alfalfa ~4 %, meliloto ~2 %
+  },
+  scale: [1.3, 2.0, 50, 300],
+  fadeFrom: 0.75,
+  nearM: 35,
+  lodPow: 0.75,
+  lodBand: 0.15,
+  byQuality: { ultra: { R: 450, dens: 1.0 }, alta: { R: 350, dens: 1.0 }, media: { R: 200, dens: 0.6 }, baja: { R: 0, dens: 0 } },
+  budgetMs: 2.0,
+  maxCells: 700,
+  tiers: [0.125, 0.25, 0.5, 1],
+  ao: { amount: 0.72, top: 0.75 }       // mismo oscurecimiento de la base que el boceto: mix(0,28, 1, smoothstep(0, 0,75, y))
+};
 /* === A2: fin === */
 
 /* === A1: inicio === */
