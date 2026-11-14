@@ -404,7 +404,7 @@ const genStats = { cells: 0, total: 0, msMask: 0, nMask: 0, msLoop: 0, msCopy: 0
    próximo (una sola celda en curso a la vez: los buffers de trabajo son compartidos). Así ni una celda llena (~8000 candidatos, unos 4-7 ms)
    produce un cuadro largo. */
 let job = null, frameGen = 0;                                             // frameGen: ms de generación acumulados en el cuadro
-const BLOCK = 192;                                                       // candidatos entre control de tiempo (~0,1-0,2 ms)
+const BLOCK = 128;                                                       // candidatos entre control de tiempo (~0,1-0,2 ms)
 const SIN = new Float32Array(1024), COS = new Float32Array(1024);        // giro por tabla (evita sin/cos por planta)
 for (let i = 0; i < 1024; i++) { SIN[i] = Math.sin(i * TWO_PI / 1024); COS[i] = Math.cos(i * TWO_PI / 1024); }
 
@@ -434,10 +434,12 @@ function startJob(S, cell, tierIdx) {
   cell.job = true;
 }
 
-/* Sigue el trabajo en curso hasta `deadline` (performance.now()); siempre procesa al menos un bloque. Devuelve true si la celda quedó terminada. */
+/* Sigue el trabajo en curso hasta `deadline` (performance.now()). Procesa al menos un bloque si todavía hay tiempo al entrar; si el
+   presupuesto se acabó justo al terminar los candidatos, el pase a buffers (finishJob) queda para el próximo cuadro. Devuelve true si la celda quedó terminada. */
 function runJob(deadline) {
   const J = job, cell = J.cell, x0 = cell.x0, z0 = cell.z0, rnd = J.rnd, mode = J.mode, hasH = J.hasH, M = J.M, Nc = J.Nc, gx0 = J.gx0, gz0 = J.gz0;
   const tl = performance.now();
+  if (J.c >= M) { finishJob(); return true; }                              // los candidatos ya estaban hechos: solo falta pasar a buffers
   const mask = maskBuf, types = PC.types;
   let c = J.c, n = J.n, nCorr = J.nCorr;
   do {
@@ -479,7 +481,7 @@ function runJob(deadline) {
   } while (c < M && performance.now() < deadline);
   J.c = c; J.n = n; J.nCorr = nCorr;
   const now = performance.now(); J.ms += now - tl; genStats.msLoop += now - tl; genStats.slices++; frameGen += now - tl;
-  if (c < M) return false;
+  if (c < M || now >= deadline) return false;
   finishJob();
   return true;
 }
@@ -555,7 +557,7 @@ function updateScenario(S, cam, frame, deadline) {
     const cy = eff(cell), dy = camY - cy;
     const d = Math.sqrt(dx * dx + dz * dz + dy * dy) - cell.rad;
     if (d >= far) continue;
-    const need = Math.min(1, keepAt(d) * (1 + band));
+    const need = Math.min(1, keepAt(Math.max(d - 20, 0)) * (1 + band));   // 20 m de anticipación: la celda sube de resolución antes de que la cámara llegue
     if (need <= 0) continue;
     let ti = 0; while (ti < PC.tiers.length - 1 && PC.tiers[ti] < need) ti++;
     if (cell.tier >= ti) continue;                                         // ya tiene resolución suficiente (o la celda quedó vacía a ese nivel)
@@ -567,7 +569,7 @@ function updateScenario(S, cam, frame, deadline) {
     if (!atlas) ensureAtlas();
     let i = 0;
     for (; i < queue.length; i++) {
-      if (job) break;                                                      // hay una celda en curso (de otro escenario): sigue en el próximo cuadro
+      if (job || performance.now() >= deadline) break;                     // celda en curso (de otro escenario) o sin presupuesto: sigue en el próximo cuadro
       startJob(S, queue[i], queue[i].want);
       if (!runJob(deadline)) { i++; break; }                              // se acabó el presupuesto a mitad de celda: sigue en el próximo cuadro
       if (performance.now() >= deadline) { i++; break; }
@@ -618,6 +620,13 @@ export default {
     const S = { old: false, key: scenarioKey, group, active: [], hiddenMs: 0, mat: null };
     prepare(ctx, S, data);
     S.mat = makeMaterial(ctx, scenarioKey);
+    /* Ancla invisible: las celdas se crean después, y shadows.js (A3, onRenderer) busca en la escena una InstancedMesh con este material
+       (userData.adChunks.wind) para engancharle la recepción de sombra del pasto en Ultra. Sin esta malla no encontraría ninguna. */
+    const bg = getBaseGeo(), ag = new THREE.BufferGeometry();
+    ag.setIndex(bg.index); ag.setAttribute("position", bg.position); ag.setAttribute("uv", bg.uv); ag.setAttribute("normal", bg.normal);
+    const anchor = new THREE.InstancedMesh(ag, S.mat, 1);
+    anchor.count = 0; anchor.visible = false; anchor.frustumCulled = false; anchor.boundingSphere = new THREE.Sphere(); anchor.userData.a2anchor = true;
+    group.add(anchor);
     built[scenarioKey] = S;
     lastQName = quality.name;
     pumpAtlas();   // el atlas se hornea de a pasos en momentos ociosos

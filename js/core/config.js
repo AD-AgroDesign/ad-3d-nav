@@ -154,7 +154,7 @@ export const A2_PASTO = {
   lodPow: 0.75,
   lodBand: 0.15,
   byQuality: { ultra: { R: 450, dens: 1.0 }, alta: { R: 350, dens: 1.0 }, media: { R: 200, dens: 0.6 }, baja: { R: 0, dens: 0 } },
-  budgetMs: 2.5,
+  budgetMs: 2.0,
   maxCells: 700,
   tiers: [0.125, 0.25, 0.5, 1],
   ao: { amount: 0.72, top: 0.75 }       // mismo oscurecimiento de la base que el boceto: mix(0,28, 1, smoothstep(0, 0,75, y))
