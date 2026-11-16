@@ -298,7 +298,7 @@ export const A4_GROUND = {
        los destaque (protagonistas del rediseño). Ya no manda "mismo promedio que las plantas" sino el CONTRASTE contra los lotes. Variantes (pintores en
        ground.js): v0 = G5 original (comparar), v1 pardo oscuro como el viejo, v2 tierra arada húmeda, v3 intermedio con más verde. `variant` = la que sale
        por defecto; ?suelo=v0|v1|v2|v3 (solo ?qa/?debug). Por variante: gain [corr, parche] (albedo RGB sobre la textura) y colores de Baja (promedio de Alta). */
-    variant: "v1",
+    variant: "v3",
     variants: {
       v0: { gain: [[0.73, 0.90, 0.86], [0.74, 0.88, 0.95]] },
       v1: { noiseK: 0.9, gain: [[1, 1, 1], [1, 1, 1]], soilK: { corr: [0.75, 0.76, 0.81], parche: [0.62, 0.72, 0.71] }, lowColor: { "corr-herb": "#51432b", "parche-herb": "#3b4623" }, lowColorExtr: { "corr-herb": "#392e1b", "parche-herb": "#2a3317" } },
