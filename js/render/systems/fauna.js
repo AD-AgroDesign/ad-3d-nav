@@ -15,8 +15,9 @@
    funciones cerradas del tiempo (sin integrar dt: T5 no aplica salvo en el lazo de reposo, que usa max(0, …)). */
 import * as THREE from "three";
 import { idleDriver } from "../idle.js?v=20261113";
-import { A5_FAUNA, TREE_SPECIES } from "../../core/config.js?v=20261113";
+import { A5_FAUNA, GRASS_CLASSES, TREE_SPECIES } from "../../core/config.js?v=20261113";
 import { state } from "../../core/state.js?v=20261113";
+import { scatterInClasses } from "../../core/geo.js?v=20261113";
 import { quality } from "../../core/quality.js?v=20261113";
 import { uniforms } from "../lighting.js?v=20261113";
 import { patch } from "../shaderlib.js?v=20261113";
@@ -171,11 +172,20 @@ function birdTarget(key) {
   return Math.min(Math.round(multi * C.ratioInicial), Math.round(nI / CB.treesPerBird * 0.8));
 }
 
-function buildFlocks(ctx, key, trees, grass) {
+/* G5: anclas de fauna sobre los polígonos herbáceos (_cls del FeatureCollection), sin depender de las matas viejas (veg.grass).
+   Muestreo determinista propio: semilla fija por escenario y clase, densidad = la de las matas viejas / porMata (misma narrativa y zonas). */
+const HERB_SEED = { inicial: 13072026, multi: 62027031 };
+function herbPoints(fc, key, cls, perPlant, frac = 1) {
+  const cfg = GRASS_CLASSES[cls];
+  if (!fc || !cfg || !(frac > 0)) return [];
+  const k = Object.keys(GRASS_CLASSES).indexOf(cls);
+  return scatterInClasses(fc, [cls], HERB_SEED[key] + k * 977 + 5, cfg.density * frac / perPlant, cfg.max * frac / perPlant, 0).points;
+}
+
+function buildFlocks(ctx, key, trees, fc) {
   const rng = ctx.rng(C.seed + (key === "multi" ? 2 : 1));
   const withXZ = trees.map(t => ({ xz: ctx.toScene(t.lon, t.lat) }));
-  const corr = (grass && grass["corr-herb"]) || [], corrXZ = [];
-  for (let i = 0; i < corr.length; i += 40) corrXZ.push(ctx.toScene(corr[i].lon, corr[i].lat));
+  const corrXZ = herbPoints(fc, key, "corr-herb", 40).map(([lon, lat]) => ctx.toScene(lon, lat));
   const anchors = findAnchors(withXZ, corrXZ);
   const target = birdTarget(key);
   const flocks = [];
@@ -351,7 +361,7 @@ export default {
     const materials = [];
 
     /* ---- aves ---- */
-    const flocks = buildFlocks(ctx, key, (veg && veg.trees) || [], veg && veg.grass);
+    const flocks = buildFlocks(ctx, key, (veg && veg.trees) || [], data);
     info.flocks = flocks;
     const slots = [];                           // orden round-robin entre bandadas: un prefijo es un raleo uniforme (Media = 50 %)
     for (let k = 0; k < CB.flockSize[1]; k++) for (const fl of flocks) if (k < fl.birds.length) slots.push([fl, fl.birds[k]]);
@@ -378,16 +388,12 @@ export default {
 
     /* ---- polinizadores ---- */
     const frac = key === "multi" ? 1 : CF.inicial;
-    const grass = veg && veg.grass;
-    if (frac > 0 && grass) {
-      const rng = ctx.rng(C.seed + 10 + (key === "multi" ? 2 : 1));
+    if (frac > 0 && data) {
       let homes = [];
       for (const [cls, per] of Object.entries(CF.tuftsPerButterfly)) {
-        const list = grass[cls]; if (!list || !list.length) continue;
-        const stride = Math.max(1, Math.round(per / frac));
-        for (let i = Math.floor(rng() * stride); i < list.length; i += stride) {
-          const t = list[i], xz = ctx.toScene(t.lon, t.lat);
-          homes.push({ x: xz[0], z: xz[1], gy: ctx.heightAt(t.lon, t.lat) });
+        for (const [lon, lat] of herbPoints(data, key, cls, per, frac)) {
+          const xz = ctx.toScene(lon, lat);
+          homes.push({ x: xz[0], z: xz[1], gy: ctx.heightAt(lon, lat) });
         }
       }
       if (homes.length > CF.max) { const st = homes.length / CF.max; homes = Array.from({ length: CF.max }, (_, i) => homes[Math.floor(i * st)]); }
