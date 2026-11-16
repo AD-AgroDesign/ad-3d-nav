@@ -129,6 +129,7 @@ export const WIND_IDLE_DIST = 250;
      scale      [×cerca, ×lejos, hasta m (cerca), desde m (lejos)]: rampa de escala en GPU (nunca llega a la altura de un árbol)
      fadeFrom   las plantas desaparecen entre fadeFrom·R y R (después solo queda el suelo de A4)
      nearM      hasta esa distancia (m) densidad completa; de ahí raleo por rango (aRank, chunks.js applyLod) ∝ (nearM/d)^lodPow (la escala ×2 y la desaparición en R compensan)
+     innerM/K   raleo interior: dentro de innerM m la densidad baja suave hasta innerK (solo GPU; ronda de rendimiento a pie)
      byQuality  R (m) y factor de densidad por nivel; Baja = sin plantas (el suelo lo resuelve A4)
      budgetMs   tiempo máximo (ms) de generación por cuadro (siempre se genera al menos 1 celda si hay pendientes)
      maxCells   tope de celdas cacheadas por escenario (se reciclan las más lejanas)
@@ -150,11 +151,11 @@ export const A2_PASTO = {
   },
   scale: [1.3, 2.0, 50, 300],
   fadeFrom: 0.75,
-  nearM: 20,
+  nearM: 18,
   lodPow: 0.85,
   innerM: 20, innerK: 0.35,                 // raleo interior: dentro de innerM m la densidad baja suave hasta innerK (0/1 = apagado)
   lodBand: 0.15,
-  byQuality: { ultra: { R: 450, dens: 0.75 }, alta: { R: 350, dens: 0.75 }, media: { R: 200, dens: 0.6 }, baja: { R: 0, dens: 0 } },
+  byQuality: { ultra: { R: 450, dens: 0.75 }, alta: { R: 350, dens: 0.65 }, media: { R: 200, dens: 0.6 }, baja: { R: 0, dens: 0 } },
   budgetMs: 2.0,
   maxCells: 700,
   tiers: [0.125, 0.25, 0.5, 1],
