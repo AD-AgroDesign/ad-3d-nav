@@ -288,7 +288,12 @@ export const A4_GROUND = {
     border: [0.80, 1.16, 0.70], borderW: 0.85, aoK: 0.5,
     size: { full: 1024, lite: 512 }
   },
-  lowSoil: true,             // Baja ya no dibuja plantas: el suelo (variante "simple") cubre corredor y parche en vez de apagarse
+  lowSoil: true,             // Baja ya no dibuja plantas: el suelo cubre corredor y parche en vez de apagarse
+  /* G5b: como se resuelve el suelo de Baja. "color" (por defecto) = SIN malla Three: se recolorean las capas MapLibre herb-ext (que Baja ya dibujaba)
+     con el promedio de Alta de lejos (costo extra 0). "textura" = la variante "simple" anterior (malla + 1 textura 512²; +6 ms en la Intel HD 520). */
+  lowSoilMode: "color",
+  lowColor: { "corr-herb": "#6c7652", "parche-herb": "#6a754c", opacity: 1 },   // promedio de Alta de lejos (calibrado con tools/qa/a4_px.mjs); con terreno la capa es `fill` (sin luz)
+  lowColorExtr: { "corr-herb": "#5a623e", "parche-herb": "#58623d" },          // sin terreno la capa es fill-extrusion: MapLibre la ilumina (~+13 %), se compensa
   classes: {
     "corr-herb":   { color: "#6b5d38", dry: "#75653a", green: "#655d38", alpha: 1.0,  tune: [0.54, 0.62, 1.02], tex: "corr" },     // G5: color/dry/green quedan de respaldo (?a4tex=0); el aspecto lo da la textura `tex`
     "parche-herb": { color: "#4d5c33", dry: "#565e34", green: "#485c34", alpha: 1.0,  tune: [0.61, 0.75, 1.06], tex: "parche" },
