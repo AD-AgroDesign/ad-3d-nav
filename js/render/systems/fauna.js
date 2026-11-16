@@ -15,7 +15,7 @@
    funciones cerradas del tiempo (sin integrar dt: T5 no aplica salvo en el lazo de reposo, que usa max(0, …)). */
 import * as THREE from "three";
 import { idleDriver } from "../idle.js?v=20261113";
-import { A5_FAUNA, GRASS_CLASSES, TREE_SPECIES } from "../../core/config.js?v=20261113";
+import { A5_FAUNA, TREE_SPECIES } from "../../core/config.js?v=20261113";
 import { state } from "../../core/state.js?v=20261113";
 import { scatterInClasses } from "../../core/geo.js?v=20261113";
 import { quality } from "../../core/quality.js?v=20261113";
@@ -172,13 +172,13 @@ function birdTarget(key) {
   return Math.min(Math.round(multi * C.ratioInicial), Math.round(nI / CB.treesPerBird * 0.8));
 }
 
-/* G5: anclas de fauna sobre los polígonos herbáceos (_cls del FeatureCollection), sin depender de las matas viejas (veg.grass).
+/* G5: anclas de fauna sobre los polígonos herbáceos (_cls del FeatureCollection), sin depender de las matas viejas (retiradas).
    Muestreo determinista propio: semilla fija por escenario y clase, densidad = la de las matas viejas / porMata (misma narrativa y zonas). */
 const HERB_SEED = { inicial: 13072026, multi: 62027031 };
 function herbPoints(fc, key, cls, perPlant, frac = 1) {
-  const cfg = GRASS_CLASSES[cls];
+  const cfg = C.herbAnchors[cls];
   if (!fc || !cfg || !(frac > 0)) return [];
-  const k = Object.keys(GRASS_CLASSES).indexOf(cls);
+  const k = cfg.k;
   return scatterInClasses(fc, [cls], HERB_SEED[key] + k * 977 + 5, cfg.density * frac / perPlant, cfg.max * frac / perPlant, 0).points;
 }
 

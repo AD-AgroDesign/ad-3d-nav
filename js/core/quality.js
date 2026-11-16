@@ -12,8 +12,6 @@ export const LEVELS = ["ultra", "alta", "media", "baja"];
 /* Tabla de §6.4. Qué haría cada parámetro cuando lo consuma su dueño:
      msaa            antialias del contexto WebGL (true/false; "gpu" = sí salvo GPU de gama baja)
      pixelRatioCap   tope de devicePixelRatio del mapa
-     grassDensity    factor sobre GRASS_CLASSES (1 = actual; "movil" = presupuesto móvil actual)
-     grassLodDist    distancia (m) de LOD del pasto
      treeCardDist    follaje en tarjetas hasta esa distancia; treeImpostorDist: impostor desde ahí
      shadows         tamaño del shadow map (0 = sombras blob actuales)
      soil / fauna / water   suelo por shader, fauna, agua por shader
@@ -21,10 +19,10 @@ export const LEVELS = ["ultra", "alta", "media", "baja"];
                      conmutador "Relieve del terreno" (localStorage ad_relieve), en cualquier nivel
      idleFps         tope del lazo de animación en reposo (0 = apagado) */
 export const LEVEL_PARAMS = {
-  ultra: { msaa: true,  pixelRatioCap: 2,    grassDensity: 1,       grassLodDist: 1400, treeCardDist: 900, treeImpostorDist: Infinity, shadows: 4096, soil: "completo",   fauna: 1,   water: "shader", idleFps: 30, terrain: "salvo-baja" },   // conmutadores (Mike 2026-11-13): relieve por defecto salvo GPU de gama baja
-  alta:  { msaa: "gpu", pixelRatioCap: 1.5,  grassDensity: 1,       grassLodDist: 1000, treeCardDist: 600, treeImpostorDist: Infinity, shadows: 2048, soil: "completo",   fauna: 1,   water: "shader", idleFps: 30, terrain: "salvo-baja" },
-  media: { msaa: "gpu", pixelRatioCap: 1.25, grassDensity: "movil", grassLodDist: 600,  treeCardDist: 300, treeImpostorDist: 1500,     shadows: 1024, soil: "sin-surcos", fauna: 0.5, water: "shader", idleFps: 20, terrain: false },
-  baja:  { msaa: false, pixelRatioCap: 1,    grassDensity: 0.5,     grassLodDist: 400,  treeCardDist: 0,   treeImpostorDist: 0,        shadows: 0,    soil: "apagado",    fauna: 0,   water: "plano",  idleFps: 0, terrain: false }
+  ultra: { msaa: true,  pixelRatioCap: 2,    treeCardDist: 900, treeImpostorDist: Infinity, shadows: 4096, soil: "completo",   fauna: 1,   water: "shader", idleFps: 30, terrain: "salvo-baja" },   // conmutadores (Mike 2026-11-13): relieve por defecto salvo GPU de gama baja
+  alta:  { msaa: "gpu", pixelRatioCap: 1.5,  treeCardDist: 600, treeImpostorDist: Infinity, shadows: 2048, soil: "completo",   fauna: 1,   water: "shader", idleFps: 30, terrain: "salvo-baja" },
+  media: { msaa: "gpu", pixelRatioCap: 1.25, treeCardDist: 300, treeImpostorDist: 1500,     shadows: 1024, soil: "sin-surcos", fauna: 0.5, water: "shader", idleFps: 20, terrain: false },
+  baja:  { msaa: false, pixelRatioCap: 1,    treeCardDist: 0,   treeImpostorDist: 0,        shadows: 0,    soil: "apagado",    fauna: 0,   water: "plano",  idleFps: 0, terrain: false }
 };
 
 const LS_KEY = "ad_calidad";

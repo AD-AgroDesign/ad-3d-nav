@@ -1,4 +1,4 @@
-import { CROWN_PALETTE, GRASS_CLASSES, NATURE_CLASSES, WOODY_CLASSES } from "../core/config.js?v=20261113";
+import { CROWN_PALETTE, NATURE_CLASSES, WOODY_CLASSES } from "../core/config.js?v=20261113";
 import { blobRing, normalizeGeometry, offsetRing, ringAreaHa, ringBBox, scatterInClasses } from "../core/geo.js?v=20261113";
 import { HOME_VIEW, setHomeView, state } from "../core/state.js?v=20261113";
 import { map, mapStyle } from "./style.js?v=20261113";
@@ -81,8 +81,6 @@ export async function loadData() {
   computeHomeView();
   state.veg.inicial = generateTreeData(ini, 20260711);
   state.veg.multi = generateTreeData(multi, 47110226);
-  state.veg.inicial.grass = generateGrassData(ini, 13072026);
-  state.veg.multi.grass = generateGrassData(multi, 62027031);
 }
 
 export function computeStats() {
@@ -189,23 +187,3 @@ export function generateTreeData(fc, seed) {
   return { trees, shadows: { type: "FeatureCollection", features: shadowFeats } };
 }
 
-/* Puntos de matas de pasto (una pasada por clase, con su paleta;
-   la densidad y el tope se aplican por clase) */
-export function generateGrassData(fc, seed) {
-  const byClass = {};
-  Object.entries(GRASS_CLASSES).forEach(([cls, cfg], k) => {
-    const { points, rng } = scatterInClasses(fc, [cls], seed + k * 977, cfg.density, cfg.max, 2);
-    const tufts = [];
-    for (const [lon, lat] of points) {
-      tufts.push({
-        lon, lat,
-        h: 0.55 + rng() * 0.75,                     // altura 0,55–1,3 m
-        c: cfg.palette[Math.floor(rng() * cfg.palette.length)],
-        j: rng(),
-        v: cfg.alt && rng() < cfg.alt.share ? 1 : 0 // 1 = variante sin flor
-      });
-    }
-    byClass[cls] = tufts;
-  });
-  return byClass;
-}

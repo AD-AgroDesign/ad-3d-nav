@@ -2,8 +2,7 @@
    Dueño: A2. Plan: realismo/PLAN_PASTO.md §3.1 y §3.2. Contrato de sistema: §6.3.
 
    Reemplaza a las matas de la Ola 1-2 (la decisión de Mike del 2026-11-14 retira la regla "las matas aprobadas no cambian").
-   Las matas viejas (GRASS_CLASSES + generateGrassData + TUFT_GEOS) solo se dibujan con `?pasto=viejo` (y solo con ?qa/?debug),
-   para la hoja de comparación G5; se retiran al aprobarla.
+   Las matas viejas (GRASS_CLASSES, generateGrassData, TUFT_GEOS y el gancho ?pasto=viejo) se retiraron al aprobarse la hoja G5.
 
    CÓMO FUNCIONA
    - Plantas = 3 tarjetas cruzadas (6 triángulos) con un atlas procedural de 6 tiles (grassgen.js). Un solo atlas y un solo material
@@ -29,22 +28,21 @@
    alphaTest siempre; alphaToCoverage si el contexto tiene MSAA. El alfa del canvas queda intacto por shaderlib.keepFramebufferAlpha
    (mezcla personalizada: color = fuente, alfa = destino) porque el material lleva alphaTest/alphaToCoverage.
 
-   QA (solo ?qa/?debug): ?pasto=viejo · ?pastoms=<ms de presupuesto> · window.__nav3dGrass { settle(), flush(), stats(), budget(ms) }. */
+   QA (solo ?qa/?debug): ?pastoms=<ms de presupuesto> · window.__nav3dGrass { settle(), flush(), stats(), budget(ms) }. */
 import * as THREE from "three";
-import { A2_PASTO as PC, CHUNK_CELL_GRASS, GRASS_CLASSES, GRASS_AO, GRASS_LOD_BAND, GRASS_LOD_COMP_MAX, GRASS_LOD_FAR_MULT, GRASS_LOD_NEAR_MULT, GRASS_SCALE, WIND_IDLE_DIST } from "../../core/config.js?v=20261113";
+import { A2_PASTO as PC, WIND_IDLE_DIST } from "../../core/config.js?v=20261113";
 import { quality } from "../../core/quality.js?v=20261113";
 import { params } from "../../core/state.js?v=20261113";
 import { mulberry32 } from "../../core/geo.js?v=20261113";
 import { patch } from "../shaderlib.js?v=20261113";
 import { idleDriver } from "../idle.js?v=20261113";
-import { ChunkLod, addRank, applyAO, applyLod, cellSeed, chainShader, partitionCells, shuffleDet } from "./chunks.js?v=20261113";
+import { applyAO, applyLod, cellSeed, chainShader } from "./chunks.js?v=20261113";
 import { map } from "../../map/style.js?v=20261113";
 import { fitSpheres, lowAt, terrain } from "../../terrain/terrain.js?v=20261113";   // A6 relieve en vivo
 import { uniforms } from "../lighting.js?v=20261113";
 import { GRASS_ATLAS, GRASS_TILE_COUNT, createAtlasJob } from "./grassgen.js?v=20261113";
 
 const DBG = params.has("qa") || params.has("debug");
-const OLD = DBG && params.get("pasto") === "viejo";                       // gancho de comparación G5
 /* ?pastocfg={"nearM":40,"lodPow":0.8,"byQuality":{"alta":{"R":300,"dens":1}}} se mezcla sobre A2_PASTO (solo ?qa/?debug; para afinar diales con capturas) */
 if (DBG && params.get("pastocfg")) {
   try { const o = JSON.parse(params.get("pastocfg")); for (const k in o) { if (o[k] && typeof o[k] === "object" && !Array.isArray(o[k])) { for (const j in o[k]) PC[k][j] = (o[k][j] && typeof o[k][j] === "object" && !Array.isArray(o[k][j])) ? Object.assign(PC[k][j] || {}, o[k][j]) : o[k][j]; } else PC[k] = o[k]; } }
@@ -53,118 +51,6 @@ if (DBG && params.get("pastocfg")) {
 const BUDGET_QA = DBG && Number(params.get("pastoms")) > 0 ? Number(params.get("pastoms")) : 0;
 
 const _fr = new THREE.Frustum(), _sp = new THREE.Sphere();
-
-/* =====================================================================================================
-   CAMINO VIEJO (solo con ?pasto=viejo): matas de 4 hojas de la Ola 1-2, sin cambios (hasta aprobar G5)
-   ===================================================================================================== */
-export function buildTuftGeometry(blades = 4, tip = [1.25, 1.15, 0.8], baseCol = [0.5, 0.47, 0.4], mid = null, midCol = null) {
-  const pos = [], col = [], idx = [];
-  for (let b = 0; b < blades; b++) {
-    const a = (b / blades) * Math.PI * 2 + b * 0.9;
-    const dx = Math.cos(a), dz = Math.sin(a);
-    const bw = 0.1;                                 // media base de la hoja
-    const px = -dz * bw, pz = dx * bw;              // perpendicular a la hoja
-    const r0 = 0.06, r2 = 0.34;                     // inclinación hacia afuera
-    const h2 = 0.9 + ((b * 37) % 12) / 60;
-    const v0 = pos.length / 3;
-    pos.push(dx * r0 - px, 0, dz * r0 - pz, dx * r0 + px, 0, dz * r0 + pz);
-    col.push(baseCol[0], baseCol[1], baseCol[2], baseCol[0], baseCol[1], baseCol[2]);
-    if (mid) {
-      const rm = r0 + (r2 - r0) * mid, hm = h2 * mid, wm = 1 - (1 - 0.22) * mid;
-      pos.push(dx * rm - px * wm, hm, dz * rm - pz * wm, dx * rm + px * wm, hm, dz * rm + pz * wm);
-      col.push(midCol[0], midCol[1], midCol[2], midCol[0], midCol[1], midCol[2]);
-      idx.push(v0, v0 + 1, v0 + 3, v0, v0 + 3, v0 + 2);
-    }
-    const t = pos.length / 3;
-    pos.push(dx * r2 + px * 0.22, h2, dz * r2 + pz * 0.22, dx * r2 - px * 0.22, h2, dz * r2 - pz * 0.22);
-    col.push(tip[0], tip[1], tip[2], tip[0], tip[1], tip[2]);
-    idx.push(t - 2, t - 1, t, t - 2, t, t + 1);
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
-  g.setIndex(idx);
-  g.computeVertexNormals();
-  return g;
-}
-
-/* Se llena solo con el gancho ?pasto=viejo (antes se armaba siempre al importar el módulo) */
-export const TUFT_GEOS = {};
-function ensureOldGeos() {
-  if (TUFT_GEOS._ready) return;
-  for (const [cls, cfg] of Object.entries(GRASS_CLASSES)) {
-    TUFT_GEOS[cls] = buildTuftGeometry(4, cfg.tip, cfg.base, cfg.mid, cfg.midCol);
-    if (cfg.alt) TUFT_GEOS[cls + "/alt"] = buildTuftGeometry(4, cfg.alt.tip, cfg.alt.base, cfg.alt.mid, cfg.alt.midCol);
-  }
-  Object.defineProperty(TUFT_GEOS, "_ready", { value: true, enumerable: false });
-}
-const labelSalt = s => [...s].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7);
-
-const oldLodU = { value: new THREE.Vector4(600, 3000, GRASS_LOD_BAND, GRASS_LOD_COMP_MAX) };
-function setOldLod(q) {
-  const d = q.grassLodDist === Infinity ? 1e9 : q.grassLodDist;
-  oldLodU.value.set(d * GRASS_LOD_NEAR_MULT, d * GRASS_LOD_FAR_MULT, GRASS_LOD_BAND, GRASS_LOD_COMP_MAX);
-}
-
-function buildOld(ctx, scenarioKey, veg) {
-  ensureOldGeos();
-  const grass = veg.grass;
-  const group = new THREE.Group();
-  const meshes = [];
-  const lod = new ChunkLod();
-  let grassMat = null;
-  if (grass && Object.values(grass).some(t => t.length)) {
-    grassMat = new THREE.MeshPhongMaterial({ color: 0xffffff, flatShading: true, shininess: 0, vertexColors: true, side: THREE.DoubleSide });
-    patch(grassMat, { wind: true, fog: true, fade: scenarioKey });
-    applyLod(grassMat, ctx.uniforms.uCamPos, oldLodU);
-    applyAO(grassMat, GRASS_AO.amount, 0, GRASS_AO.top);
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), eul = new THREE.Euler(), col = new THREE.Color();
-    const pos = new THREE.Vector3(), scl = new THREE.Vector3();
-    for (const [cls, list] of Object.entries(grass)) {
-      if (!list.length) continue;
-      const batches = [[cls, TUFT_GEOS[cls], list.filter(t => !t.v)]];
-      if (TUFT_GEOS[cls + "/alt"]) batches.push([cls + "/alt", TUFT_GEOS[cls + "/alt"], list.filter(t => t.v)]);
-      batches.forEach(([label, geo, sub]) => {
-        if (!sub.length) return;
-        const withXZ = sub.map(t => ({ t, xz: ctx.toScene(t.lon, t.lat), gy: ctx.heightAt(t.lon, t.lat) }));
-        const cells = partitionCells(withXZ, CHUNK_CELL_GRASS, o => o.xz);
-        for (const cell of cells.values()) {
-          shuffleDet(cell.items, cellSeed(cell.ix, cell.iz, labelSalt(label)));
-          const n = cell.items.length;
-          const cg = geo.clone();
-          addRank(cg, n);
-          const tufts = new THREE.InstancedMesh(cg, grassMat, n);
-          cell.items.forEach(({ t, xz, gy }, i) => {
-            const [x, z] = xz;
-            eul.set(0, t.j * Math.PI * 2, 0);
-            m.compose(pos.set(x, gy, z), q.setFromEuler(eul), scl.set(t.h * 0.9 * GRASS_SCALE, t.h * GRASS_SCALE, t.h * 0.9 * GRASS_SCALE));
-            tufts.setMatrixAt(i, m);
-            col.setHex(t.c).offsetHSL(0, 0, (t.j - 0.5) * 0.09);
-            tufts.setColorAt(i, col);
-          });
-          tufts.instanceMatrix.needsUpdate = true;
-          if (tufts.instanceColor) tufts.instanceColor.needsUpdate = true;
-          lod.add(tufts, n);
-          tufts.boundingSphere.radius += 1.5;
-          group.add(tufts);
-          meshes.push({ label, n, mesh: tufts });
-        }
-      });
-    }
-  }
-  return { old: true, grassMat, group, lod, meshes };
-}
-
-function updateOld(frame, b) {
-  const c = frame.camPosScene, lod = oldLodU.value;
-  b.visibleChunks = b.lod.update(c, lod.x, lod.y, lod.z);
-  for (const k of b.lod.chunks) {
-    if (!k.mesh.visible) continue;
-    const kcy = k.cy - lowAt(k.cx, k.cz);
-    if (Math.hypot(c.x - k.cx, c.y - kcy, c.z - k.cz) - k.r < WIND_IDLE_DIST && _fr.intersectsSphere(_sp.set(_sp.center.set(k.cx, kcy, k.cz), k.r))) return true;
-  }
-  return false;
-}
 
 /* =====================================================================================================
    CAMINO NUEVO (G5): celdas bajo demanda
@@ -615,13 +501,8 @@ export default {
 
   build(ctx, scenarioKey, data, veg) {
     CTX = ctx;
-    if (OLD) {
-      const b = built[scenarioKey] = buildOld(ctx, scenarioKey, veg);
-      setOldLod(quality);
-      return { object3d: b.group, materials: b.grassMat ? [b.grassMat] : [] };
-    }
     const group = new THREE.Group();
-    const S = { old: false, key: scenarioKey, group, active: [], hiddenMs: 0, mat: null };
+    const S = { key: scenarioKey, group, active: [], hiddenMs: 0, mat: null };
     prepare(ctx, S, data);
     S.mat = makeMaterial(ctx, scenarioKey);
     /* Ancla invisible: las celdas se crean después, y shadows.js (A3, onRenderer) busca en la escena una InstancedMesh con este material
@@ -649,7 +530,6 @@ export default {
     const tg = performance.now(), deadline = tg + (budgetOverride || BUDGET_QA || PC.budgetMs);
     if (job) { if (visibleScenario(job.S)) runJob(deadline); else { job.cell.job = false; job = null; } }   // sigue la celda que quedó a medias
     for (const b of Object.values(built)) {
-      if (b.old) { if (visibleScenario(b) && updateOld(frame, b)) windNear = true; continue; }
       if (!visibleScenario(b)) {                                            // escenario oculto: pasados unos segundos suelta sus celdas
         b.hiddenMs += frame.dt || 16;
         if (b.hiddenMs > 3000 && b.active.length) releaseAll(b);
@@ -667,11 +547,10 @@ export default {
   },
 
   onQuality(q) {
-    setOldLod(q);
     applyQuality();
     if (lastQName !== q.name) {                                             // R y densidad cambian: se regeneran las celdas
       lastQName = q.name;
-      for (const b of Object.values(built)) if (!b.old) releaseAll(b);
+      for (const b of Object.values(built)) releaseAll(b);
       map.triggerRepaint();
     }
   },
@@ -679,11 +558,6 @@ export default {
   /* Para __nav3d.stats(). Las instancias de las celdas activas son las GENERADAS (la CPU dibuja menos, según el LOD: `grassDibujadas`). */
   stats(scenarioKey) {
     const b = built[scenarioKey];
-    if (b && b.old) {
-      const grass = {};
-      for (const { label, n } of b.meshes) grass[label] = (grass[label] || 0) + n;
-      return { pasto: "viejo", grass, grassTotal: Object.values(grass).reduce((s, n) => s + n, 0), grassChunks: b.meshes.length, grassChunksVisibles: b.visibleChunks ?? b.meshes.length };
-    }
     if (!b) return { grass: {}, grassTotal: 0, grassChunks: 0, grassChunksVisibles: 0 };
     let gen = 0, drawn = 0, vis = 0, corr = 0, nTiers = [0, 0, 0, 0];
     for (const cell of b.active) { gen += cell.n; corr += cell.nCorr || 0; nTiers[cell.tier] = (nTiers[cell.tier] || 0) + 1; if (cell.mesh.visible) { vis++; drawn += cell.mesh.count; } }
@@ -713,7 +587,7 @@ if (DBG) {
       for (let it = 0; it < 8; it++) {
         _fr.setFromProjectionMatrix(lastVP);
         let pend = 0;
-        for (const b of Object.values(built)) if (!b.old && visibleScenario(b)) {
+        for (const b of Object.values(built)) if (visibleScenario(b)) {
           if (job && job.S === b) while (job && !runJob(Infinity));
           const r = updateScenario(b, lastCam, lastFrame, Infinity); pend += r.pending; n++;
         }
@@ -723,11 +597,11 @@ if (DBG) {
       map.triggerRepaint();
       return n;
     },
-    flush() { for (const b of Object.values(built)) if (!b.old) releaseAll(b); map.triggerRepaint(); },
+    flush() { for (const b of Object.values(built)) releaseAll(b); map.triggerRepaint(); },
     budget(ms) { budgetOverride = ms; },
     resetGenStats() { genStats.msMask = genStats.nMask = genStats.msLoop = genStats.msCopy = genStats.cand = 0; genStats.cells = 0; genStats.total = 0; genStats.ri = 0; genStats.nFrames = 0; genStats.lastFrame = 0; genStats.maxCell = 0; genStats.ring.fill(0); },
     ensureAtlas() { return ensureAtlas(); },
-    cells(key) { const b = built[key]; return b && !b.old ? b.active.map(c => ({ ix: c.ix, iz: c.iz, cx: c.cx, cz: c.cz, n: c.n, tier: c.tier, d: +c.d.toFixed(1), count: c.mesh.count, vis: c.mesh.visible, fc: +c.fc.toFixed(2), fp: +c.fp.toFixed(2), yc: c.yc })) : []; },
+    cells(key) { const b = built[key]; return b ? b.active.map(c => ({ ix: c.ix, iz: c.iz, cx: c.cx, cz: c.cz, n: c.n, tier: c.tier, d: +c.d.toFixed(1), count: c.mesh.count, vis: c.mesh.visible, fc: +c.fc.toFixed(2), fp: +c.fp.toFixed(2), yc: c.yc })) : []; },
     built,
     genStats
   };

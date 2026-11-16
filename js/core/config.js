@@ -33,49 +33,11 @@ export const CROWN_PALETTE = [0x2a4f22, 0x33602a, 0x3e6d2f, 0x4a7434, 0x567c38, 
 export const WOODY_BASE = { color: "#2e5026", height: 1.2, opacity: 0.45 };
 export const HERB_HEIGHT = 0.6;
 
-/* Matas de pasto: corredores herbáceos (pardo) y parches herbáceos
-   (verde; el gradiente de vértices les da las puntas doradas).
-   Presupuesto por clase: los corredores son los protagonistas y mantienen
-   densidad plena; los parches, mucho más extensos, van con tope menor
-   (midió 20 fps en el peor caso con tope pleno en ambos). */
 export const IS_MOBILE = window.matchMedia("(max-width: 760px)").matches;
-export const GRASS_CLASSES = {
-  "corr-herb": {
-    // verdes grisáceos con flores lila SOLO en la puntita (ref
-    // img/Vista_sobre_corredor.jpg): fila intermedia de vértices a 2/3 de
-    // altura, verde hasta ahí y de ahí al lila (hoja de 4 triángulos)
-    palette: [0x5a6d48, 0x647952, 0x536a42, 0x6d7f57, 0x4c6240, 0x71835a],
-    tip: [2.05, 1.4, 3.1],
-    base: [0.62, 0.72, 0.5],
-    mid: 0.66,
-    midCol: [0.72, 0.82, 0.58],
-    // ~la mitad de las matas sin flor: hoja verde de gradiente simple
-    // (sin fila intermedia: 8 tris en vez de 16)
-    alt: { share: 0.5, tip: [0.9, 1.05, 0.65], base: [0.62, 0.72, 0.5] },
-    density: IS_MOBILE ? 1000 : 1500,
-    max: IS_MOBILE ? 100000 : 180000
-  },
-  "parche-herb": {
-    palette: [0x5f7a3a, 0x6b8a41, 0x548034, 0x71904a, 0x497029, 0x8a9448],
-    tip: [1.25, 1.15, 0.8],   // puntas doradas
-    density: IS_MOBILE ? 500 : 800,
-    max: IS_MOBILE ? 60000 : 120000
-  }
-};
-/* Escala estilizada: a altura de dron una mata real de 1 m no se lee;
-   se exagera igual que el resto de la estética low-poly */
-export const GRASS_SCALE = 3.6;
 
 /* === A2: inicio === */
 /* Chunking / LOD de vegetación (render/systems/chunks.js). Diales: ver handoffs/a2-chunks.md */
-export const CHUNK_CELL_GRASS = 400;       // m, lado de la celda del pasto (una InstancedMesh por celda y clase)
 export const CHUNK_CELL_TREES = 500;       // m, lado de la celda de árboles (pocas instancias: celda más gruesa = menos draws)
-export const GRASS_LOD_NEAR_MULT = 0.6;    // LOD_NEAR = mult × quality.grassLodDist: hasta ahí, densidad completa
-export const GRASS_LOD_FAR_MULT = 3.0;     // LOD_FAR = mult × quality.grassLodDist: desde ahí la celda se omite
-export const GRASS_LOD_COMP_MAX = 2.2;     // tope del agrandado que compensa el raleo (conserva la masa de color a lo lejos)
-export const GRASS_LOD_BAND = 0.15;        // franja de encogimiento progresivo por instancia (fracción del orden aleatorio)
-/* E-AO: oclusión falsa por vértice (amount = oscurecimiento máx. en la base, 0..1; top = y local donde termina) */
-export const GRASS_AO = { amount: 0.28, top: 0.4 };   // matas: solo el tramo bajo; puntas y flores (y>0.4) intactas
 /* G · Árboles nuevos (render/systems/trees.js + treegen.js). Decisión del dueño en G1 (2026-11-10):
    nativas del espinal (tala, algarrobo, chañar), sin eucalipto. La clase (parche-le / corr-le) no
    cambia la mezcla: el dato de árbol no la guarda y la ficha da la misma mezcla para las dos.
@@ -120,8 +82,7 @@ export const TREE_BAKE = { interior: 0.18, bottom: 0.14, trunk: 0.22 };   // ocl
    vegetación EN CUADRO a menos de WIND_IDLE_DIST m (distancia a la esfera de la celda). Rasante (~76 m) y de cerca: se
    mueve; vistas altas/cenitales (> ~250 m del follaje más cercano): no. Tope quality.idleFps (0 = apagado). */
 export const WIND_IDLE_DIST = 250;
-/* G5 · Pasto de corredores y parches (render/systems/grass.js + grassgen.js). Plan: realismo/PLAN_PASTO.md. Reemplaza las matas de GRASS_CLASSES
-   (que quedan solo para el gancho ?pasto=viejo hasta aprobar la hoja G5).
+/* G5 · Pasto de corredores y parches (render/systems/grass.js + grassgen.js). Plan: realismo/PLAN_PASTO.md. Reemplazó a las matas viejas (retiradas).
      cell       lado (m) de la celda de generación bajo demanda, en coordenadas de escena
      density    plantas por m² con cobertura total (3,2); el factor por calidad la multiplica
      types      uno por tile del atlas (orden de grassgen.js): asp = ancho/alto de la tarjeta, h = rango de altura real (m)
@@ -465,6 +426,12 @@ export const A3_SHADOWS = {
 /* Fauna (render/systems/fauna.js): aves en bandadas y polinizadores. Diales y método: handoffs/a5-fauna.md.
    Todo procedural (sin assets). Semilla fija: la misma fauna en cada carga (con ?qa y sin él). */
 export const A5_FAUNA = {
+  /* Anclas herbáceas (herbPoints en fauna.js): números heredados de las matas viejas (retiradas) para que la fauna caiga exactamente donde siempre.
+     k = índice histórico de la clase (entra en la semilla). */
+  herbAnchors: {
+    "corr-herb":   { k: 0, density: IS_MOBILE ? 1000 : 1500, max: IS_MOBILE ? 100000 : 180000 },
+    "parche-herb": { k: 1, density: IS_MOBILE ? 500 : 800,   max: IS_MOBILE ? 60000 : 120000 }
+  },
   enabled: true,               // false = sin fauna. También ?fauna=0 (con ?qa/?debug)
   seed: 0xA5F0,                // semilla base (se suma 1 en inicial, 2 en multi)
   ratioInicial: 0.25,          // D-4: proporción inicial : multi = 1 : 4 (aves). Los polinizadores usan butterflyInicial
