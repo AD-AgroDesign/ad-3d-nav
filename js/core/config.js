@@ -267,6 +267,11 @@ export const A4_GROUND = {
   yOff: 0.04,          // m sobre la altura del suelo (heightAt)
   maxEdgeFlat: 300,    // m · arista máx. de la malla SIN terreno (la profundidad del revelado va en textura horneada: ~10x menos triángulos)
   maxEdge: 40,         // m · arista máx. CON terreno (la altura se pide por vértice, hay que refinar)
+  /* G5 (manchas pardas con relieve): con terreno una arista > minL m también se parte si la altura real en su medio se aparta > tol m de la recta (flecha),
+     y la malla se apoya a yOffRelief m (no yOff) sobre heightAt: margen contra la malla de terreno de MapLibre (±0,05 m). Chapa II-V: 17,7 k -> 49,6 k tris de suelo.
+     QA: ?a4sag=<tol> (0 = como antes), ?a4minl=<m>, ?a4yoff=<m>. */
+  sag: { tol: 0.15, minL: 8 },
+  yOffRelief: 0.08,    // m · yOff CON terreno
   gain: 1.0,           // multiplicador de albedo (calibrado contra el suelo MapLibre anterior)
   noise: { fine: 0.10, mid: 0.13, coarse: 0.16 },   // amplitud de luminancia por escala (≈0,7 m / 4 m / 25 m)
   edgeAO: { width: 1.8, strength: 0.38 },           // m de la franja oscura hacia adentro y oscurecimiento máximo

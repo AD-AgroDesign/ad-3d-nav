@@ -191,18 +191,37 @@ function triangulatePoly(rings) {
 }
 
 /* Refinamiento conforme por puntos medios: parte toda arista más larga que L (las dos caras que
-   la comparten la parten igual, sin T-junctions). */
-function refine(P, T, L) {
-  const L2 = L * L;
-  const long = (a, b) => { const dx = P[a][0] - P[b][0], dz = P[a][1] - P[b][1]; return dx * dx + dz * dz > L2; };
+   la comparten la parten igual, sin T-junctions).
+   G5 (devolución de Mike, manchas pardas con relieve): con `adapt = { h(x,z), tol, minL }` una arista TAMBIÉN se parte si es más larga que
+   minL y la altura real en su punto medio se aparta más de `tol` m de la recta entre sus extremos (flecha de la malla). Una arista de 40 m
+   cruza varias celdas del DEM (~16 m, bilineal con quiebres) y la malla Three quedaba hasta decímetros por DEBAJO del terreno de MapLibre:
+   el terreno la tapaba en cuñas y asomaba la capa de abajo. La decisión se cachea por arista (clave a<b), así las dos caras que la
+   comparten la toman igual (sin T-junctions). */
+function refine(P, T, L, adapt) {
+  const L2 = L * L, mL2 = adapt ? adapt.minL * adapt.minL : 0;
+  const H = [];                                  // altura por vértice (solo con adapt), crece con P
+  const hv = i => (H[i] === undefined ? (H[i] = adapt.h(P[i][0], P[i][1])) : H[i]);
+  const dec = new Map();                         // arista → ¿partir? (adapt)
+  const key = (a, b) => (a < b ? a * 4194304 + b : b * 4194304 + a);
+  const mid = new Map();
+  const mp = (a, b) => {
+    const k = key(a, b); let m = mid.get(k);
+    if (m === undefined) { m = P.length; P.push([(P[a][0] + P[b][0]) / 2, (P[a][1] + P[b][1]) / 2]); mid.set(k, m); }
+    return m;
+  };
+  const long = (a, b) => {
+    const dx = P[a][0] - P[b][0], dz = P[a][1] - P[b][1], d2 = dx * dx + dz * dz;
+    if (d2 > L2) return true;
+    if (!adapt || d2 <= mL2) return false;
+    const k = key(a, b); let r = dec.get(k);
+    if (r === undefined) {
+      const hm = adapt.h((P[a][0] + P[b][0]) / 2, (P[a][1] + P[b][1]) / 2);
+      r = Math.abs(hm - (hv(a) + hv(b)) / 2) > adapt.tol; dec.set(k, r);
+    }
+    return r;
+  };
   for (let pass = 0; pass < 14; pass++) {
-    const mid = new Map();
-    const key = (a, b) => (a < b ? a * 4194304 + b : b * 4194304 + a);
-    const mp = (a, b) => {
-      const k = key(a, b); let m = mid.get(k);
-      if (m === undefined) { m = P.length; P.push([(P[a][0] + P[b][0]) / 2, (P[a][1] + P[b][1]) / 2]); mid.set(k, m); }
-      return m;
-    };
+    mid.clear();
     const out = []; let any = false;
     for (const [a, b, c] of T) {
       const lab = long(a, b), lbc = long(b, c), lca = long(c, a), n = lab + lbc + lca;
@@ -288,11 +307,20 @@ function bakeDepth(map, rings) {
   return dm;
 }
 
+/* Criterio de flecha para refine(): altura real del suelo en (x,z) de escena (ver refine). Dial: A4_GROUND.sag = { tol, minL } (null/0 = como antes). */
+function sagAdapt(ctx, toLngLat) {
+  const sg = A4_GROUND.sag;
+  if (!sg || !(sg.tol > 0)) return null;
+  const tol = DBG && params.get("a4sag") ? +params.get("a4sag") : sg.tol;   // ?a4sag=<m> (solo QA): 0 = sin refinamiento adaptativo
+  return tol > 0 ? { h: (x, z) => ctx.heightAt(...toLngLat(x, z)), tol, minL: DBG && params.get("a4minl") ? +params.get("a4minl") : sg.minL } : null;   // ?a4minl=<m> (solo QA)
+}
+
 /* ---------- construcción de la malla de suelo ---------- */
 function buildGroundGeometry(ctx, data, toLngLat, hasH) {
   const P_ = [], I_ = { tops: [], ribbons: [] };   // P_: floats por vértice (5): x,y,z, cls,edge
   let nv = 0, polys = 0, failed = 0, tiny = 0;
-  const yAt = (x, z) => (hasH ? ctx.heightAt(...toLngLat(x, z)) : 0) + A4_GROUND.yOff;
+  const yOffH = DBG && params.get("a4yoff") ? +params.get("a4yoff") : A4_GROUND.yOffRelief;
+  const yAt = (x, z) => (hasH ? ctx.heightAt(...toLngLat(x, z)) : 0) + (hasH ? yOffH : A4_GROUND.yOff);
   /* A6: normal del relieve por vértice (diferencias centrales de heightAt a ±NRM_D m) */
   const N_ = [], NRM_D = 12;
   const nrmAt = (x, z) => {
@@ -336,7 +364,7 @@ function buildGroundGeometry(ctx, data, toLngLat, hasH) {
   // --- pasada 2: profundidad horneada + geometría ---
   for (const { ci, rings, tri } of items) {
     const dmax = Math.max(0.5, bakeDepth(dmap, rings));
-    const T = refine(tri.P, tri.T, hasH ? A4_GROUND.maxEdge : A4_GROUND.maxEdgeFlat);
+    const T = refine(tri.P, tri.T, hasH ? A4_GROUND.maxEdge : A4_GROUND.maxEdgeFlat, hasH ? sagAdapt(ctx, toLngLat) : null);
     const P = tri.P;
     // --- tapa (cara hacia arriba) ---
     const base = nv;
@@ -522,7 +550,7 @@ function buildFurrowGeometry(ctx, data, toLngLat, hasH) {
       const phase = rnd() * A4_FURROWS.spacing * 8;
       const cx = ox + mx, cz = oz + mz, base = nv;
       // A6: con terreno, malla fina (misma arista máxima que el suelo) y cada vértice a su altura (los surcos dibujan sobre la ladera)
-      const T2 = hasH ? refine(P, T, A4_GROUND.maxEdge) : T;
+      const T2 = hasH ? refine(P, T, A4_GROUND.maxEdge)   /* sin refinamiento adaptativo: con la malla fina las huellas de pulverizadora (0,5 m) salen en trazos a 300 m */ : T;
       for (const p of P) {
         pos.push(p[0], (hasH ? ctx.heightAt(...toLngLat(p[0], p[1])) : 0) + A4_GROUND.yOff, p[1]);
         row.push((p[0] - cx) * nx + (p[1] - cz) * nz + phase, (p[0] - cx) * ax + (p[1] - cz) * az, 0);
