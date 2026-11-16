@@ -607,10 +607,12 @@ const LAYER_OFF = { herbExt: 0.001, woody: 0.001, pattern: 0 };
 /* Modo de suelo por calidad: "completo" | "sin-surcos" | "simple" | "apagado". "simple" = Baja con A4_GROUND.lowSoil (Baja ya no dibuja
    plantas: el suelo la cubre, sin 2.a muestra de textura, sin ruido fino y sin franja de AO). quality.js sigue diciendo soil: "apagado" para
    Baja; la traduccion vive aca para no tocar archivos ajenos (pedido opcional: renombrar a "simple" en quality.js). */
-const soilMode = q => (q.soil === "apagado" && A4_GROUND.lowSoil ? "simple" : q.soil);
+const soilMode = q => (q.soil === "apagado" && A4_GROUND.lowSoil ? (A4_GROUND.lowSoilMode === "textura" ? "simple" : "plano") : q.soil);
+/* G5b "plano": Baja sin malla Three; las capas MapLibre herb-ext (ya dibujadas en Baja desde siempre) llevan el color promedio de Alta. */
+const flatLow = () => groundWanted() && soilMode(quality) === "plano";
 const lite = () => soilMode(quality) === "simple";
 const furrowsFor = q => furrowsWanted() && soilMode(q) === "completo" && !(!(DBG && params.has("surcos")) && A4_FURROWS.byQuality[q.name] === false);
-let active = groundWanted() && soilMode(quality) !== "apagado";
+let active = groundWanted() && soilMode(quality) !== "apagado" && soilMode(quality) !== "plano";
 let furrowsOn = furrowsFor(quality);
 
 const pfx = key => (key === "inicial" ? "ini" : "multi");
@@ -618,10 +620,24 @@ const setPaint = (id, prop, v) => { if (map.getLayer(id)) map.setPaintProperty(i
 
 /* Capas MapLibre de las clases reemplazadas: casi invisibles pero vivas (T9) cuando el suelo está activo;
    valores originales de layers.js cuando no (calidad Baja). */
+const HERB_ORIG = {};   // expresion original de fill(-extrusion)-color de herb-ext, para restaurarla fuera de Baja
+function paintHerbColor(p) {
+  const id = `${p}-herb-ext`, L = map.getLayer(id); if (!L) return;
+  const prop = L.type === "fill" ? "fill-color" : "fill-extrusion-color";
+  if (!(id in HERB_ORIG)) HERB_ORIG[id] = map.getPaintProperty(id, prop);
+  const C = L.type === "fill" ? A4_GROUND.lowColor : { ...A4_GROUND.lowColor, ...A4_GROUND.lowColorExtr };
+  const o = HERB_ORIG[id];   // ["match", ["get","_cls"], "corr-herb", c, "bajo", c, "parche-herb", c, default]
+  map.setPaintProperty(id, prop, flatLow() ? [o[0], o[1], o[2], C["corr-herb"], o[4], o[5], o[6], C["parche-herb"], o[8]] : o);
+}
 function syncMapLayers(key) {
   const s = S[key]; if (!s) return;
   const o = s.opacity, p = pfx(key);
-  if (active) {
+  paintHerbColor(p);
+  if (flatLow()) {   // G5b: herb-ext recoloreado (pattern fuera: Baja mas barata que antes), woody-base como siempre
+    setPaint(`${p}-herb-ext`, extOpacityProp(), A4_GROUND.lowColor.opacity * o);
+    setPaint(`${p}-herb-pattern`, extOpacityProp(), 0);
+    setPaint(`${p}-woody-base`, extOpacityProp(), WOODY_BASE.opacity * o);
+  } else if (active) {
     setPaint(`${p}-herb-ext`, extOpacityProp(), LAYER_OFF.herbExt * o);   // A6: extOpacityProp() = fill-opacity con terreno (T14), fill-extrusion-opacity sin terreno
     setPaint(`${p}-herb-pattern`, extOpacityProp(), LAYER_OFF.pattern * o);
     setPaint(`${p}-woody-base`, extOpacityProp(), LAYER_OFF.woody * o);
@@ -696,7 +712,7 @@ export default {
   },
 
   onQuality(q) {
-    active = groundWanted() && soilMode(q) !== "apagado";
+    active = groundWanted() && soilMode(q) !== "apagado" && soilMode(q) !== "plano";
     furrowsOn = furrowsFor(q);
     if (active && Object.keys(S).length) ensureSoilTex(soilMode(q) === "simple");   // textura 512 en Baja, 1024 en el resto
     applyModes();
