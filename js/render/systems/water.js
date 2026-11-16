@@ -22,7 +22,7 @@
        document.hidden, y no repinta si el tiempo está congelado (freezeTime). Calidad Baja: sin malla (plano de MapLibre).
    T9: `*-agua-fill` queda con opacidad 0,001 (clic/popup); `*-agua-line` en config (0). En Baja se restauran (0,38 / 0,7). */
 import * as THREE from "three";
-import { A1_SKY, A4_WATER as CFG } from "../../core/config.js?v=20261113";
+import { A1_SKY, A4_GROUND, A4_WATER as CFG } from "../../core/config.js?v=20261113";
 import { HOME_VIEW, params } from "../../core/state.js?v=20261113";
 import { quality } from "../../core/quality.js?v=20261113";
 import { idleDriver } from "../idle.js?v=20261113";
@@ -80,15 +80,27 @@ function getWaveTex() {
    que tenga alguna > L (las dos caras que la comparten se parten igual: sin T-junctions). El refinamiento de ground.js parte
    TODAS las aristas largas y, con los triángulos-astilla del earcut de un curso (3 km × 8 m), explota (~70 k tris); así quedan
    unos pocos miles de triángulos de buena forma. */
-function refineLongest(P, T, L, maxTris) {
+function refineLongest(P, T, L, maxTris, adapt) {
   const L2 = L * L, key = (a, b) => (a < b ? a * 4194304 + b : b * 4194304 + a);
-  const d2 = (a, b) => { const dx = P[a][0] - P[b][0], dz = P[a][1] - P[b][1]; return dx * dx + dz * dz; };
+  const d2raw = (a, b) => { const dx = P[a][0] - P[b][0], dz = P[a][1] - P[b][1]; return dx * dx + dz * dz; };
+  /* G5: con `adapt = { h, tol, minL }` (relieve) una arista tambien cuenta como "larga" si pasa minL y la altura real en su medio se aparta mas de tol
+     m de la recta (flecha): la malla de agua quedaba por debajo del terreno de MapLibre y asomaba el satelite pardo en cunas. Se cachea por arista. */
+  const H = [], dec = new Map(), mL2 = adapt ? adapt.minL * adapt.minL : 0;
+  const hv = i => (H[i] === undefined ? (H[i] = adapt.h(P[i][0], P[i][1])) : H[i]);
+  const d2 = (a, b) => {   // d2 efectiva: la real si hay que partir la arista, 0 si no (el maximo elige la mas larga de las que SI hay que partir)
+    const d = d2raw(a, b);
+    if (d > L2) return d;
+    if (!adapt || d <= mL2) return 0;
+    const k = key(a, b); let r = dec.get(k);
+    if (r === undefined) { r = Math.abs(adapt.h((P[a][0] + P[b][0]) / 2, (P[a][1] + P[b][1]) / 2) - (hv(a) + hv(b)) / 2) > adapt.tol; dec.set(k, r); }
+    return r ? d : 0;
+  };
   for (let pass = 0; pass < 80; pass++) {
     const mark = new Map();
     let any = false;
     for (const [a, b, c] of T) {
       const lab = d2(a, b), lbc = d2(b, c), lca = d2(c, a), m = Math.max(lab, lbc, lca);
-      if (m <= L2) continue;
+      if (m <= 0) continue;
       any = true;
       const [p, q] = m === lab ? [a, b] : m === lbc ? [b, c] : [c, a], k = key(p, q);
       if (!mark.has(k)) { mark.set(k, P.length); P.push([(P[p][0] + P[q][0]) / 2, (P[p][1] + P[q][1]) / 2]); }
@@ -216,10 +228,10 @@ function buildGeometry(ctx, data, hasH) {
       if (tri.tiny) { tiny++; continue; }
       polys++; items.push({ rings });
       // sin terreno: triángulos crudos del earcut (la distancia a la orilla va en la textura). Con terreno: se refina para apoyar en heightAt
-      const T = refineLongest(tri.P, tri.T, hasH ? CFG.maxEdgeRelief : CFG.maxEdge, 120000), P = tri.P;
+      const T = refineLongest(tri.P, tri.T, hasH ? CFG.maxEdgeRelief : CFG.maxEdge, 120000, hasH && A4_GROUND.sag && A4_GROUND.sag.tol > 0 ? { h: (x, z) => ctx.heightAt(...ctx.toLngLat(x, z)), tol: A4_GROUND.sag.tol, minL: A4_GROUND.sag.minL } : null), P = tri.P;
       const base = nv;
       for (const p of P) {
-        const y = (hasH ? ctx.heightAt(...ctx.toLngLat(p[0], p[1])) : 0) + CFG.yOff;
+        const y = (hasH ? ctx.heightAt(...ctx.toLngLat(p[0], p[1])) : 0) + (hasH ? A4_GROUND.yOffRelief : CFG.yOff);
         pos.push(p[0], y, p[1]);
         const k = Math.floor(p[0] / CELL) + "," + Math.floor(p[1] / CELL);
         let b = boxes.get(k); if (!b) boxes.set(k, b = new THREE.Box3());
