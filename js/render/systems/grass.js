@@ -185,7 +185,11 @@ const TWO_PI = 6.283185307179586;
 const lodNew = { value: new THREE.Vector4(PC.nearM, 450, PC.lodBand, 1) };   // near, far, band, compMax (1 = sin compensación: la escala la maneja la rampa)
 /* Curva de raleo del pasto: densidad completa hasta nearM y de ahí ∝ (nearM/d)^lodPow (más barata que el smoothstep general de chunks.js:
    la cantidad de instancias de un disco crece como d^(2-pow), no como d²). La CPU usa la misma fórmula (keepAt) para el prefijo a dibujar. */
-const KEEP_GLSL = PC.lodPow === 1 ? "clamp(uA2Lod.x / max(lodD, 1.0), 0.0, 1.0)" : "pow(clamp(uA2Lod.x / max(lodD, 1.0), 0.0, 1.0), " + PC.lodPow.toFixed(3) + ")";
+const KEEP_BASE = PC.lodPow === 1 ? "clamp(uA2Lod.x / max(lodD, 1.0), 0.0, 1.0)" : "pow(clamp(uA2Lod.x / max(lodD, 1.0), 0.0, 1.0), " + PC.lodPow.toFixed(3) + ")";
+/* Raleo interior (ronda de rendimiento a pie): dentro de innerM metros la fracción que sobrevive baja suavemente a innerK (las plantas muy cercanas
+   tapan mucha pantalla y se superponen; el relleno de tarjetas transparentes es lo que cuesta). Solo en GPU: la cuenta de la CPU no cambia. innerK >= 1 = apagado. */
+const INNER_ON = PC.innerM > 0 && PC.innerK < 1;
+const KEEP_GLSL = INNER_ON ? "(" + KEEP_BASE + ") * mix(" + PC.innerK.toFixed(3) + ", 1.0, smoothstep(0.0, " + PC.innerM.toFixed(1) + ", lodD))" : KEEP_BASE;
 function keepAt(d) { const k = Math.min(1, lodNew.value.x / Math.max(d, 1)); return PC.lodPow === 1 ? k : Math.pow(k, PC.lodPow); }
 const scaleU = { value: new THREE.Vector4(PC.scale[0], PC.scale[1], PC.scale[2], PC.scale[3]) };
 const fadeU = { value: new THREE.Vector2(450 * PC.fadeFrom, 450) };
@@ -267,7 +271,7 @@ function makeMaterial(ctx, key) {
     sh.fragmentShader = sh.fragmentShader
       .replace("#include <normal_fragment_begin>", "#include <normal_fragment_begin>\n  normal = normalize(vNormal);   // misma normal (inclinada hacia arriba) en las dos caras de la tarjeta");
   });
-  applyLod(mat, ctx.uniforms.uCamPos, lodNew, { keep: KEEP_GLSL, tag: "g5p" + PC.lodPow });   // raleo por rango (aRank), curva propia; se encadena DESPUÉS de patch()
+  applyLod(mat, ctx.uniforms.uCamPos, lodNew, { keep: KEEP_GLSL, tag: "g5p" + PC.lodPow + "i" + (INNER_ON ? PC.innerM + "_" + PC.innerK : 0) });   // raleo por rango (aRank), curva propia; se encadena DESPUÉS de patch()
   applyAO(mat, PC.ao.amount, 0, PC.ao.top);                            // E-AO: oscurece la base (igual que el boceto)
   mats.push(mat);
   return mat;
