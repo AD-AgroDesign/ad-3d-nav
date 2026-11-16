@@ -87,39 +87,106 @@ const nu = cell => (1 / (cell * NOISE_C)).toFixed(7);
    cruza el borde. sRGB (la GPU decodifica a lineal; los mipmaps promedian en lineal). Costo: ~2 canvas de 1024² (full) o 512² (lite, Baja);
    se hace UNA vez en el primer build y se rehace solo si el nivel cambia de tamaño (onQuality). */
 const TEX_SEED = { corr: 77, parche: 91 };
+/* Variantes de suelo (devolución G5 de Mike: "piso marrón más oscuro, tipo tierra arada"). v0 = el G5 original (gris verdoso claro, solo para comparar);
+   v1/v2/v3 = tierra oscura con moteado + matas verdes + las mismas flores. ?suelo=v0|v1|v2|v3 (solo ?qa/?debug); el default y los diales por variante
+   (gain, colores de Baja) están en A4_GROUND.tex.variants / .variant (config.js). Cada entrada de los pintores: [cantidad, radio mín, radio máx, colores]. */
+const FLOWERS_C = [
+  [1500, 1, 2.4, ["#8ea4e0", "#7f98dc", "#9fb2ea"]],            // achicoria
+  [250, 1, 2, ["#dcdbcf", "#e4e3d8"]],                          // melilotos y trébol blanco
+  [350, 1, 2, ["#8a6cc0", "#7a5cb0"]],                          // alfalfa
+  [200, 1, 1.8, ["#d9c446", "#c4507f"]]                         // lotus y trébol rojo
+];
+const FLOWERS_P = [
+  [400, 1, 2.4, ["#8ea4e0", "#7f98dc"]],                        // achicoria (6 %)
+  [60, 1, 2, ["#dcdbcf"]],
+  [90, 1, 2, ["#8a6cc0", "#7a5cb0"]],
+  [190, 1, 1.8, ["#d9c446", "#c4507f", "#e2e0d2"]]
+];
+const FLOWER_SET = new Set([...FLOWERS_C, ...FLOWERS_P]);
 const SOIL_PAINT = {
-  corr(c, S, r) {   // corredor: mezcla de plantas del PLAN_PASTO §1 (38 % gramíneas, 22 % achicoria, 20 % estrato bajo, 16 % alfalfa, 4 % meliloto)
-    c.fillStyle = "#66704f"; c.fillRect(0, 0, S, S);
-    return [
-      [900, 10, 34, ["#5a6444", "#737d58", "#7d875f", "#6a7550"]],
-      [380, 8, 22, ["#465034", "#4d5839"]],                         // sombras entre matas
-      [2600, 2, 7, ["#56613f", "#74805a", "#808a62", "#8e9670", "#6c7a4a"]],
-      [1500, 1, 2.4, ["#8ea4e0", "#7f98dc", "#9fb2ea"]],            // achicoria
-      [250, 1, 2, ["#dcdbcf", "#e4e3d8"]],                          // melilotos y trébol blanco
-      [350, 1, 2, ["#8a6cc0", "#7a5cb0"]],                          // alfalfa
-      [200, 1, 1.8, ["#d9c446", "#c4507f"]]                         // lotus y trébol rojo
-    ];
+  v0: {
+    corr: { base: "#66704f",   // G5 original. Corredor: mezcla de plantas del PLAN_PASTO §1 (38 % gramíneas, 22 % achicoria, 20 % estrato bajo, 16 % alfalfa, 4 % meliloto)
+      blobs: [
+        [900, 10, 34, ["#5a6444", "#737d58", "#7d875f", "#6a7550"]],
+        [380, 8, 22, ["#465034", "#4d5839"]],                         // sombras entre matas
+        [2600, 2, 7, ["#56613f", "#74805a", "#808a62", "#8e9670", "#6c7a4a"]],
+        ...FLOWERS_C
+      ] },
+    parche: { base: "#5b6a41",   // pastizal (PLAN_PASTO §5.1: ~70 % gramíneas, 18 % estrato bajo, 6 % achicoria, 4 % alfalfa, 2 % meliloto): más verde/pajizo, menos azul
+      blobs: [
+        [900, 10, 34, ["#52623a", "#667548", "#6f7c4c", "#5d6d42"]],
+        [380, 8, 22, ["#3f4c2e", "#46532f"]],
+        [2600, 2, 7, ["#4f6236", "#6a7a4a", "#7c8750", "#5b7038", "#5f7340"]],
+        [900, 3, 9, ["#8f9160", "#9a9660", "#a39a62"]],               // paja / espigas secas
+        ...FLOWERS_P
+      ] }
   },
-  parche(c, S, r) {   // pastizal (PLAN_PASTO §5.1: ~70 % gramíneas, 18 % estrato bajo, 6 % achicoria, 4 % alfalfa, 2 % meliloto): más verde/pajizo, menos azul
-    c.fillStyle = "#5b6a41"; c.fillRect(0, 0, S, S);
-    return [
-      [900, 10, 34, ["#52623a", "#667548", "#6f7c4c", "#5d6d42"]],
-      [380, 8, 22, ["#3f4c2e", "#46532f"]],
-      [2600, 2, 7, ["#4f6236", "#6a7a4a", "#7c8750", "#5b7038", "#5f7340"]],
-      [900, 3, 9, ["#8f9160", "#9a9660", "#a39a62"]],               // paja / espigas secas
-      [400, 1, 2.4, ["#8ea4e0", "#7f98dc"]],                        // achicoria (6 %)
-      [60, 1, 2, ["#dcdbcf"]],
-      [90, 1, 2, ["#8a6cc0", "#7a5cb0"]],
-      [190, 1, 1.8, ["#d9c446", "#c4507f", "#e2e0d2"]]
-    ];
+  v1: {   // pardo oscuro como el suelo viejo (#6b5d38 x 0,54/0,62/1,02) + moteado, matas verdes y flores
+    corr: { base: "#54452a",
+      blobs: [
+        [900, 10, 34, ["#463a22", "#62502e", "#574829", "#6b5a33"]],  // terrones claros y oscuros
+        [380, 8, 22, ["#352b1a", "#3d321e"]],                         // sombras entre matas
+        [2600, 2, 7, ["#4a5530", "#5f6e38", "#6a7a40", "#56482b", "#756338"]],   // matas verdes y tierra entre ellas
+        ...FLOWERS_C
+      ] },
+    parche: { base: "#3f4a2a",
+      blobs: [
+        [900, 10, 34, ["#38441f", "#4e5a30", "#58663a", "#454f2a"]],
+        [380, 8, 22, ["#2c3620", "#323d22"]],
+        [2600, 2, 7, ["#41522a", "#58693a", "#697944", "#4a5e30", "#52633a"]],
+        [900, 3, 9, ["#6f6c48", "#7a7650", "#82795a"]],               // paja / espigas secas (apagadas: el parche es oscuro)
+        ...FLOWERS_P
+      ] }
+  },
+  v2: {   // tierra arada húmeda: más oscuro, casi sin verde
+    corr: { base: "#3f3322",
+      blobs: [
+        [900, 10, 34, ["#33291b", "#4a3b25", "#3e3220", "#54432a"]],
+        [380, 8, 22, ["#271f14", "#2e2517"]],
+        [2600, 2, 7, ["#3b4528", "#4c5a2e", "#55663a", "#3f3322", "#5d4d2e"]],
+        ...FLOWERS_C
+      ] },
+    parche: { base: "#2e3520",
+      blobs: [
+        [900, 10, 34, ["#262d19", "#3a4426", "#434e2c", "#2f3720"]],
+        [380, 8, 22, ["#1f2615", "#252c18"]],
+        [2600, 2, 7, ["#33401f", "#46542e", "#52613a", "#3a4a26", "#41502c"]],
+        [900, 3, 9, ["#5a5a3a", "#646140", "#6a6444"]],
+        ...FLOWERS_P
+      ] }
+  },
+  v3: {   // intermedio, con más verde de matas: se lee vegetado y no tierra pelada
+    corr: { base: "#4e4a2b",
+      blobs: [
+        [900, 10, 34, ["#423e27", "#5a5733", "#4c472b", "#655f37"]],
+        [380, 8, 22, ["#312f1b", "#393620"]],
+        [1500, 4, 12, ["#4c6532", "#5a7938", "#43582c"]],             // matas verdes anchas
+        [2600, 2, 7, ["#4f6032", "#62773a", "#6d8340", "#586a36", "#6f7d44"]],
+        ...FLOWERS_C
+      ] },
+    parche: { base: "#3d4a2a",
+      blobs: [
+        [900, 10, 34, ["#36421f", "#4b5a2f", "#566a38", "#424f29"]],
+        [380, 8, 22, ["#2a3520", "#303c22"]],
+        [1500, 4, 12, ["#44632c", "#527a34", "#3a542a"]],
+        [2600, 2, 7, ["#40562a", "#58703a", "#687f44", "#4a6330", "#52683a"]],
+        [900, 3, 9, ["#706e49", "#7a7650", "#837a58"]],
+        ...FLOWERS_P
+      ] }
   }
 };
+const soilVariant = () => { const v = DBG ? params.get("suelo") : null; return v && SOIL_PAINT[v] && A4_GROUND.tex.variants[v] ? v : A4_GROUND.tex.variant; };
+const soilVar = () => A4_GROUND.tex.variants[soilVariant()];
+let texMean = null;   // QA: promedio sRGB de cada textura (solo con ?qa/?debug)
 function paintSoilTex(kind, size) {
   const cv = document.createElement("canvas"); cv.width = cv.height = size;
   const c = cv.getContext("2d"), r = mulberry32(TEX_SEED[kind]), sc = size / 1024;
-  const blobs = SOIL_PAINT[kind](c, size, r);
+  const pal = SOIL_PAINT[soilVariant()][kind], kk = soilVar().soilK, blobs = pal.blobs;
+  /* soilK = [r,g,b] por tipo: multiplica (sRGB) los colores de TIERRA y matas pero no los de las flores: así se oscurece el piso sin apagar los puntos celestes */
+  const tone = col => { if (!kk || !kk[kind]) return col; const k = kk[kind], n = parseInt(col.slice(1), 16); return "#" + [n >> 16, (n >> 8) & 255, n & 255].map((v, i) => Math.min(255, Math.round(v * k[i])).toString(16).padStart(2, "0")).join(""); };
+  c.fillStyle = tone(pal.base); c.fillRect(0, 0, size, size);
   /* fill() por mancha: con Path2D por color todo junto es ~13x MAS lento (rasteriza miles de subcaminos solapados). */
-  for (const [n, rmin, rmax, cols] of blobs) for (let i = 0; i < n; i++) {
+  for (const bl of blobs) for (let i = 0, [n, rmin, rmax, cols0] = bl, cols = FLOWER_SET.has(bl) ? cols0 : cols0.map(tone); i < n; i++) {
     const x = r() * size, y = r() * size, rr = Math.max((rmin + r() * (rmax - rmin)) * sc, 0.6), ry = Math.max(rr * (0.7 + r() * 0.5), 0.6), a = r() * 3, col = cols[Math.floor(r() * cols.length)];
     const e = Math.max(rr, ry) + 1;
     c.fillStyle = col;
@@ -128,6 +195,11 @@ function paintSoilTex(kind, size) {
       if (px + e < 0 || px - e > size || py + e < 0 || py - e > size) continue;
       c.beginPath(); c.ellipse(px, py, rr, ry, a, 0, 6.2832); c.fill();
     }
+  }
+  if (DBG) {   // QA: promedio sRGB (reduce a 16x16 y promedia)
+    const t = document.createElement("canvas"); t.width = t.height = 16; const tc = t.getContext("2d"); tc.drawImage(cv, 0, 0, 16, 16);
+    const d = tc.getImageData(0, 0, 16, 16).data, m = [0, 0, 0]; for (let i = 0; i < d.length; i += 4) { m[0] += d[i]; m[1] += d[i + 1]; m[2] += d[i + 2]; }
+    (texMean = texMean || {})[kind] = m.map(v => Math.round(v / 256));
   }
   const tex = new THREE.CanvasTexture(cv);
   tex.colorSpace = THREE.SRGBColorSpace; tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
@@ -191,18 +263,37 @@ function triangulatePoly(rings) {
 }
 
 /* Refinamiento conforme por puntos medios: parte toda arista más larga que L (las dos caras que
-   la comparten la parten igual, sin T-junctions). */
-function refine(P, T, L) {
-  const L2 = L * L;
-  const long = (a, b) => { const dx = P[a][0] - P[b][0], dz = P[a][1] - P[b][1]; return dx * dx + dz * dz > L2; };
+   la comparten la parten igual, sin T-junctions).
+   G5 (devolución de Mike, manchas pardas con relieve): con `adapt = { h(x,z), tol, minL }` una arista TAMBIÉN se parte si es más larga que
+   minL y la altura real en su punto medio se aparta más de `tol` m de la recta entre sus extremos (flecha de la malla). Una arista de 40 m
+   cruza varias celdas del DEM (~16 m, bilineal con quiebres) y la malla Three quedaba hasta decímetros por DEBAJO del terreno de MapLibre:
+   el terreno la tapaba en cuñas y asomaba la capa de abajo. La decisión se cachea por arista (clave a<b), así las dos caras que la
+   comparten la toman igual (sin T-junctions). */
+function refine(P, T, L, adapt) {
+  const L2 = L * L, mL2 = adapt ? adapt.minL * adapt.minL : 0;
+  const H = [];                                  // altura por vértice (solo con adapt), crece con P
+  const hv = i => (H[i] === undefined ? (H[i] = adapt.h(P[i][0], P[i][1])) : H[i]);
+  const dec = new Map();                         // arista → ¿partir? (adapt)
+  const key = (a, b) => (a < b ? a * 4194304 + b : b * 4194304 + a);
+  const mid = new Map();
+  const mp = (a, b) => {
+    const k = key(a, b); let m = mid.get(k);
+    if (m === undefined) { m = P.length; P.push([(P[a][0] + P[b][0]) / 2, (P[a][1] + P[b][1]) / 2]); mid.set(k, m); }
+    return m;
+  };
+  const long = (a, b) => {
+    const dx = P[a][0] - P[b][0], dz = P[a][1] - P[b][1], d2 = dx * dx + dz * dz;
+    if (d2 > L2) return true;
+    if (!adapt || d2 <= mL2) return false;
+    const k = key(a, b); let r = dec.get(k);
+    if (r === undefined) {
+      const hm = adapt.h((P[a][0] + P[b][0]) / 2, (P[a][1] + P[b][1]) / 2);
+      r = Math.abs(hm - (hv(a) + hv(b)) / 2) > adapt.tol; dec.set(k, r);
+    }
+    return r;
+  };
   for (let pass = 0; pass < 14; pass++) {
-    const mid = new Map();
-    const key = (a, b) => (a < b ? a * 4194304 + b : b * 4194304 + a);
-    const mp = (a, b) => {
-      const k = key(a, b); let m = mid.get(k);
-      if (m === undefined) { m = P.length; P.push([(P[a][0] + P[b][0]) / 2, (P[a][1] + P[b][1]) / 2]); mid.set(k, m); }
-      return m;
-    };
+    mid.clear();
     const out = []; let any = false;
     for (const [a, b, c] of T) {
       const lab = long(a, b), lbc = long(b, c), lca = long(c, a), n = lab + lbc + lca;
@@ -288,11 +379,20 @@ function bakeDepth(map, rings) {
   return dm;
 }
 
+/* Criterio de flecha para refine(): altura real del suelo en (x,z) de escena (ver refine). Dial: A4_GROUND.sag = { tol, minL } (null/0 = como antes). */
+function sagAdapt(ctx, toLngLat) {
+  const sg = A4_GROUND.sag;
+  if (!sg || !(sg.tol > 0)) return null;
+  const tol = DBG && params.get("a4sag") ? +params.get("a4sag") : sg.tol;   // ?a4sag=<m> (solo QA): 0 = sin refinamiento adaptativo
+  return tol > 0 ? { h: (x, z) => ctx.heightAt(...toLngLat(x, z)), tol, minL: DBG && params.get("a4minl") ? +params.get("a4minl") : sg.minL } : null;   // ?a4minl=<m> (solo QA)
+}
+
 /* ---------- construcción de la malla de suelo ---------- */
 function buildGroundGeometry(ctx, data, toLngLat, hasH) {
   const P_ = [], I_ = { tops: [], ribbons: [] };   // P_: floats por vértice (5): x,y,z, cls,edge
   let nv = 0, polys = 0, failed = 0, tiny = 0;
-  const yAt = (x, z) => (hasH ? ctx.heightAt(...toLngLat(x, z)) : 0) + A4_GROUND.yOff;
+  const yOffH = DBG && params.get("a4yoff") ? +params.get("a4yoff") : A4_GROUND.yOffRelief;
+  const yAt = (x, z) => (hasH ? ctx.heightAt(...toLngLat(x, z)) : 0) + (hasH ? yOffH : A4_GROUND.yOff);
   /* A6: normal del relieve por vértice (diferencias centrales de heightAt a ±NRM_D m) */
   const N_ = [], NRM_D = 12;
   const nrmAt = (x, z) => {
@@ -336,7 +436,7 @@ function buildGroundGeometry(ctx, data, toLngLat, hasH) {
   // --- pasada 2: profundidad horneada + geometría ---
   for (const { ci, rings, tri } of items) {
     const dmax = Math.max(0.5, bakeDepth(dmap, rings));
-    const T = refine(tri.P, tri.T, hasH ? A4_GROUND.maxEdge : A4_GROUND.maxEdgeFlat);
+    const T = refine(tri.P, tri.T, hasH ? A4_GROUND.maxEdge : A4_GROUND.maxEdgeFlat, hasH ? sagAdapt(ctx, toLngLat) : null);
     const P = tri.P;
     // --- tapa (cara hacia arriba) ---
     const base = nv;
@@ -420,9 +520,9 @@ function makeGroundMaterial(ctx, key, hasH, dTex, dmap) {
     uSoft: { value: new THREE.Vector2(A4_GROUND.reveal.soft, A4_GROUND.reveal.jitter) },
     // G5: texturas de corredor/parche (ver bloque A4_GROUND.tex en config.js)
     uTexSel: { value: sel }, t_corr: { value: soil.corr.tex }, t_parche: { value: soil.parche.tex },
-    uTexK: { value: new THREE.Vector4(1 / TX.period, 1 / TX.detailPeriod, TX.detailAmp, TX.noiseK) },
+    uTexK: { value: new THREE.Vector4(1 / TX.period, 1 / TX.detailPeriod, TX.detailAmp, soilVar().noiseK ?? TX.noiseK) },
     uTexP: { value: new THREE.Vector4(TX.tint, TX.aoK, TX.borderW, 0) },
-    uTexGainC: { value: new THREE.Vector3(...TX.gain[0]) }, uTexGainP: { value: new THREE.Vector3(...TX.gain[1]) },
+    uTexGainC: { value: new THREE.Vector3(...soilVar().gain[0]) }, uTexGainP: { value: new THREE.Vector3(...soilVar().gain[1]) },
     uBorder: { value: new THREE.Vector3(...TX.border) },
     uLite: { value: lite() ? 1 : 0 }
   };
@@ -522,7 +622,7 @@ function buildFurrowGeometry(ctx, data, toLngLat, hasH) {
       const phase = rnd() * A4_FURROWS.spacing * 8;
       const cx = ox + mx, cz = oz + mz, base = nv;
       // A6: con terreno, malla fina (misma arista máxima que el suelo) y cada vértice a su altura (los surcos dibujan sobre la ladera)
-      const T2 = hasH ? refine(P, T, A4_GROUND.maxEdge) : T;
+      const T2 = hasH ? refine(P, T, A4_GROUND.maxEdge)   /* sin refinamiento adaptativo: con la malla fina las huellas de pulverizadora (0,5 m) salen en trazos a 300 m */ : T;
       for (const p of P) {
         pos.push(p[0], (hasH ? ctx.heightAt(...toLngLat(p[0], p[1])) : 0) + A4_GROUND.yOff, p[1]);
         row.push((p[0] - cx) * nx + (p[1] - cz) * nz + phase, (p[0] - cx) * ax + (p[1] - cz) * az, 0);
@@ -625,7 +725,8 @@ function paintHerbColor(p) {
   const id = `${p}-herb-ext`, L = map.getLayer(id); if (!L) return;
   const prop = L.type === "fill" ? "fill-color" : "fill-extrusion-color";
   if (!(id in HERB_ORIG)) HERB_ORIG[id] = map.getPaintProperty(id, prop);
-  const C = L.type === "fill" ? A4_GROUND.lowColor : { ...A4_GROUND.lowColor, ...A4_GROUND.lowColorExtr };
+  const lv = soilVar(), LC = { ...A4_GROUND.lowColor, ...(lv.lowColor || {}) }, LX = { ...A4_GROUND.lowColorExtr, ...(lv.lowColorExtr || {}) };
+  const C = L.type === "fill" ? LC : { ...LC, ...LX };
   const o = HERB_ORIG[id];   // ["match", ["get","_cls"], "corr-herb", c, "bajo", c, "parche-herb", c, default]
   map.setPaintProperty(id, prop, flatLow() ? [o[0], o[1], o[2], C["corr-herb"], o[4], o[5], o[6], C["parche-herb"], o[8]] : o);
 }
@@ -722,7 +823,7 @@ export default {
     for (const k in S) { S[k].gMesh.geometry.dispose(); S[k].gMat.dispose(); S[k].dTex.dispose(); S[k].fMesh.geometry.dispose(); S[k].fMat.dispose(); }
   },
 
-  stats(key) { return S[key] ? { suelo: { ...S[key].info, texMs, texSize: SOIL.size, modo: soilMode(quality) } } : {}; }
+  stats(key) { return S[key] ? { suelo: { ...S[key].info, texMs, texSize: SOIL.size, modo: soilMode(quality), variante: soilVariant(), texMean } } : {}; }
 };
 
 /* A4 (water.js reutiliza la triangulación del suelo) */

@@ -267,6 +267,11 @@ export const A4_GROUND = {
   yOff: 0.04,          // m sobre la altura del suelo (heightAt)
   maxEdgeFlat: 300,    // m · arista máx. de la malla SIN terreno (la profundidad del revelado va en textura horneada: ~10x menos triángulos)
   maxEdge: 40,         // m · arista máx. CON terreno (la altura se pide por vértice, hay que refinar)
+  /* G5 (manchas pardas con relieve): con terreno una arista > minL m también se parte si la altura real en su medio se aparta > tol m de la recta (flecha),
+     y la malla se apoya a yOffRelief m (no yOff) sobre heightAt: margen contra la malla de terreno de MapLibre (±0,05 m). Chapa II-V: 17,7 k -> 49,6 k tris de suelo.
+     QA: ?a4sag=<tol> (0 = como antes), ?a4minl=<m>, ?a4yoff=<m>. */
+  sag: { tol: 0.15, minL: 8 },
+  yOffRelief: 0.08,    // m · yOff CON terreno
   gain: 1.0,           // multiplicador de albedo (calibrado contra el suelo MapLibre anterior)
   noise: { fine: 0.10, mid: 0.13, coarse: 0.16 },   // amplitud de luminancia por escala (≈0,7 m / 4 m / 25 m)
   edgeAO: { width: 1.8, strength: 0.38 },           // m de la franja oscura hacia adentro y oscurecimiento máximo
@@ -288,7 +293,18 @@ export const A4_GROUND = {
     period: 16, detailPeriod: 27, detailAmp: 0.55,   // m
     gain: [[0.73, 0.90, 0.86], [0.74, 0.88, 0.95]], tint: 0.05, noiseK: 0.55,
     border: [0.80, 1.16, 0.70], borderW: 0.85, aoK: 0.5,
-    size: { full: 1024, lite: 512 }
+    size: { full: 1024, lite: 512 },
+    /* Devolución G5 (Mike, 2026-11-16): el corredor/parche herbáceo se lee deslucido desde el aire; quiere un piso marrón oscuro tipo tierra arada que
+       los destaque (protagonistas del rediseño). Ya no manda "mismo promedio que las plantas" sino el CONTRASTE contra los lotes. Variantes (pintores en
+       ground.js): v0 = G5 original (comparar), v1 pardo oscuro como el viejo, v2 tierra arada húmeda, v3 intermedio con más verde. `variant` = la que sale
+       por defecto; ?suelo=v0|v1|v2|v3 (solo ?qa/?debug). Por variante: gain [corr, parche] (albedo RGB sobre la textura) y colores de Baja (promedio de Alta). */
+    variant: "v1",
+    variants: {
+      v0: { gain: [[0.73, 0.90, 0.86], [0.74, 0.88, 0.95]] },
+      v1: { noiseK: 0.9, gain: [[1, 1, 1], [1, 1, 1]], soilK: { corr: [0.75, 0.76, 0.81], parche: [0.62, 0.72, 0.71] }, lowColor: { "corr-herb": "#51432b", "parche-herb": "#3b4623" }, lowColorExtr: { "corr-herb": "#392e1b", "parche-herb": "#2a3317" } },
+      v2: { noiseK: 0.9, gain: [[1, 1, 1], [1, 1, 1]], soilK: { corr: [0.67, 0.69, 0.75], parche: [0.60, 0.67, 0.74] }, lowColor: { "corr-herb": "#332920", "parche-herb": "#283019" }, lowColorExtr: { "corr-herb": "#221c13", "parche-herb": "#1d2211" } },
+      v3: { noiseK: 1.0, gain: [[1, 1, 1], [1, 1, 1]], soilK: { corr: [0.77, 0.78, 0.81], parche: [0.66, 0.79, 0.73] }, lowColor: { "corr-herb": "#4f502f", "parche-herb": "#405326" }, lowColorExtr: { "corr-herb": "#39391f", "parche-herb": "#2f3c19" } }
+    }
   },
   lowSoil: true,             // Baja ya no dibuja plantas: el suelo cubre corredor y parche en vez de apagarse
   /* G5b: como se resuelve el suelo de Baja. "color" (por defecto) = SIN malla Three: se recolorean las capas MapLibre herb-ext (que Baja ya dibujaba)
