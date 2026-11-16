@@ -155,7 +155,7 @@ export const A2_PASTO = {
   lodPow: 0.85,
   innerM: 20, innerK: 0.35,                 // raleo interior: dentro de innerM m la densidad baja suave hasta innerK (0/1 = apagado)
   lodBand: 0.15,
-  byQuality: { ultra: { R: 450, dens: 0.75 }, alta: { R: 350, dens: 0.65 }, media: { R: 200, dens: 0.6 }, baja: { R: 0, dens: 0 } },
+  byQuality: { ultra: { R: 450, dens: 1.0 }, alta: { R: 350, dens: 1.0 }, media: { R: 200, dens: 0.6 }, baja: { R: 0, dens: 0 } },
   budgetMs: 2.0,
   maxCells: 700,
   tiers: [0.125, 0.25, 0.5, 1],
