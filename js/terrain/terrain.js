@@ -13,13 +13,13 @@
 
    Fuente y licencia: ver config.js (A6_TERRAIN) y handoffs/a6-terreno.md. */
 import * as THREE from "three";
-import { A1_CAMPOS, A1_SUN, A6_TERRAIN as C } from "../core/config.js?v=20261117";
-import { emit, on } from "../core/events.js?v=20261117";
-import { pointInPolygon, ringBBox } from "../core/geo.js?v=20261117";
-import { params, state } from "../core/state.js?v=20261117";
-import { quality, terrainEnabled } from "../core/quality.js?v=20261117";
-import { chainShader, reliefHook } from "../render/systems/chunks.js?v=20261117";
-import { loadHeightfield } from "./heightfield.js?v=20261117";
+import { A1_CAMPOS, A1_SUN, A6_TERRAIN as C } from "../core/config.js?v=20261118";
+import { emit, on } from "../core/events.js?v=20261118";
+import { pointInPolygon, ringBBox } from "../core/geo.js?v=20261118";
+import { params, state } from "../core/state.js?v=20261118";
+import { quality, terrainEnabled } from "../core/quality.js?v=20261118";
+import { chainShader, reliefHook } from "../render/systems/chunks.js?v=20261118";
+import { loadHeightfield } from "./heightfield.js?v=20261118";
 
 const DBG = params.has("debug") || params.has("qa");
 
@@ -190,8 +190,9 @@ function decidir(stats) {
   const cfg = C.campos[campo.id];
   if (cfg && typeof cfg.terreno === "boolean") return { available: cfg.terreno, why: "config del campo (A6_TERRAIN.campos)" };
   const a = C.auto;
-  const available = stats.desvioResidual > a.desvioResidual || stats.pendienteP95 > a.pendienteP95;
-  return { available, why: `auto: desvío residual ${stats.desvioResidual.toFixed(2)} m (umbral ${a.desvioResidual}), pendiente p95 ${stats.pendienteP95.toFixed(2)} % (umbral ${a.pendienteP95})` };
+  const porRegla = stats.desvioResidual > a.desvioResidual || stats.pendienteP95 > a.pendienteP95;
+  const available = C.todos || porRegla;
+  return { available, why: (C.todos ? "todos los campos (regla auto: " + (porRegla ? "con relieve" : "llano") + ") · " : "") + `auto: desvío residual ${stats.desvioResidual.toFixed(2)} m (umbral ${a.desvioResidual}), pendiente p95 ${stats.pendienteP95.toFixed(2)} % (umbral ${a.pendienteP95})` };
 }
 
 /* Máscara "adentro de algún polígono del campo" (como en la calibración del spike). */
@@ -313,6 +314,9 @@ function aplicarK(k, final = false) {
   if (map && terrain.mesh && map.terrain) {
     const t = map.terrain, tr = map.transform;
     t.exaggeration = Math.max(1e-3, k * terrain.exag);
+    /* 2026-11-18: MapLibre solo redibuja su framebuffer de coordenadas del terreno (con el que traduce el puntero a un punto del suelo) si
+       cambia la cámara. Con la cámara quieta quedaba el de k≈0 y el primer arrastre tras encender saltaba ~600 m y 1,5 niveles de zoom. */
+    if (map.painter && map.painter.terrainFacilitator) map.painter.terrainFacilitator.dirty = true;
     tr.minElevationForCurrentTile = t.getMinTileElevationForLngLatZoom(tr.center, tr.tileZoom);
     tr.elevation = t.getElevationForLngLatZoom(tr.center, tr.tileZoom);
   }
@@ -351,6 +355,57 @@ function apagarMalla(map) {
   limitarEscala(map, 0);   // la barra de escala vuelve a refrescarse en cada 'move'
   if (_skyPrev && map.getSky) map.setSky({ ...map.getSky(), "fog-ground-blend": _skyPrev.g, "horizon-fog-blend": _skyPrev.h });   // k = 0: ya estaba igual (aplicarSky)
   if (map.getLayer("hillshade")) map.setLayoutProperty("hillshade", "visibility", "none");
+}
+
+/* Cuelgue del 2026-11-18 (Mike: "al reactivar o mover la escena salta la cámara y se queda tildado"). La red de seguridad apaga el relieve
+   justo mientras el usuario arrastra, y setTerrain(null) en medio del gesto rompe MapLibre 4.7.1: el HandlerManager termina el arrastre
+   con transform.recalculateZoom(map.terrain) y map.terrain ya es null → TypeError DENTRO de su cola de tareas de render, que queda marcada
+   "en ejecución" para siempre ("Attempting to run(), but is already running") y el mapa no vuelve a dibujar.
+   (1) La malla se quita recién con el mapa quieto (sin gesto, inercia ni animación). (2) blindarColaRender: si alguna tarea de esa cola
+   falla, se libera la cola y se sigue (red de seguridad general: cualquier excepción así congelaba todo sin remedio). */
+function apagarMallaQuieta(map) {
+  return new Promise(res => {
+    const t0 = performance.now();
+    const intentar = () => {
+      if (terrain.on || terrain.k > 0) { res(false); return; }        // lo reencendieron mientras tanto: la malla se queda
+      const h = map.handlers;
+      if ((map.isMoving() || (h && h._terrainMovement)) && performance.now() - t0 < 30000) { setTimeout(intentar, 120); return; }
+      apagarMalla(map); res(true);
+    };
+    intentar();
+  });
+}
+function blindarColaRender(map) {
+  const q = map && map._renderTaskQueue;
+  if (!q || q._a6Safe || typeof q.run !== "function") return;
+  const run = q.run;
+  q.run = function (t) {
+    try { return run.call(this, t); }
+    catch (e) {
+      this._currentlyRunning = false;   // sin esto, todos los cuadros siguientes abortan y el visor queda congelado
+      console.warn("[mapa] una tarea de render falló y se recuperó:", (e && e.message) || e);
+    }
+  };
+  q._a6Safe = true;
+  /* Al terminar un arrastre con terreno MapLibre llama transform.recalculateZoom(map.terrain): deja la CÁMARA quieta en el espacio y corre el
+     centro adonde la mirada toca el suelo nuevo. Si el relieve está en transición (el suelo sube o baja ~100 m), a 79° de inclinación eso es un
+     salto de ~600 m y 1,5 niveles de zoom. Durante la transición manda aplicarK (centro y zoom fijos, la cámara acompaña al suelo), así que el
+     recálculo se omite; también sin terreno (map.terrain null: el TypeError que congelaba el mapa). */
+  /* En el PROTOTIPO: el gestor de gestos trabaja sobre copias de la cámara (transform.clone()) y recién después las aplica. */
+  const trP = map.transform && Object.getPrototypeOf(map.transform);
+  if (trP && typeof trP.recalculateZoom === "function" && !trP._a6Safe) {
+    const rz = trP.recalculateZoom;
+    trP.recalculateZoom = function (t) { if (!t || terrain.animating) return; return rz.call(this, t); };
+    trP._a6Safe = true;
+  }
+  /* Mismo problema por otra vía (medido con la pila del cambio de zoom 17,7 → 16,3): al soltar el arrastre, _applyUpdatedTransform llama a
+     _elevateCameraIfInsideTerrain, que con el suelo a medio camino y la elevación congelada por el gesto cree que la cámara quedó enterrada y
+     la "levanta" cambiando zoom y centro. Durante la transición del relieve no corre. */
+  if (typeof map._elevateCameraIfInsideTerrain === "function" && !map._a6SafeElev) {
+    const ec = map._elevateCameraIfInsideTerrain;
+    map._elevateCameraIfInsideTerrain = function (t) { return terrain.animating || !this.terrain ? {} : ec.call(this, t); };
+    map._a6SafeElev = true;
+  }
 }
 
 /* Espera (tope `ms`) a que las teselas DEM de la vista estén cargadas: si no, el relieve "crecería" sobre una malla vacía. */
@@ -401,7 +456,10 @@ export async function setRelief(on_, { animate = true, auto = false } = {}) {
   }
   const fin = await animarK(on_ ? 1 : 0, ms);
   if (!fin) return reliefState();   // otro pedido tomó el mando: él cierra el estado
-  if (!on_) apagarMalla(map);
+  if (!on_) {
+    await apagarMallaQuieta(map);   // k = 0 ya se ve plano; la malla se suelta cuando el mapa está quieto (ver arriba)
+    if (terrain.on) return reliefState();   // lo reencendieron mientras esperaba: ese pedido cierra el estado
+  }
   terrain.animating = false;
   emitirEstado();
   return reliefState();
@@ -447,6 +505,11 @@ function safetyFrame(f) {
 async function autoOff() {
   if (safety.fired || !terrain.on) return;
   safety.fired = true;
+  /* 2026-11-18: se espera a que el usuario suelte la escena (sin gesto, inercia ni animación de cámara). Apagar en medio del arrastre hacía
+     saltar el zoom al soltar (MapLibre recalcula la altura de la cámara sobre un suelo que se está aplanando) y quitaba la malla a mitad del gesto. */
+  const map = _map, t0 = performance.now();
+  while (map && (map.isMoving() || (map.handlers && map.handlers._terrainMovement)) && performance.now() - t0 < 60000) await new Promise(r => setTimeout(r, 150));
+  if (!terrain.on) return;   // el usuario lo apagó a mano mientras tanto
   const reason = "fluidez: p50 " + safety.lastP50.toFixed(1) + " ms > " + SAFE_THR + " ms en movimiento";
   console.info("[relieve] apagado automático (" + reason + ")");
   await setRelief(false, { animate: true, auto: true });
@@ -463,6 +526,7 @@ if (SAFE_ON) on("frame", safetyFrame);
 export async function initTerrain(map, bbox, data) {
   const t0 = performance.now();
   _map = map;
+  blindarColaRender(map);
   /* ?terreno=0 apaga TODO lo de A6 (terreno, hillshade y hasta la descarga del DEM): el visor queda idéntico al de antes
      del terreno (sirve de interruptor de comparación). ?hillshade=0|1 fuerza solo el sombreado de relieve. */
   if (params.get("terreno") === "0") { terrain.reason = "URL ?terreno=0 (todo apagado)"; terrain.unavailable = "sin-dem"; emitirEstado(); return terrain; }

@@ -363,6 +363,9 @@ export const A6_TERRAIN = {
      mediana 3×3 y pendiente con línea de base de `baselineM`, dentro de los polígonos del campo.
      Terreno ON si desvioResidual > X m (desvío tras restar el plano de mejor ajuste) o pendienteP95 > Y %. */
   auto: { desvioResidual: 2.7, pendienteP95: 2.5, baselineM: 240 },
+  /* 2026-11-18 (Mike): TODOS los campos tienen relieve disponible (El Carmen tiene zonas onduladas que la regla automática daba por llano);
+     el usuario lo apaga con el conmutador. La regla `auto` queda solo como dato (terrain.stats / terrain.reason). false = volver a la regla. */
+  todos: true,
   /* Override por campo (id de campo): { terreno: true|false, exag: n }. Tiene menos prioridad que el campo
      `terreno` de campos.local.json / la tabla `campos`, y que ?terreno=0|1 en la URL (la más fuerte). */
   campos: {
