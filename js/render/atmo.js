@@ -9,12 +9,12 @@
    está al 0,85 del horizonte geométrico, así que se descarta por ella y no por dir.z, y se deja
    un solape de ~3 px para evitar una rendija oscura (el canvas es transparente donde nadie pinta).
    Un draw call, 4 vértices. Calidad Baja: no dibuja (lighting.fog.enabled). */
-import { A1_FOG } from "../core/config.js?v=20261113";
-import { updateCamera } from "../core/camera.js?v=20261113";
-import { atm, fog, uniforms, updateFog } from "./lighting.js?v=20261113";
-import { GLSL_ADFOG, GLSL_FOG_UNIFORMS } from "./shaderlib.js?v=20261113";
-import { host } from "./host.js?v=20261113";
-import { terrain } from "../terrain/terrain.js?v=20261113";   // A6: con terreno la niebla la aplica MapLibre sobre la malla
+import { A1_FOG } from "../core/config.js?v=20261117";
+import { updateCamera } from "../core/camera.js?v=20261117";
+import { atm, fog, uniforms, updateFog } from "./lighting.js?v=20261117";
+import { GLSL_ADFOG, GLSL_FOG_UNIFORMS } from "./shaderlib.js?v=20261117";
+import { host } from "./host.js?v=20261117";
+import { terrain } from "../terrain/terrain.js?v=20261117";   // A6: con terreno la niebla la aplica MapLibre sobre la malla
 
 const VS = "attribute vec2 a;\nvarying vec2 vN;\nvoid main() { vN = a; gl_Position = vec4(a, 0.0, 1.0); }\n";
 const FS = "precision highp float;\nvarying vec2 vN;\n" +

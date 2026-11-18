@@ -3,9 +3,9 @@
    (?hora=dorada|atardecer; mediodía = sin parámetro) para compartir vistas. La lógica y la transición viven en render/lighting.js;
    acá solo se arma el DOM, se escucha "preset" (lo emite lighting.js, también desde la API de QA) y se actualiza la URL.
    D-5: el tour NO cambia de modo solo; lo elige el usuario. */
-import { on } from "../core/events.js?v=20261113";
-import { armarRelieve } from "./relief-ui.js?v=20261113";   // conmutador "Relieve del terreno" (debajo de la hora)
-import { PRESET_NAMES, presetName, setPreset } from "../render/lighting.js?v=20261113";
+import { on } from "../core/events.js?v=20261117";
+import { armarRelieve } from "./relief-ui.js?v=20261117";   // conmutador "Relieve del terreno" (debajo de la hora)
+import { PRESET_NAMES, presetName, setPreset } from "../render/lighting.js?v=20261117";
 
 const ICONOS = {
   // sol alto: disco con rayos

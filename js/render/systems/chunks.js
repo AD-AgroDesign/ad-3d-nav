@@ -33,7 +33,7 @@
    customProgramCacheKey; propuesta a A1 en handoffs/a2-fade.md); solo exige que `#include <common>` y
    `#include <project_vertex>` sigan presentes en el vertex shader. */
 import * as THREE from "three";
-import { mulberry32 } from "../../core/geo.js?v=20261113";
+import { mulberry32 } from "../../core/geo.js?v=20261117";
 
 /* A6 relieve en vivo: terrain.js (que importa este módulo) enchufa acá `low(x, z)` = metros que el suelo está bajado en (x, z) respecto de lo horneado
    (0 con el relieve completo). ChunkLod mide la distancia con el centro del chunk ya bajado, igual que lo dibujan los shaders. */

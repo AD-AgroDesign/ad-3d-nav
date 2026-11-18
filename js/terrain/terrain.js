@@ -13,13 +13,13 @@
 
    Fuente y licencia: ver config.js (A6_TERRAIN) y handoffs/a6-terreno.md. */
 import * as THREE from "three";
-import { A1_CAMPOS, A1_SUN, A6_TERRAIN as C } from "../core/config.js?v=20261113";
-import { emit, on } from "../core/events.js?v=20261113";
-import { pointInPolygon, ringBBox } from "../core/geo.js?v=20261113";
-import { params, state } from "../core/state.js?v=20261113";
-import { quality, terrainEnabled } from "../core/quality.js?v=20261113";
-import { chainShader, reliefHook } from "../render/systems/chunks.js?v=20261113";
-import { loadHeightfield } from "./heightfield.js?v=20261113";
+import { A1_CAMPOS, A1_SUN, A6_TERRAIN as C } from "../core/config.js?v=20261117";
+import { emit, on } from "../core/events.js?v=20261117";
+import { pointInPolygon, ringBBox } from "../core/geo.js?v=20261117";
+import { params, state } from "../core/state.js?v=20261117";
+import { quality, terrainEnabled } from "../core/quality.js?v=20261117";
+import { chainShader, reliefHook } from "../render/systems/chunks.js?v=20261117";
+import { loadHeightfield } from "./heightfield.js?v=20261117";
 
 const DBG = params.has("debug") || params.has("qa");
 

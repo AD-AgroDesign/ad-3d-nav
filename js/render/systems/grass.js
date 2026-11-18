@@ -30,17 +30,17 @@
 
    QA (solo ?qa/?debug): ?pastoms=<ms de presupuesto> · window.__nav3dGrass { settle(), flush(), stats(), budget(ms) }. */
 import * as THREE from "three";
-import { A2_PASTO as PC, WIND_IDLE_DIST } from "../../core/config.js?v=20261113";
-import { quality } from "../../core/quality.js?v=20261113";
-import { params } from "../../core/state.js?v=20261113";
-import { mulberry32 } from "../../core/geo.js?v=20261113";
-import { patch } from "../shaderlib.js?v=20261113";
-import { idleDriver } from "../idle.js?v=20261113";
-import { applyAO, applyLod, cellSeed, chainShader } from "./chunks.js?v=20261113";
-import { map } from "../../map/style.js?v=20261113";
-import { fitSpheres, lowAt, terrain } from "../../terrain/terrain.js?v=20261113";   // A6 relieve en vivo
-import { uniforms } from "../lighting.js?v=20261113";
-import { GRASS_ATLAS, GRASS_TILE_COUNT, createAtlasJob } from "./grassgen.js?v=20261113";
+import { A2_PASTO as PC, WIND_IDLE_DIST } from "../../core/config.js?v=20261117";
+import { quality } from "../../core/quality.js?v=20261117";
+import { params } from "../../core/state.js?v=20261117";
+import { mulberry32 } from "../../core/geo.js?v=20261117";
+import { patch } from "../shaderlib.js?v=20261117";
+import { idleDriver } from "../idle.js?v=20261117";
+import { applyAO, applyLod, cellSeed, chainShader } from "./chunks.js?v=20261117";
+import { map } from "../../map/style.js?v=20261117";
+import { fitSpheres, lowAt, terrain } from "../../terrain/terrain.js?v=20261117";   // A6 relieve en vivo
+import { uniforms } from "../lighting.js?v=20261117";
+import { GRASS_ATLAS, GRASS_TILE_COUNT, createAtlasJob } from "./grassgen.js?v=20261117";
 
 const DBG = params.has("qa") || params.has("debug");
 /* ?pastocfg={"nearM":40,"lodPow":0.8,"byQuality":{"alta":{"R":300,"dens":1}}} se mezcla sobre A2_PASTO (solo ?qa/?debug; para afinar diales con capturas) */
@@ -208,7 +208,9 @@ function getMaskCtx() {
 const maskBuf = new Uint8Array(MPX * MPX);
 function rasterMask(S, cell) {
   const c = getMaskCtx();
-  c.setTransform(1, 0, 0, 1, 0, 0); c.globalCompositeOperation = "source-over"; c.clearRect(0, 0, MPX, MPX);
+  /* Fondo NEGRO OPACO (no transparente): getImageData devuelve el color des-premultiplicado, así que sobre fondo transparente un píxel
+     apenas rozado por el borde se lee como rojo 255. Con fondo opaco el canal = cobertura real (fix 2026-11-17: plantas sobre los caminos). */
+  c.setTransform(1, 0, 0, 1, 0, 0); c.globalCompositeOperation = "source-over"; c.fillStyle = "#000"; c.fillRect(0, 0, MPX, MPX);
   c.setTransform(MS, 0, 0, MS, -cell.x0 * MS, -cell.z0 * MS);
   c.globalCompositeOperation = "lighter";
   const x1 = cell.x0 + CELL, z1 = cell.z0 + CELL;
@@ -260,6 +262,9 @@ function prepare(ctx, S, data) {
   if (W > 16384 || H > 16384) { console.warn("[pasto] campo demasiado extenso para el raster grueso: sin pasto"); S.prepMs = performance.now() - t0; return; }
   const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
   const c = cv.getContext("2d", { willReadFrequently: true });
+  /* Fondo negro opaco: ver rasterMask. Sobre fondo transparente, cada píxel de borde se leía como cubierto al 100 % y las celdas cruzadas
+     por un camino o un borde quedaban como "totalmente adentro" (sin máscara): se sembraban enteras, camino incluido. */
+  c.fillStyle = "#000"; c.fillRect(0, 0, W, H);
   c.setTransform(CP / CELL, 0, 0, CP / CELL, -ix0 * CP, -iz0 * CP);
   c.globalCompositeOperation = "lighter";
   for (const cls of [1, 2]) {

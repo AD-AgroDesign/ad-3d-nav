@@ -16,14 +16,14 @@
 
    Para A3 (sombras): ver `casters(scenarioKey)` abajo. */
 import * as THREE from "three";
-import { CHUNK_CELL_TREES, TREE_ALPHA_TEST, TREE_IMPOSTOR, TREE_IMPOSTOR_CULL, TREE_LOD_BAND, TREE_SPECIES, TREE_SWAY, WIND_IDLE_DIST } from "../../core/config.js?v=20261113";
-import { idleDriver } from "../idle.js?v=20261113";
-import { chainShader, partitionCells } from "./chunks.js?v=20261113";
-import { lowAt } from "../../terrain/terrain.js?v=20261113";   // A6 relieve en vivo: centro de celda bajado
-import { uniforms } from "../lighting.js?v=20261113";
+import { CHUNK_CELL_TREES, TREE_ALPHA_TEST, TREE_IMPOSTOR, TREE_IMPOSTOR_CULL, TREE_LOD_BAND, TREE_SPECIES, TREE_SWAY, WIND_IDLE_DIST } from "../../core/config.js?v=20261117";
+import { idleDriver } from "../idle.js?v=20261117";
+import { chainShader, partitionCells } from "./chunks.js?v=20261117";
+import { lowAt } from "../../terrain/terrain.js?v=20261117";   // A6 relieve en vivo: centro de celda bajado
+import { uniforms } from "../lighting.js?v=20261117";
 
 const _fr = new THREE.Frustum(), _sp = new THREE.Sphere();
-import { buildAtlas, buildImpostorAtlas, buildImpostorGeometry, buildProxy, buildSpecies } from "./treegen.js?v=20261113";
+import { buildAtlas, buildImpostorAtlas, buildImpostorGeometry, buildProxy, buildSpecies } from "./treegen.js?v=20261117";
 
 const built = {};   // scenarioKey → { cells, nearMat, farMat, counts, n }
 const SPECIES = Object.keys(TREE_SPECIES);

@@ -255,6 +255,8 @@ export const A4_GROUND = {
     gain: [[0.73, 0.90, 0.86], [0.74, 0.88, 0.95]], tint: 0.05, noiseK: 0.55,
     border: [0.80, 1.16, 0.70], borderW: 0.85, aoK: 0.5,
     size: { full: 1024, lite: 512 },
+    /* Caminos (2026-11-17): textura de tierra y ripio (pintor ROAD_PAINT en ground.js). gain = albedo RGB; borderW = banquina verde en la franja de borde. */
+    road: { gain: [1.0, 1.0, 1.0], borderW: 0.55 },
     /* Devolución G5 (Mike, 2026-11-16): el corredor/parche herbáceo se lee deslucido desde el aire; quiere un piso marrón oscuro tipo tierra arada que
        los destaque (protagonistas del rediseño). Ya no manda "mismo promedio que las plantas" sino el CONTRASTE contra los lotes. Variantes (pintores en
        ground.js): v0 = G5 original (comparar), v1 pardo oscuro como el viejo, v2 tierra arada húmeda, v3 intermedio con más verde. `variant` = la que sale
@@ -278,7 +280,8 @@ export const A4_GROUND = {
     "parche-herb": { color: "#4d5c33", dry: "#565e34", green: "#485c34", alpha: 1.0,  tune: [0.61, 0.75, 1.06], tex: "parche" },
     "bajo":        { color: "#6f8a72", dry: "#788a70", green: "#6b8a76", alpha: 1.0,  tune: [0.62, 0.75, 0.52] },
     "parche-le":   { color: "#2e5026", dry: "#34502a", green: "#2b5028", alpha: 0.45, tune: [1.0, 1.08, 1.28] },
-    "corr-le":     { color: "#2e5026", dry: "#34502a", green: "#2b5028", alpha: 0.45, tune: [1.04, 1.10, 1.26] }
+    "corr-le":     { color: "#2e5026", dry: "#34502a", green: "#2b5028", alpha: 0.45, tune: [1.04, 1.10, 1.26] },
+    "camino":      { color: "#a8936f", dry: "#ad9672", green: "#a3906e", alpha: 1.0,  tune: [1, 1, 1], tex: "camino" }   // 2026-11-17: caminos con textura (ROAD_PAINT)
   }
 };
 export const A4_FURROWS = {

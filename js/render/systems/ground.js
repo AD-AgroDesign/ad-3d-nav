@@ -30,13 +30,13 @@
        dibuja esta capa) + polygonOffset, apoyados en heightAt, con normales del relieve para que reciban el sol
        como la ladera real. Sin terreno nada cambia. */
 import * as THREE from "three";
-import { A4_FURROWS, A4_GROUND, WOODY_BASE } from "../../core/config.js?v=20261113";
-import { HOME_VIEW, params } from "../../core/state.js?v=20261113";
-import { quality } from "../../core/quality.js?v=20261113";
-import { map } from "../../map/style.js?v=20261113";
-import { chainShader } from "./chunks.js?v=20261113";
-import { mulberry32 } from "../../core/geo.js?v=20261113";
-import { extOpacityProp, GLSL_DECL, withReliefU } from "../../terrain/terrain.js?v=20261113";   // A6: relieve
+import { A4_FURROWS, A4_GROUND, WOODY_BASE } from "../../core/config.js?v=20261117";
+import { HOME_VIEW, params } from "../../core/state.js?v=20261117";
+import { quality } from "../../core/quality.js?v=20261117";
+import { map } from "../../map/style.js?v=20261117";
+import { chainShader } from "./chunks.js?v=20261117";
+import { mulberry32 } from "../../core/geo.js?v=20261117";
+import { extOpacityProp, GLSL_DECL, withReliefU } from "../../terrain/terrain.js?v=20261117";   // A6: relieve
 
 /* ---------- parámetros efectivos (config + URL) ---------- */
 const DBG = params.has("qa") || params.has("debug");
@@ -86,7 +86,7 @@ const nu = cell => (1 / (cell * NOISE_C)).toFixed(7);
    promedio del suelo coincida con el de las plantas de A2 vistas de lejos. Sin costura: cada mancha se dibuja también desplazada ±S cuando
    cruza el borde. sRGB (la GPU decodifica a lineal; los mipmaps promedian en lineal). Costo: ~2 canvas de 1024² (full) o 512² (lite, Baja);
    se hace UNA vez en el primer build y se rehace solo si el nivel cambia de tamaño (onQuality). */
-const TEX_SEED = { corr: 77, parche: 91 };
+const TEX_SEED = { corr: 77, parche: 91, camino: 133 };
 /* Variantes de suelo (devolución G5 de Mike: "piso marrón más oscuro, tipo tierra arada"). v0 = el G5 original (gris verdoso claro, solo para comparar);
    v1/v2/v3 = tierra oscura con moteado + matas verdes + las mismas flores. ?suelo=v0|v1|v2|v3 (solo ?qa/?debug); el default y los diales por variante
    (gain, colores de Baja) están en A4_GROUND.tex.variants / .variant (config.js). Cada entrada de los pintores: [cantidad, radio mín, radio máx, colores]. */
@@ -175,13 +175,26 @@ const SOIL_PAINT = {
       ] }
   }
 };
+/* Caminos de tierra (2026-11-17, devolución de Mike antes de la demo: "los caminos lucen a contramano de los corredores"). Tierra apisonada con
+   tosca: manchas secas/húmedas grandes, ripio fino claro y oscuro, algo de pasto ralo. No depende de la variante del suelo de corredores.
+   Sin dirección (no hay eje del camino en el GIS): nada de huellas de ruedas, que con un patrón fijo quedarían cruzadas en las curvas. */
+const ROAD_PAINT = {
+  base: "#a8936f",
+  blobs: [
+    [700, 14, 44, ["#9f8a68", "#b29d79", "#a6916e", "#b9a581"]],   // zonas más secas y más compactas
+    [420, 8, 22, ["#8f7b5c", "#957f5f", "#8a7758"]],               // manchas húmedas / tierra suelta
+    [2200, 2, 5, ["#c2b090", "#9a8564", "#b7a482"]],                // terrones
+    [7000, 0.7, 1.9, ["#cfc0a0", "#d8cbad", "#7b6a50", "#6c5c45", "#bba985", "#e0d5ba"]],   // ripio / tosca
+    [160, 2, 6, ["#7a7d48", "#6f7642", "#868a52"]]                  // pasto ralo que asoma
+  ]
+};
 const soilVariant = () => { const v = DBG ? params.get("suelo") : null; return v && SOIL_PAINT[v] && A4_GROUND.tex.variants[v] ? v : A4_GROUND.tex.variant; };
 const soilVar = () => A4_GROUND.tex.variants[soilVariant()];
 let texMean = null;   // QA: promedio sRGB de cada textura (solo con ?qa/?debug)
 function paintSoilTex(kind, size) {
   const cv = document.createElement("canvas"); cv.width = cv.height = size;
   const c = cv.getContext("2d"), r = mulberry32(TEX_SEED[kind]), sc = size / 1024;
-  const pal = SOIL_PAINT[soilVariant()][kind], kk = soilVar().soilK, blobs = pal.blobs;
+  const pal = kind === "camino" ? ROAD_PAINT : SOIL_PAINT[soilVariant()][kind], kk = kind === "camino" ? null : soilVar().soilK, blobs = pal.blobs;
   /* soilK = [r,g,b] por tipo: multiplica (sRGB) los colores de TIERRA y matas pero no los de las flores: así se oscurece el piso sin apagar los puntos celestes */
   const tone = col => { if (!kk || !kk[kind]) return col; const k = kk[kind], n = parseInt(col.slice(1), 16); return "#" + [n >> 16, (n >> 8) & 255, n & 255].map((v, i) => Math.min(255, Math.round(v * k[i])).toString(16).padStart(2, "0")).join(""); };
   c.fillStyle = tone(pal.base); c.fillRect(0, 0, size, size);
@@ -206,13 +219,13 @@ function paintSoilTex(kind, size) {
   tex.anisotropy = size >= 1024 ? 8 : 2; tex.generateMipmaps = true; tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter;
   return { tex };
 }
-const SOIL = { size: 0, corr: null, parche: null };
+const SOIL = { size: 0, corr: null, parche: null, camino: null };
 let texMs = 0;
 function ensureSoilTex(lite) {
   const size = lite ? A4_GROUND.tex.size.lite : A4_GROUND.tex.size.full;
   if (SOIL.size === size) return SOIL;
   const t0 = performance.now();
-  for (const k of ["corr", "parche"]) {
+  for (const k of ["corr", "parche", "camino"]) {
     const o = paintSoilTex(k, size);
     if (SOIL[k]) {   // cambio de tamaño en caliente: se reemplaza la textura en los uniforms vivos
       SOIL[k].tex.dispose();
@@ -509,7 +522,7 @@ function makeGroundMaterial(ctx, key, hasH, dTex, dmap) {
     const tn = c && c.tune ? c.tune : [1, 1, 1];
     dry.push(new THREE.Color(c ? c.dry : "#000000").multiply(new THREE.Color(...tn))); grn.push(new THREE.Color(c ? c.green : "#000000").multiply(new THREE.Color(...tn)));
     alp.push(c ? c.alpha : 1);
-    sel.push(c && texWanted() ? (c.tex === "corr" ? 1 : c.tex === "parche" ? 2 : 0) : 0);   // G5: 0 = color plano (dry/green), 1 = textura de corredor, 2 = de parche
+    sel.push(c && texWanted() ? (c.tex === "corr" ? 1 : c.tex === "parche" ? 2 : c.tex === "camino" ? 3 : 0) : 0);   // G5: 0 = color plano (dry/green), 1 = textura de corredor, 2 = de parche, 3 = de camino
   }
   const U = {
     uDry: { value: dry }, uGrn: { value: grn }, uAlp: { value: alp },
@@ -519,7 +532,8 @@ function makeGroundMaterial(ctx, key, hasH, dTex, dmap) {
     uAO: { value: new THREE.Vector2(A4_GROUND.edgeAO.width, A4_GROUND.edgeAO.strength) },
     uSoft: { value: new THREE.Vector2(A4_GROUND.reveal.soft, A4_GROUND.reveal.jitter) },
     // G5: texturas de corredor/parche (ver bloque A4_GROUND.tex en config.js)
-    uTexSel: { value: sel }, t_corr: { value: soil.corr.tex }, t_parche: { value: soil.parche.tex },
+    uTexSel: { value: sel }, t_corr: { value: soil.corr.tex }, t_parche: { value: soil.parche.tex }, t_camino: { value: soil.camino.tex },
+    uRoad: { value: new THREE.Vector4(...TX.road.gain, TX.road.borderW) },   // caminos: albedo RGB y cuánto del borde verde se aplica
     uTexK: { value: new THREE.Vector4(1 / TX.period, 1 / TX.detailPeriod, TX.detailAmp, soilVar().noiseK ?? TX.noiseK) },
     uTexP: { value: new THREE.Vector4(TX.tint, TX.aoK, TX.borderW, 0) },
     uTexGainC: { value: new THREE.Vector3(...soilVar().gain[0]) }, uTexGainP: { value: new THREE.Vector3(...soilVar().gain[1]) },
@@ -546,7 +560,7 @@ function makeGroundMaterial(ctx, key, hasH, dTex, dmap) {
     sh.fragmentShader = sh.fragmentShader
       .replace("#include <common>",
         "#include <common>\nvarying vec3 vWp;\nflat varying vec3 vDry;\nflat varying vec3 vGrn;\nflat varying float vTex;\nvarying vec2 vInf;\n" +
-        "uniform sampler2D t_corr;\nuniform sampler2D t_parche;\nuniform vec4 uTexK;\nuniform vec4 uTexP;\nuniform vec3 uTexGainC;\nuniform vec3 uTexGainP;\nuniform vec3 uBorder;\nuniform float uLite;\n" +
+        "uniform sampler2D t_corr;\nuniform sampler2D t_parche;\nuniform sampler2D t_camino;\nuniform vec4 uRoad;\nuniform vec4 uTexK;\nuniform vec4 uTexP;\nuniform vec3 uTexGainC;\nuniform vec3 uTexGainP;\nuniform vec3 uBorder;\nuniform float uLite;\n" +
         "uniform sampler2D tDepth;\nuniform vec4 uDMap;\nuniform float uGrow;\nuniform float uGain;\nuniform vec3 uNoise;\nuniform vec2 uAO;\nuniform vec2 uSoft;\n" + GLSL_NOISE_TEX)
       .replace("vec4 diffuseColor = vec4( diffuse, opacity );",
         "vec2 adP = vWp.xz;\n" +
@@ -559,18 +573,19 @@ function makeGroundMaterial(ctx, key, hasH, dTex, dmap) {
         "if (vTex > 0.5) {\n" +                                              // G5: corredor / parche con textura de suelo
         "  vec2 uvA = adP * uTexK.x, dAx = adPx * uTexK.x, dAy = adPy * uTexK.x;\n" +
         "  vec3 tx;\n" +
-        "  if (vTex < 1.5) tx = textureGrad(t_corr, uvA, dAx, dAy).rgb; else tx = textureGrad(t_parche, uvA, dAx, dAy).rgb;\n" +
+        "  bool adRoad = vTex > 2.5;\n" +                                     // caminos (2026-11-17)
+        "  if (adRoad) tx = textureGrad(t_camino, uvA, dAx, dAy).rgb; else if (vTex < 1.5) tx = textureGrad(t_corr, uvA, dAx, dAy).rgb; else tx = textureGrad(t_parche, uvA, dAx, dAy).rgb;\n" +
         "  if (uLite < 0.5) {\n" +                                            // 2.a muestra, rotada y a otra escala: rompe la repeticion; suma solo la desviacion (promedio intacto)
         "    mat2 R = mat2(0.87, -0.50, 0.50, 0.87);\n" +
         "    vec2 uvB = R * adP * uTexK.y + vec2(0.31, 0.77), dBx = R * adPx * uTexK.y, dBy = R * adPy * uTexK.y;\n" +
-        "    vec3 tb = vTex < 1.5 ? textureGrad(t_corr, uvB, dBx, dBy).rgb : textureGrad(t_parche, uvB, dBx, dBy).rgb;\n" +
-        "    vec3 mn = vTex < 1.5 ? textureLod(t_corr, vec2(0.5), 10.0).rgb : textureLod(t_parche, vec2(0.5), 10.0).rgb;\n" +
+        "    vec3 tb = adRoad ? textureGrad(t_camino, uvB, dBx, dBy).rgb : vTex < 1.5 ? textureGrad(t_corr, uvB, dBx, dBy).rgb : textureGrad(t_parche, uvB, dBx, dBy).rgb;\n" +
+        "    vec3 mn = adRoad ? textureLod(t_camino, vec2(0.5), 10.0).rgb : vTex < 1.5 ? textureLod(t_corr, vec2(0.5), 10.0).rgb : textureLod(t_parche, vec2(0.5), 10.0).rgb;\n" +
         "    tx += (tb - mn) * uTexK.z;\n" +
         "  }\n" +
-        "  adCol = max(tx, vec3(0.0)) * (vTex < 1.5 ? uTexGainC : uTexGainP);\n" +
-        "  adCol *= mix(vec3(1.0 + uTexP.x, 1.0 + 0.3 * uTexP.x, 1.0 - 1.5 * uTexP.x), vec3(1.0 - 0.6 * uTexP.x, 1.0, 1.0 + 0.5 * uTexP.x), gmix);\n" +   // seco <-> verde
+        "  adCol = max(tx, vec3(0.0)) * (adRoad ? uRoad.rgb : vTex < 1.5 ? uTexGainC : uTexGainP);\n" +
+        "  if (!adRoad) adCol *= mix(vec3(1.0 + uTexP.x, 1.0 + 0.3 * uTexP.x, 1.0 - 1.5 * uTexP.x), vec3(1.0 - 0.6 * uTexP.x, 1.0, 1.0 + 0.5 * uTexP.x), gmix);\n" +   // seco <-> verde (no en caminos)
         "  adCol *= (1.0 + 2.0 * uTexK.w * (uNoise.y * (n2 - 0.5) + uNoise.z * (n3 - 0.5))) * uGain;\n" +
-        "  adCol *= mix(vec3(1.0), uBorder, uTexP.z * smoothstep(0.0, 1.0, vInf.x));\n" +   // borde verde junto al cultivo (franja de AO)
+        "  adCol *= mix(vec3(1.0), uBorder, (adRoad ? uRoad.w : uTexP.z) * smoothstep(0.0, 1.0, vInf.x));\n" +   // borde verde junto al cultivo (franja de AO); en caminos, la banquina
         "  aoK = uTexP.y;\n" +
         "} else {\n" +
         "  float n1 = 0.5;\n" +
@@ -580,7 +595,7 @@ function makeGroundMaterial(ctx, key, hasH, dTex, dmap) {
         "}\n" +
         "adCol *= 1.0 - uAO.y * aoK * smoothstep(0.0, 1.0, vInf.x);\n" +       // AO de borde (franja)
         "float adM = 1.0;\n" +
-        "if (uGrow < 0.999) {\n" +                                                 // revelado desde el eje
+        "if (uGrow < 0.999 && vTex < 2.5) {\n" +                                   // revelado desde el eje (los caminos existen en los dos escenarios: no se revelan)
         "  float span = 1.0 + uSoft.x + uSoft.y;\n" +
         "  float lo = 1.0 - uGrow * span;\n" +
         "  float s = texture2D(tDepth, (vWp.xz - uDMap.xy) * uDMap.zw).r + (n3 - 0.5) * 2.0 * uSoft.y;\n" +   // profundidad horneada (a4-g2)

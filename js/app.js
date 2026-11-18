@@ -6,18 +6,18 @@
    Supabase: ver js/auth.js.
    ============================================================ */
 
-import { loadCampos, loadData } from "./map/data.js?v=20261113";
-import { addScenarioLayers, applyGrowth, applyOpacity } from "./map/layers.js?v=20261113";
-import { applyRasterGrade, map } from "./map/style.js?v=20261113";
-import { updatePanel } from "./ui/panel.js?v=20261113";
-import { mapStyle } from "./map/style.js?v=20261113";
-import { DEBUG, state } from "./core/state.js?v=20261113";
-import { initTerrain } from "./terrain/terrain.js?v=20261113";   // A6: relieve (DEM terrarium), hillshade y terreno 3D automático
-import "./render/atmo.js?v=20261113";   // A1: capa atmo-fog (se registra sola en host.registerBeforeLayer, antes de addScenarioLayers)
-import "./ui/controls.js?v=20261113";
-import "./ui/presets-ui.js?v=20261113";   // A1 (3.1): botones de modo de hora
-import "./debug/fps.js?v=20261113";
-import "./debug/qa-api.js?v=20261113";
+import { loadCampos, loadData } from "./map/data.js?v=20261117";
+import { addScenarioLayers, applyGrowth, applyOpacity } from "./map/layers.js?v=20261117";
+import { applyRasterGrade, map } from "./map/style.js?v=20261117";
+import { updatePanel } from "./ui/panel.js?v=20261117";
+import { mapStyle } from "./map/style.js?v=20261117";
+import { DEBUG, state } from "./core/state.js?v=20261117";
+import { initTerrain } from "./terrain/terrain.js?v=20261117";   // A6: relieve (DEM terrarium), hillshade y terreno 3D automático
+import "./render/atmo.js?v=20261117";   // A1: capa atmo-fog (se registra sola en host.registerBeforeLayer, antes de addScenarioLayers)
+import "./ui/controls.js?v=20261117";
+import "./ui/presets-ui.js?v=20261117";   // A1 (3.1): botones de modo de hora
+import "./debug/fps.js?v=20261117";
+import "./debug/qa-api.js?v=20261117";
 
 /* Con ?debug se exponen el mapa, su estilo y el estado en window (inspección desde
    la consola). Antes vivía junto a la creación del mapa en main.js. */

@@ -30,11 +30,61 @@ export function lonLatToPixel(lon, lat, z) {
   return { x, y };
 }
 
+/* Decodificador PNG propio (8 bits, RGB / RGBA / paleta, sin entrelazado) con DecompressionStream.
+   POR QUÉ (2026-11-17): Brave (y Firefox con resistFingerprinting) alteran a propósito lo que devuelve getImageData ("farbling") para
+   evitar la huella digital del canvas. En terrarium un ±1 en el canal R son ±256 m: aparecían agujas de cientos de metros en el suelo,
+   el agua y el pasto (las "torres"). Leyendo los bytes del PNG directamente no hay canvas de por medio. Devuelve null si el PNG no es de
+   un tipo soportado (entonces se usa el canvas, como antes). */
+async function decodePngRGB(buf) {
+  const b = new Uint8Array(buf), dv = new DataView(buf);
+  if (typeof DecompressionStream === "undefined" || b.length < 33 || b[0] !== 0x89 || b[1] !== 0x50 || b[2] !== 0x4e || b[3] !== 0x47) return null;
+  let p = 8, w = 0, h = 0, depth = 0, ctype = 0, inter = 0, pal = null;
+  const idat = [];
+  while (p + 8 <= b.length) {
+    const len = dv.getUint32(p), type = String.fromCharCode(b[p + 4], b[p + 5], b[p + 6], b[p + 7]), d0 = p + 8;
+    if (type === "IHDR") { w = dv.getUint32(d0); h = dv.getUint32(d0 + 4); depth = b[d0 + 8]; ctype = b[d0 + 9]; inter = b[d0 + 12]; }
+    else if (type === "PLTE") pal = b.subarray(d0, d0 + len);
+    else if (type === "IDAT") idat.push(b.subarray(d0, d0 + len));
+    else if (type === "IEND") break;
+    p = d0 + len + 4;
+  }
+  const bpp = ctype === 2 ? 3 : ctype === 6 ? 4 : ctype === 3 ? 1 : 0;
+  if (!bpp || depth !== 8 || inter !== 0 || w !== TS || h !== TS || (ctype === 3 && !pal) || !idat.length) return null;
+  const raw = new Uint8Array(await new Response(new Blob(idat).stream().pipeThrough(new DecompressionStream("deflate"))).arrayBuffer());
+  const stride = w * bpp;
+  if (raw.length < h * (stride + 1)) return null;
+  const px = new Uint8Array(h * stride);
+  for (let y = 0; y < h; y++) {
+    const f = raw[y * (stride + 1)], src = y * (stride + 1) + 1, o = y * stride, up = o - stride;
+    for (let x = 0; x < stride; x++) {
+      const v = raw[src + x], a = x >= bpp ? px[o + x - bpp] : 0, u = y ? px[up + x] : 0, c = (x >= bpp && y) ? px[up + x - bpp] : 0;
+      let r;
+      if (f === 0) r = v;
+      else if (f === 1) r = v + a;
+      else if (f === 2) r = v + u;
+      else if (f === 3) r = v + ((a + u) >> 1);
+      else if (f === 4) { const q = a + u - c, pa = Math.abs(q - a), pb = Math.abs(q - u), pc = Math.abs(q - c); r = v + (pa <= pb && pa <= pc ? a : pb <= pc ? u : c); }
+      else return null;
+      px[o + x] = r & 255;
+    }
+  }
+  const out = new Float32Array(w * h);
+  for (let i = 0; i < out.length; i++) {
+    let R, G, B;
+    if (ctype === 3) { const k = px[i] * 3; R = pal[k]; G = pal[k + 1]; B = pal[k + 2]; }
+    else { const k = i * bpp; R = px[k]; G = px[k + 1]; B = px[k + 2]; }
+    out[i] = R * 256 + G + B / 256 - 32768;
+  }
+  return out;
+}
+
 async function decodeTile(url) {
   // timeout: un tile colgado no debe frenar el arranque del visor (initTerrain cae a "sin terreno" si algo falla)
   const res = await fetch(url, { mode: "cors", signal: AbortSignal.timeout(12000) });
   if (!res.ok) throw new Error("terrarium " + res.status + " " + url);
   const blob = await res.blob();
+  try { const direct = await decodePngRGB(await blob.arrayBuffer()); if (direct) return direct; }
+  catch (e) { console.warn("terrarium: decodificación directa falló, uso canvas:", e.message || e); }
   // sin conversión de color ni premultiplicado: los canales son datos, no color
   const bmp = await createImageBitmap(blob, { colorSpaceConversion: "none", premultiplyAlpha: "none" });
   const cv = (typeof OffscreenCanvas !== "undefined")
