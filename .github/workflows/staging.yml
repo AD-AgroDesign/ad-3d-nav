@@ -1,0 +1,52 @@
+# Publica la rama de preview en el sitio de staging (https://3d-staging.agrodesign.site).
+# Producción (3d.agrodesign.site) NO pasa por acá: sigue saliendo de `main` con GitHub Pages ("Deploy from a branch").
+# Dispara con cualquier rama cuyo nombre contenga "staging" (p. ej. `staging` o `claude/staging`), nunca con `main`.
+# Requiere el secreto STAGING_DEPLOY_KEY: clave privada SSH cuya pública está como deploy key CON ESCRITURA en
+# AD-AgroDesign/ad-3d-nav-staging (ver LEEME_TRASPASO del programa del simulador).
+name: Publicar staging
+
+on:
+  push:
+    branches: ["**staging**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: staging
+  cancel-in-progress: true
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Traer el código de la rama
+        uses: actions/checkout@v4
+
+      - name: Armar el sitio de staging
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+          # Todo el sitio menos lo que no se sirve: git, workflows, agentes y herramientas de desarrollo.
+          # (docs/ se publica a propósito: las hojas de cada compuerta se pueden abrir en el staging.)
+          rsync -a --exclude '.git' --exclude '.github' --exclude '.claude' --exclude 'dev' --exclude '_site' ./ _site/
+          echo "3d-staging.agrodesign.site" > _site/CNAME
+          # Que los buscadores no indexen el staging.
+          sed -i '0,/<head>/s##<head>\n  <meta name="robots" content="noindex, nofollow">#' _site/index.html
+          printf 'User-agent: *\nDisallow: /\n' > _site/robots.txt
+          touch _site/.nojekyll
+          # Qué commit está publicado (útil en los informes de compuerta).
+          printf '%s %s\n' "${GITHUB_REF_NAME}" "${GITHUB_SHA}" > _site/STAGING_COMMIT.txt
+          grep -q 'name="robots"' _site/index.html
+
+      - name: Publicar en el repo de staging
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          deploy_key: ${{ secrets.STAGING_DEPLOY_KEY }}
+          external_repository: AD-AgroDesign/ad-3d-nav-staging
+          publish_branch: gh-pages
+          publish_dir: ./_site
+          cname: 3d-staging.agrodesign.site
+          force_orphan: true
+          commit_message: "staging: ${{ github.ref_name }} @ ${{ github.sha }}"
