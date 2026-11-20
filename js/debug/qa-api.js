@@ -10,16 +10,16 @@
    Con ?qa nunca arranca el tour ni la cámara solos: el splash se saltea desde
    la API y el tour/órbita solo corren si se piden (startTour/startOrbit).
    ==================================================================== */
-import { HOME_VIEW, state } from "../core/state.js?v=20261118";
-import { featureCentroid, mulberry32, ringAreaHa } from "../core/geo.js?v=20261118";
-import { map } from "../map/style.js?v=20261118";
-import { setScenario } from "../map/scenario.js?v=20261118";
-import { getCamera } from "../core/camera.js?v=20261118";
-import { LEVELS, setQuality } from "../core/quality.js?v=20261118";
-import { host } from "../render/host.js?v=20261118";
-import { PRESET_NAMES, atm, presetName, setPreset, uniforms } from "../render/lighting.js?v=20261118";
-import { RAZANTE_CAM, corridorCenterline, makeFlight } from "../tour/flight.js?v=20261118";
-import { startOrbit, startTour, stopOrbit, stopTour } from "../tour/tour.js?v=20261118";
+import { HOME_VIEW, state } from "../core/state.js?v=20261120";
+import { featureCentroid, mulberry32, ringAreaHa } from "../core/geo.js?v=20261120";
+import { map } from "../map/style.js?v=20261120";
+import { setScenario } from "../map/scenario.js?v=20261120";
+import { getCamera } from "../core/camera.js?v=20261120";
+import { LEVELS, setQuality } from "../core/quality.js?v=20261120";
+import { host } from "../render/host.js?v=20261120";
+import { PRESET_NAMES, atm, presetName, setPreset, uniforms } from "../render/lighting.js?v=20261120";
+import { RAZANTE_CAM, corridorCenterline, makeFlight } from "../tour/flight.js?v=20261120";
+import { startOrbit, startTour, stopOrbit, stopTour } from "../tour/tour.js?v=20261120";
 
 (() => {
   const _q = new URLSearchParams(location.search);

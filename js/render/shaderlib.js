@@ -14,8 +14,8 @@
                    fade: true               → uniforme propio del material (setFade(mat, v))
    El material debe ser MeshBasic/Lambert/Phong/Standard (necesitan <fog_fragment>). */
 import * as THREE from "three";
-import { A1_FOLIAGE, A6_NIEBLA, A6_TERRAIN } from "../core/config.js?v=20261118";
-import { uniforms } from "./lighting.js?v=20261118";
+import { A1_FOLIAGE, A6_NIEBLA, A6_TERRAIN } from "../core/config.js?v=20261120";
+import { uniforms } from "./lighting.js?v=20261120";
 
 /* ---------- GLSL ---------- */
 
@@ -123,11 +123,20 @@ function applyChunks(sh, o) {
     // Follaje: wrap lighting (el sol "dobla" alrededor del volumen) + translucidez barata (luz que
     // atraviesa la hoja desde atrás, sin depender de la cámara). Solo MeshPhong (lights_phong_pars).
     const W = A1_FOLIAGE.wrap.toFixed(3), T = A1_FOLIAGE.trans.toFixed(3);
-    fs = fs.replace("#include <lights_phong_pars_fragment>", THREE.ShaderChunk.lights_phong_pars_fragment.replace(
+    /* 2026-11-20 (Mike: copas grises con relieve en Monte Hermoso). Especular negra = SIN especular. Three r170 calcula el brillo con
+       F_Schlick(specular, 1.0, dotVH): con specular 0x000000 igual queda el Fresnel (1-dotVH)^5, blanco. Y geometryViewDir sale de
+       vViewPosition, que en la capa custom de MapLibre NO es relativo a la cámara (la vista está metida en la proyección: viewMatrix =
+       identidad), así que es la posición del árbol en la escena. Con relieve los árboles suben a su cota del DEM (cientos de m), ese
+       "viewDir" apunta casi contra el sol, el Fresnel llega a ~1 y el brillo blanco supera a la difusa de las copas oscuras. */
+    const SPEC = "\treflectedLight.directSpecular += irradiance * BRDF_BlinnPhong(";
+    const phong = THREE.ShaderChunk.lights_phong_pars_fragment;
+    if (!phong.includes(SPEC)) console.warn("shaderlib foliage: no encontré la especular de Phong (¿cambió Three?)");
+    fs = fs.replace("#include <lights_phong_pars_fragment>", phong.replace(
       "float dotNL = saturate( dot( geometryNormal, directLight.direction ) );\n\tvec3 irradiance = dotNL * directLight.color;",
       "float rawNL = dot( geometryNormal, directLight.direction );\n" +
       "\tfloat dotNL = saturate( ( rawNL + " + W + " ) / ( 1.0 + " + W + " ) );\n" +
-      "\tvec3 irradiance = ( dotNL + saturate( -rawNL ) * " + T + " ) * directLight.color;"));
+      "\tvec3 irradiance = ( dotNL + saturate( -rawNL ) * " + T + " ) * directLight.color;").replace(
+      SPEC, "\tif ( max( max( material.specularColor.r, material.specularColor.g ), material.specularColor.b ) > 0.0 ) reflectedLight.directSpecular += irradiance * BRDF_BlinnPhong("));
   }
 
   if (o.floor) {
