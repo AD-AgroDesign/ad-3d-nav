@@ -6,6 +6,7 @@
 import { on } from "../core/events.js?v=20261122";
 import { relief, onRelief, setReliefSession } from "../core/relief.js?v=20261122";
 import { getState, setMode, setRain } from "../hydro/state.js?v=20261122";
+import { turboCss } from "../render/systems/runoff-turbo.js?v=20261122";   // misma paleta (y misma t) que el shader
 import { HIDRO } from "../core/config.js?v=20261122";
 
 const MOTIVOS = {
@@ -15,16 +16,6 @@ const MOTIVOS = {
 const VISTAS = [{ id: "natural", txt: "Agua natural" }, { id: "velocidad", txt: "Velocidad" }];   // "Diferencia" llega en F4
 const LEYENDA_GRAD = "linear-gradient(90deg, #60a0c4, #1e5280)";   // somero → profundo (MODELO §6)
 
-/* misma fórmula que el render: reemplazar por el import de turboCss al integrar.
-   Aproximación polinómica del mapa de colores "turbo" (Mikhailov 2019, Google), t en [0,1] → "rgb(r, g, b)". */
-function turboCss(t) {
-  t = Math.min(1, Math.max(0, t));
-  const r = 0.13572138 + t * (4.61539260 + t * (-42.66032258 + t * (132.13108234 + t * (-152.94239396 + t * 59.28637943))));
-  const g = 0.09140261 + t * (2.19418839 + t * (4.84296658 + t * (-14.18503333 + t * (4.27729857 + t * 2.82956604))));
-  const b = 0.10667330 + t * (12.64194608 + t * (-60.58204836 + t * (110.36276771 + t * (-89.90310912 + t * 27.34824973))));
-  const c = x => Math.round(255 * Math.min(1, Math.max(0, x)));
-  return "rgb(" + c(r) + ", " + c(g) + ", " + c(b) + ")";
-}
 const coma = n => String(n).replace(".", ",");
 /* posición de una velocidad en la barra: escala log10 entre vMinMs y vMaxMs (la misma sobre la que el render pinta turbo) */
 const posLog = v => (Math.log10(v) - Math.log10(HIDRO.vis.vMinMs)) / (Math.log10(HIDRO.vis.vMaxMs) - Math.log10(HIDRO.vis.vMinMs));
