@@ -539,7 +539,6 @@ export const HIDRO = {
     marcasMs: [0.02, 0.05, 0.1, 0.2, 0.5, 1, 1.5],
     hVisibleM: 0.02, hOpacoM: 0.2,         // lámina desde la que se ve el agua / donde ya es opaca
     estelaSegundos: 320, estelaMinM: 45, estelaMaxM: 420,   // largo de estela ≈ v·320 s, acotado
-    difUmbral: 0.06, difSatura: -1.15,     // saturado en −55 % de velocidad (log2(0,45) = −1,15)
     /* lámina de agua "natural" (sistema runoff.js; antes la constante NAT) */
     natural: {
       colShallow: "#60a0c4", colDeep: "#1e5280",   // somero → profundo (MODELO §6)
@@ -592,7 +591,7 @@ export const HIDRO = {
     },
     /* vista Diferencia (MODELO §6): log2(v_multi/v_ini) divergente; frena = azul, acelera = naranja/rojo */
     diferencia: {
-      umbral: 0.06, saturacion: -1.15,             // = difUmbral / difSatura (referencia: valores arriba; render usa estos)
+      umbral: 0.06, saturacion: -1.15,             // única fuente (antes difUmbral/difSatura); saturado en −55 % de velocidad (log2(0,45) = −1,15)
       colFrena: ["#96cdff", "#1946c8"],            // de umbral a saturación, desaturando hacia el satélite
       colAcelera: ["#ffbe8c", "#c8321e"],
       opacidad: 0.85,                              // igual que velocidad

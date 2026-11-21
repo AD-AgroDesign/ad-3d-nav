@@ -228,7 +228,7 @@ Valores existentes sin cambios; el render los lee después (no toqué `js/render
 | `STATIC_SUB` | `vis.particulas.subdivBaja` | 3 |
 | (nuevo, G2-1a) | `vis.particulas.factorMovil` | 0.5 (× presupuesto con `IS_MOBILE`; lo aplica el render) |
 
-Vista Diferencia: `vis.diferencia` = `umbral` 0.06, `saturacion` -1.15 (mismos valores que `difUmbral`/`difSatura`, que siguen), `colFrena` [#96cdff, #1946c8], `colAcelera` [#ffbe8c, #c8321e], `opacidad` 0.85, `traza` {clases corr-herb/corr-le/parche-herb/parche-le, color #ffffff, alfa 0.9, rayaPx 8, huecoPx 6, anchoPx 1.5}.
+Vista Diferencia: `vis.diferencia` = `umbral` 0.06, `saturacion` -1.15 (única fuente: `vis.difUmbral`/`difSatura` se eliminaron, nadie los usaba), `colFrena` [#96cdff, #1946c8], `colAcelera` [#ffbe8c, #c8321e], `opacidad` 0.85, `traza` {clases corr-herb/corr-le/parche-herb/parche-le, color #ffffff, alfa 0.9, rayaPx 8, huecoPx 6, anchoPx 1.5}.
 
 Stats para la UI (en `result.stats`, ya existentes; `HIDRO.vis.diferencia.metricas` los lista):
 - ha con v > 0,3 m/s: `stats.inicial.haVMayor` → `stats.multi.haVMayor`
