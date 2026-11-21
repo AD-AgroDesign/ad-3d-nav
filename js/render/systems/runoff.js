@@ -46,12 +46,14 @@ import { createParticles } from "./runoff-particulas.js?v=20261123";
 export { turboCss } from "./runoff-turbo.js?v=20261123";   // la leyenda de la UI importa la paleta desde acá
 
 /* ---------- diales: HIDRO.vis.natural (antes constante local NAT) ---------- */
-const NAT = HIDRO.vis.natural;
+const NAT = HIDRO.vis.natural, VEL = HIDRO.vis.velocidad, PV = HIDRO.vis.particulas, DIF = HIDRO.vis.diferencia;
+const glf = n => { const s = String(+n); return /[.e]/.test(s) ? s : s + ".0"; };   // número como literal float de GLSL
+const LIFT_FROM = glf(VEL.liftDistDesdeM);
 
 /* ---------- shaders ---------- */
 const VS =
   "varying vec3 vWp;\nuniform vec3 uCamPos;\nuniform float uLift;\n" +
-  "void main() {\n  vec4 w = modelMatrix * vec4(position, 1.0);\n  w.y -= a6Low(w.xz);\n  w.y += uLift * max(length(uCamPos - w.xyz) - 600.0, 0.0);\n  vWp = w.xyz;\n" +
+  "void main() {\n  vec4 w = modelMatrix * vec4(position, 1.0);\n  w.y -= a6Low(w.xz);\n  w.y += uLift * max(length(uCamPos - w.xyz) - " + LIFT_FROM + ", 0.0);\n  vWp = w.xyz;\n" +
   "  gl_Position = projectionMatrix * viewMatrix * w;\n}\n";
 
 /* uG = afín escena→celda (fx = x·G.x + G.y ; fy = z·G.z + G.w) · uN = tamaño de la grilla
@@ -131,13 +133,13 @@ const FS =
 /* Subida de las capas de velocidad y estelas proporcional a la distancia a la cámara (m por m): lejos, la malla de terreno de MapLibre
    (LOD grueso) asoma por encima de la nuestra (fina) y la tapa a manchones; con 0,002 no se ve ni en la cenital a varios km y en
    el rasante son centímetros. La lámina natural (F2) no la usa (no cambia su aspecto). */
-const LIFT = 0.002;   // → HIDRO  (la subida empieza a 600 m de la cámara: de cerca no se mueve nada)
-const HALO_M = 300;   // m · en Velocidad el mapa se desvanece a 0 a esta distancia del borde del campo   // → HIDRO
-const PART_IDLE_MAX = 8000;   // m · las estelas se ven (y se animan) desde mucho más lejos que las ondas del agua natural (1500 m)   // → HIDRO
+const LIFT = VEL.liftDist;       // la subida empieza a VEL.liftDistDesdeM de la cámara: de cerca no se mueve nada
+const HALO_M = VEL.haloM;        // m · en Velocidad y Diferencia el mapa se desvanece a 0 a esta distancia del borde del campo
+const PART_IDLE_MAX = PV.idleMaxDistM;   // m · las estelas se ven (y se animan) desde mucho más lejos que las ondas del agua natural (1500 m)
 
 /* Cámara y niebla, compartidos por referencia con lighting.js: los usan los tres materiales (natural, velocidad, estelas). */
 const SHARED = {
-  uCamPos: uniforms.uCamPos, uLift: { value: LIFT }, uLift0: { value: 0.4 },   // m · subida fija (cerca): la malla de MapLibre asoma en manchitas ovaladas a < 0,3 m del suelo   // → HIDRO
+  uCamPos: uniforms.uCamPos, uLift: { value: LIFT }, uLift0: { value: VEL.liftFijoM },   // m · subida fija (cerca): la malla de MapLibre asoma en manchitas ovaladas a < 0,3 m del suelo
    
   uFogColor: uniforms.uFogColor, uFogNear: uniforms.uFogNear, uFogFar: uniforms.uFogFar, uFogMax: uniforms.uFogMax, uFogRel: uniforms.uFogRel
 };
