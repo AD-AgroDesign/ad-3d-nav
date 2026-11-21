@@ -14,7 +14,7 @@ const MOTIVOS = {
 const VISTAS = [{ id: "natural", txt: "Agua natural", ok: true }, { id: "velocidad", txt: "Velocidad", ok: false, motivo: "Próximamente" }];
 const LEYENDA_GRAD = "linear-gradient(90deg, #60a0c4, #1e5280)";   // somero → profundo (MODELO §6)
 
-let sw, seg, estado, leyenda, rotulo, nota, bloque, pedidoUrl = null, avisoRelieve = false, modoUrl = null;
+let sw, seg, estado, leyenda, rotulo, nota, bloque, pedidoUrl = null, avisoRelieve = false, modoUrl = "off";   // "off" de arranque: apagado no toca la URL (cero efecto)
 
 export function armarEscorrentia() {
   const panel = document.getElementById("panel");
