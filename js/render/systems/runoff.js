@@ -1,0 +1,335 @@
+/* ============ Sistema de render: simulador de escorrentía · vista "Agua natural" (hidro-render, F2) ============
+   Dueño: hidro-render. Contrato del host: ARQUITECTURA §2. Modelo y objetivo visual: MODELO §6. Plan: PLAN §4 F2.
+
+   Qué dibuja: la lámina de agua `h` (m) que calcula el motor (js/hydro, worker) sobre la grilla de la cuenca (~15 m por celda)
+   como cintas de agua que confluyen hacia los cauces. La lámina real es de milímetros: la visible está exagerada a propósito
+   (la leyenda de la UI lo dice). Solo se ve con getState().mode === "natural"; "velocidad" y "diferencia" quedan ocultas (F3/F4).
+
+   Ciclo de vida (el host construye UNA vez, sin reconstrucción posterior):
+     - build(): grupo invisible, malla vacía y material por escenario. Cero costo con el simulador apagado: no hay texturas, no se
+       compila el shader (el grupo está invisible) y update() sale temprano sin tocar el idleDriver.
+     - evento "runoff" (cambio "result"): llegan h/v/dirección. La primera vez se hornea la grilla de vértices (compartida por los
+       dos escenarios: x,z lineales en Mercator, y = heightAt + offset; la bajada viva a6Low va en el vertex shader). Cada resultado
+       (también al cambiar la lluvia) REEMPLAZA los datos in situ: se reescribe el RGBA32F del escenario y el índice de la malla.
+     - evento "runoff" (cambio "mode"): muestra u oculta.
+
+   Datos en la GPU (WebGL2 sin extensiones de render a float; en celulares solo se LEE):
+     tD   RGBA32F, NEAREST, una por escenario: r = h (m), g = v (m/s), b/a = dirección unitaria del flujo (x este, z sur).
+          El filtrado bilineal es manual en el fragment shader (NEAREST es el único filtro de float que WebGL2 garantiza).
+     tIn  R8, LINEAR (el filtrado de enteros normalizados sí es de hardware), compartida: 1 = celda dentro del campo.
+   La malla es una grilla de 1 vértice por celda; el índice solo incluye los cuadros donde alguna esquina tiene lámina visible
+   (en el sintético ~10 % de la cuenca), así el costo de rasterizado es el de las cintas y no el de 3 km² de agua inexistente.
+
+   Shader: derivado de water.js (fresnel de Schlick con uCamPos, cielo zenit→horizonte, destello del sol, luz de hemisferio + sol,
+   niebla GLSL_ADFOG después del tone mapping, uFade). Alfa y color por profundidad; ondas = flowmap de dos fases cruzadas
+   sobre la textura de normales de water.js (getWaveTex), desplazadas en la dirección del flujo con rapidez según v.
+
+   Orden de dibujo: renderOrder −9,5 = después del suelo (−10) y antes del receptor de sombras (−9): el agua queda sobre el suelo
+   y recibe gratis las sombras de los árboles (el receptor multiplica lo ya dibujado). Todos los de esa lista tienen depthWrite
+   apagado, así que el desempate entre ellos es solo el orden; contra la malla de terreno de MapLibre se usa depthTest +
+   polygonOffset(−2, −4) (mismo criterio que suelo y agua) y yOff por encima del suelo. */
+import * as THREE from "three";
+import { A1_SKY, A4_GROUND, HIDRO } from "../../core/config.js?v=20261122";
+import { quality } from "../../core/quality.js?v=20261122";
+import { on } from "../../core/events.js?v=20261122";
+import { idleDriver } from "../idle.js?v=20261122";
+import { map } from "../../map/style.js?v=20261122";
+import { lights, uniforms } from "../lighting.js?v=20261122";
+import { GLSL_ADFOG, GLSL_FOG_UNIFORMS, scenarioFade } from "../shaderlib.js?v=20261122";
+import { GLSL_DECL, lowAt, terrain, withReliefU } from "../../terrain/terrain.js?v=20261122";
+import { getState } from "../../hydro/state.js?v=20261122";
+import { pxToLonLat } from "../../hydro/grid.js?v=20261122";
+import { getWaveTex } from "./water.js?v=20261122";
+
+/* ---------- diales de esta vista (→ HIDRO: proponer como HIDRO.vis.natural en la próxima ronda del motor) ---------- */
+const NAT = {   // → HIDRO
+  colShallow: "#60a0c4", colDeep: "#1e5280",   // MODELO §6: somero → profundo
+  yOff: A4_GROUND.yOffRelief + 0.04,           // m sobre heightAt: por encima del suelo (0,08) y del margen de la malla de MapLibre
+  alphaMin: 0.20,                              // alfa de la lámina recién visible (h ≈ hVisibleM)
+  alphaMax: 0.95,                              // alfa con lámina ≥ hOpacoM
+  edgeNoise: 0.6,                              // celdas · distorsión de dominio del borde (ruido estático)
+  outside: 0.35,                               // alfa relativa FUERA del campo (la cuenca de aporte, atenuada)
+  gain: 0.82,                                  // igual que A4_WATER.gain: calibración del cuerpo
+  waveScale: [5, 11],                          // m · período de las dos capas de normales
+  waveSlope: 0.30,                             // pendiente máx. de las normales
+  waveFade: [160, 600],                        // m · las ondas se aplanan con la distancia
+  cycle: 2.0,                                  // s · ciclo de las dos fases cruzadas del flowmap
+  speedBase: 0.15, speedGain: 2.0,             // rapidez visual de las ondas (m/s) = base + gain·v (la v real, 0,02–1,5 m/s, se ve lentísima)
+  reflection: 0.55, spec: [300, 0.8], f0: 0.02,
+  idleMaxDist: 1500                            // m · más lejos no hace falta animar en reposo
+};
+
+/* ---------- shaders ---------- */
+const VS =
+  "varying vec3 vWp;\n" +
+  "void main() {\n  vec4 w = modelMatrix * vec4(position, 1.0);\n  w.y -= a6Low(w.xz);\n  vWp = w.xyz;\n" +
+  "  gl_Position = projectionMatrix * viewMatrix * w;\n}\n";
+
+/* uG = afín escena→celda (fx = x·G.x + G.y ; fy = z·G.z + G.w) · uN = tamaño de la grilla
+   uV = (h visible, h opaca, alfa fuera, ganancia del cuerpo) · uW = (escala capa 1, escala capa 2, pendiente, ciclo s)
+   uS = (base de rapidez, ganancia de rapidez, reflejo, f0) · uQ = (exponente del destello, intensidad, aplanado desde, hasta) */
+const FS =
+  "precision highp float;\n" +
+  "varying vec3 vWp;\n" +
+  "uniform sampler2D tD;\nuniform sampler2D tIn;\nuniform sampler2D tWave;\n" +
+  "uniform vec4 uG;\nuniform vec2 uN;\nuniform vec4 uV;\nuniform vec4 uW;\nuniform vec4 uS;\nuniform vec4 uQ;\n" +
+  "uniform vec3 uCamPos;\nuniform float uTime;\nuniform float uFlowOn;\nuniform float uFade;\n" +
+  "uniform vec3 uSunDir;\nuniform vec3 uSunColor;\nuniform float uSunI;\nuniform vec3 uHemiSky;\nuniform vec3 uHemiGround;\n" +
+  "uniform vec3 uZenith;\nuniform vec3 uColShallow;\nuniform vec3 uColDeep;\nuniform float uEdgeNoise;\n" +
+  GLSL_FOG_UNIFORMS + GLSL_ADFOG +
+  "const float PI_ = 3.14159265;\n" +
+  "vec4 tx(ivec2 i) { return texelFetch(tD, clamp(i, ivec2(0), ivec2(uN) - 1), 0); }\n" +
+  // ondas: dos capas de la textura de normales (xy = pendiente, z = altura), rotadas distinto
+  "vec3 wave(vec2 q) {\n" +
+  "  vec4 a = texture2D(tWave, mat2(0.80, -0.60, 0.60, 0.80) * q / uW.x);\n" +
+  "  vec4 b = texture2D(tWave, mat2(0.60, 0.80, -0.80, 0.60) * q / uW.y + vec2(0.37, 0.61));\n" +
+  "  return vec3((a.rg - 0.5) + 0.7 * (b.rg - 0.5), a.b);\n}\n" +
+  "void main() {\n" +
+  "  vec3 toCam = uCamPos - vWp;\n  float dist = length(toCam);\n  vec3 V = toCam / dist;\n  vec2 p = vWp.xz;\n" +
+  // bilineal manual de h, v y dirección (la dirección se pesa con la lámina: las celdas secas no la tuercen)
+  "  vec2 f = vec2(p.x * uG.x + uG.y, p.y * uG.z + uG.w);\n" +
+  // distorsión de dominio con ruido estático (±uEdgeNoise celdas): rompe la escalera de 15 m del borde sin mover la red de cauces
+  "  f += (texture2D(tWave, p / 41.0).rg - 0.5) * 2.0 * uEdgeNoise;\n" +
+  "  ivec2 i0 = ivec2(floor(f));\n  vec2 t = f - vec2(i0);\n  t = t * t * (3.0 - 2.0 * t);\n" +
+  "  vec4 d00 = tx(i0), d10 = tx(i0 + ivec2(1, 0)), d01 = tx(i0 + ivec2(0, 1)), d11 = tx(i0 + ivec2(1, 1));\n" +
+  "  float w00 = (1.0 - t.x) * (1.0 - t.y), w10 = t.x * (1.0 - t.y), w01 = (1.0 - t.x) * t.y, w11 = t.x * t.y;\n" +
+  "  float h = d00.r * w00 + d10.r * w10 + d01.r * w01 + d11.r * w11;\n" +
+  "  float v = d00.g * w00 + d10.g * w10 + d01.g * w01 + d11.g * w11;\n" +
+  "  vec2 dr = d00.ba * (w00 * (d00.r + 1e-5)) + d10.ba * (w10 * (d10.r + 1e-5)) + d01.ba * (w01 * (d01.r + 1e-5)) + d11.ba * (w11 * (d11.r + 1e-5));\n" +
+  "  float dl = length(dr);\n  vec2 dir = dl > 1e-9 ? dr / dl : vec2(0.0);\n" +
+  // borde orgánico: la lámina se modula con ruido ESTÁTICO (no parpadea)
+  "  float hE = h * (1.0 + 0.5 * (texture2D(tWave, p / 9.0).b - 0.5));\n" +
+  "  float edge = smoothstep(uV.x * 0.6, uV.x * 1.25, hE);\n" +
+  "  float body = smoothstep(uV.x, uV.y, hE);\n" +
+  "  if (edge < 0.004) discard;\n" +
+  // flowmap de dos fases cruzadas: cada fase arrastra el patrón por el flujo y vuelve a empezar; se mezclan con pesos triangulares
+  "  float tt = uTime * uFlowOn / uW.w;\n" +
+  "  float ph0 = fract(tt), ph1 = fract(tt + 0.5);\n" +
+  "  float k0 = 1.0 - abs(1.0 - 2.0 * ph0), k1 = 1.0 - k0;\n" +
+  "  vec2 off = dir * (uS.x + uS.y * v) * uW.w;\n" +
+  "  vec3 wv = k0 * wave(p - off * ph0) + k1 * wave(p - off * ph1);\n" +
+  "  float wf = 1.0 - smoothstep(uQ.z, uQ.w, dist);\n" +
+  "  vec2 s = wv.xy * 2.0 * uW.z * wf * (0.55 + 0.9 * clamp(v, 0.0, 1.0));\n" +
+  "  vec3 N = normalize(vec3(s.x, 1.0, s.y));\n" +
+  // color por profundidad (somero → profundo) y un poco de textura a lo largo del flujo
+  "  float dd = pow(body, 0.75);\n" +
+  "  vec3 base = mix(uColShallow, uColDeep, dd);\n" +
+  "  base *= 1.0 + 0.22 * (wv.z - 0.5);\n" +
+  "  float NL = max(dot(N, uSunDir), 0.0);\n" +
+  "  vec3 E = mix(uHemiGround, uHemiSky, 0.5 * N.y + 0.5) + uSunColor * uSunI * NL;\n" +
+  "  vec3 diff = base * E / PI_ * uV.w;\n" +
+  "  float NV = max(dot(N, V), 0.0);\n" +
+  "  float F = uS.w + (1.0 - uS.w) * pow(1.0 - NV, 5.0);\n" +
+  "  vec3 R = reflect(-V, N);\n" +
+  "  vec3 sky = mix(pow(uFogColor, vec3(2.2)), uZenith, pow(clamp(R.y, 0.0, 1.0), 0.45));\n" +
+  "  vec3 refl = sky * uS.z;\n" +
+  "  vec3 H = normalize(V + uSunDir);\n" +
+  "  float spec = pow(max(dot(N, H), 0.0), uQ.x) * (uQ.x + 8.0) / (8.0 * PI_) * NL;\n" +
+  "  vec3 col = mix(diff, refl, F) + uSunColor * uSunI * min(spec * F, 6.0) * uQ.y;\n" +
+  // alfa: invisible bajo ~2 cm, crece hasta opaco hacia hOpaca; el rasante la sube un poco (fresnel)
+  "  float a0 = mix(" + NAT.alphaMin.toFixed(3) + ", " + NAT.alphaMax.toFixed(3) + ", body);\n" +
+  "  float a = edge * mix(a0, 1.0, F * 0.5);\n" +
+  "  float ins = texture2D(tIn, (f + 0.5) / uN).r;\n" +
+  "  a *= mix(uV.z, 1.0, ins);\n" +
+  "  a *= uFade;\n" +
+  "  if (a < 0.003) discard;\n" +
+  "  gl_FragColor = vec4(col, a);\n" +
+  "  #include <tonemapping_fragment>\n" +
+  "  #include <colorspace_fragment>\n" +
+  "  gl_FragColor.rgb = mix(gl_FragColor.rgb, uFogColor, adFog(dist));\n" +
+  "}\n";
+
+const U = {   // uniforms comunes a los dos escenarios (compartidos por referencia con lighting.js donde existen)
+  uCamPos: uniforms.uCamPos, uTime: uniforms.uTime,
+  uSunDir: uniforms.uSunDir, uSunColor: uniforms.uSunColor, uHemiSky: uniforms.uHemiSky, uHemiGround: uniforms.uHemiGround,
+  uFogColor: uniforms.uFogColor, uFogNear: uniforms.uFogNear, uFogFar: uniforms.uFogFar, uFogMax: uniforms.uFogMax, uFogRel: uniforms.uFogRel,
+  uSunI: { value: 1 },
+  uZenith: { value: new THREE.Color(A1_SKY.skyColor) },
+  uColShallow: { value: new THREE.Color(NAT.colShallow) }, uColDeep: { value: new THREE.Color(NAT.colDeep) },
+  uFlowOn: { value: 1 },
+  uEdgeNoise: { value: NAT.edgeNoise },
+  uV: { value: new THREE.Vector4(HIDRO.vis.hVisibleM, HIDRO.vis.hOpacoM, NAT.outside, NAT.gain) },
+  uW: { value: new THREE.Vector4(NAT.waveScale[0], NAT.waveScale[1], NAT.waveSlope, NAT.cycle) },
+  uS: { value: new THREE.Vector4(NAT.speedBase, NAT.speedGain, NAT.reflection, NAT.f0) },
+  uQ: { value: new THREE.Vector4(NAT.spec[0], NAT.spec[1], NAT.waveFade[0], NAT.waveFade[1]) }
+};
+
+function makeMaterial(key) {
+  const m = new THREE.ShaderMaterial({
+    vertexShader: GLSL_DECL + VS, fragmentShader: FS,
+    uniforms: { ...U, ...withReliefU({}), uFade: scenarioFade[key] || { value: 1 },
+      tD: { value: null }, tIn: { value: null }, tWave: { value: null }, uG: { value: new THREE.Vector4(1, 0, 1, 0) }, uN: { value: new THREE.Vector2(1, 1) } }
+  });
+  m.side = THREE.DoubleSide;
+  m.depthTest = true; m.depthWrite = false; m.transparent = false;   // lista OPACA con mezcla a medida (como suelo y agua): el receptor de sombras la multiplica
+  m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -4;
+  m.blending = THREE.CustomBlending;
+  m.blendEquation = THREE.AddEquation; m.blendSrc = THREE.SrcAlphaFactor; m.blendDst = THREE.OneMinusSrcAlphaFactor;
+  m.blendSrcAlpha = THREE.ZeroFactor; m.blendDstAlpha = THREE.OneFactor;   // alfa de destino preservado
+  return m;
+}
+
+/* ---------- estado ---------- */
+const S = {};          // key → { group, mesh, mat, geom, idx, data, tex, tris, hasData }
+let G = null;          // grilla compartida: { nx, ny, gx0, gy0, pos, inTex, aff, box, nz }
+let mode = "off";      // espejo de getState().mode (evento "runoff")
+let wantReq = false;   // último valor pasado a idleDriver.request("runoff", …)
+let ctxRef = null, subscribed = false;
+const MB = 1 / 1048576;
+
+const shown = () => mode === "natural" && !!G && terrain.active;
+
+function applyVisibility() {
+  const on_ = shown();
+  for (const k in S) S[k].group.visible = on_ && S[k].hasData;
+  if (!on_ && wantReq) { wantReq = false; idleDriver.request("runoff", false); }
+  map.triggerRepaint();
+}
+
+/* Hornea la grilla de vértices (una vez por cuenca): x,z lineales (Mercator es lineal en la escena), y = heightAt + yOff. */
+function initGrid(ctx, meta) {
+  const { nx, ny, gx0, gy0, z } = meta;
+  if (G) { G.pos.dispose?.(); G.inTex.dispose(); G = null; }
+  // columnas: lon solo depende de i; filas: lat solo de j (esquinas de píxel, convención de terrain.hf)
+  const [xa, za] = ctx.toScene(...pxToLonLat(gx0, gy0, z)), [xb, zb] = ctx.toScene(...pxToLonLat(gx0 + nx, gy0 + ny, z));
+  const dx = (xb - xa) / nx, dz = (zb - za) / ny;
+  const lon = new Float64Array(nx), lat = new Float64Array(ny);
+  for (let i = 0; i < nx; i++) lon[i] = pxToLonLat(gx0 + i, gy0, z)[0];
+  for (let j = 0; j < ny; j++) lat[j] = pxToLonLat(gx0, gy0 + j, z)[1];
+  const pos = new Float32Array(nx * ny * 3);
+  let ymin = 1e9, ymax = -1e9;
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const o = (j * nx + i) * 3, y = ctx.heightAt(lon[i], lat[j]) + NAT.yOff;
+    pos[o] = xa + i * dx; pos[o + 1] = y; pos[o + 2] = za + j * dz;
+    if (y < ymin) ymin = y; if (y > ymax) ymax = y;
+  }
+  const inTex = new THREE.DataTexture(new Uint8Array(nx * ny), nx, ny, THREE.RedFormat, THREE.UnsignedByteType);
+  inTex.magFilter = inTex.minFilter = THREE.LinearFilter; inTex.generateMipmaps = false; inTex.flipY = false;
+  inTex.wrapS = inTex.wrapT = THREE.ClampToEdgeWrapping; inTex.unpackAlignment = 1; inTex.needsUpdate = true;
+  G = { nx, ny, gx0, gy0, pos: new THREE.BufferAttribute(pos, 3), inTex, mk: new Uint8Array(nx * ny), mk2: new Uint8Array(nx * ny),
+    aff: new THREE.Vector4(1 / dx, -xa / dx, 1 / dz, -za / dz),   // fx = (x − xa)/dx ; fy = (z − za)/dz
+    box: new THREE.Box3(new THREE.Vector3(xa, ymin, za), new THREE.Vector3(xa + nx * dx, ymax, za + ny * dz)) };
+  for (const k in S) {
+    const s = S[k];
+    s.geom.setAttribute("position", G.pos);
+    s.idx = new THREE.BufferAttribute(new Uint32Array(6 * (nx - 1) * (ny - 1)), 1); s.idx.setUsage(THREE.DynamicDrawUsage);
+    s.geom.setIndex(s.idx);
+    if (s.tex) { s.tex.dispose(); s.tex = null; }
+    s.data = new Float32Array(nx * ny * 4);
+    s.mat.uniforms.uG.value.copy(G.aff); s.mat.uniforms.uN.value.set(nx, ny);
+    s.mat.uniforms.tIn.value = inTex; s.mat.uniforms.tWave.value = getWaveTex();
+  }
+}
+
+/* Reemplaza los datos de los dos escenarios con el resultado vigente (primera vez y cada recálculo por lluvia). */
+function setResult(res) {
+  if (!ctxRef || !res || !res.meta) return;
+  const m = res.meta;
+  if (!G || G.nx !== m.nx || G.ny !== m.ny || G.gx0 !== m.gx0 || G.gy0 !== m.gy0) initGrid(ctxRef, m);
+  const n = m.nx * m.ny, thr = HIDRO.vis.hVisibleM * 0.5;   // el borde empieza en 0,6·hVisible (con el ruido de h, 0,45): 0,5 lo cubre
+  const ins = G.inTex.image.data;
+  for (let i = 0; i < n; i++) ins[i] = res.inside[i] ? 255 : 0;
+  G.inTex.needsUpdate = true;
+  for (const k in S) {
+    const s = S[k], r = res[k];
+    if (!r) continue;
+    const d = s.data, h = r.h, v = r.v, dx = res.dirX, dy = res.dirY;
+    for (let i = 0, o = 0; i < n; i++, o += 4) { d[o] = h[i]; d[o + 1] = v[i]; d[o + 2] = dx[i]; d[o + 3] = dy[i]; }
+    if (!s.tex) {
+      s.tex = new THREE.DataTexture(d, m.nx, m.ny, THREE.RGBAFormat, THREE.FloatType);
+      s.tex.internalFormat = "RGBA32F"; s.tex.magFilter = s.tex.minFilter = THREE.NearestFilter; s.tex.generateMipmaps = false; s.tex.flipY = false;
+      s.tex.wrapS = s.tex.wrapT = THREE.ClampToEdgeWrapping; s.tex.unpackAlignment = 4;
+      s.mat.uniforms.tD.value = s.tex;
+    }
+    s.tex.needsUpdate = true;
+    // índice: solo los cuadros que pueden mostrar agua. El bilineal no supera el máximo de sus esquinas, y la distorsión de dominio del
+    // shader trae valores de hasta 1 celda de distancia: se dilata 1 celda la máscara de "h ≥ umbral" (separable) antes de armar los cuadros.
+    const ix = s.idx.array, nx = m.nx, ny = m.ny, mk = G.mk, mk2 = G.mk2;
+    for (let i = 0; i < n; i++) mk[i] = h[i] >= thr ? 1 : 0;
+    for (let j = 0; j < ny; j++) for (let i = 0, q = j * nx; i < nx; i++, q++) mk2[q] = mk[q] | (i > 0 ? mk[q - 1] : 0) | (i < nx - 1 ? mk[q + 1] : 0);
+    for (let j = 0; j < ny; j++) for (let i = 0, q = j * nx; i < nx; i++, q++) mk[q] = mk2[q] | (j > 0 ? mk2[q - nx] : 0) | (j < ny - 1 ? mk2[q + nx] : 0);
+    let c = 0;
+    for (let j = 0; j < ny - 1; j++) for (let i = 0, q = j * nx; i < nx - 1; i++, q++) {
+      if (!(mk[q] | mk[q + 1] | mk[q + nx] | mk[q + nx + 1])) continue;
+      ix[c++] = q; ix[c++] = q + nx; ix[c++] = q + 1; ix[c++] = q + 1; ix[c++] = q + nx; ix[c++] = q + nx + 1;
+    }
+    s.idx.needsUpdate = true; s.geom.setDrawRange(0, c); s.tris = c / 3; s.hasData = true;
+  }
+  applyVisibility();
+}
+
+/* ---------- animación en reposo: el repintado lo maneja el idleDriver único del host ---------- */
+const frustum = new THREE.Frustum(), _cam = new THREE.Vector3(), _bb = new THREE.Box3(), _lo = new THREE.Vector3();
+
+export default {
+  id: "runoff",
+
+  build(ctx, key) {
+    ctxRef = ctx;
+    const group = new THREE.Group();
+    group.name = "hidro-runoff"; group.visible = false;   // simulador apagado = grupo invisible (cero costo)
+    const geom = new THREE.BufferGeometry();
+    geom.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), 1e6);
+    geom.setDrawRange(0, 0);
+    const mat = makeMaterial(key);
+    const mesh = new THREE.Mesh(geom, mat);
+    mesh.frustumCulled = false; mesh.renderOrder = -9.5; mesh.name = "hidro-runoff-" + key;
+    group.add(mesh);
+    S[key] = { group, mesh, mat, geom, idx: null, data: null, tex: null, tris: 0, hasData: false };
+    if (!subscribed) {   // una sola suscripción para los dos escenarios
+      subscribed = true;
+      on("runoff", p => {
+        mode = p.mode;
+        if (p.cambio === "result" && p.result) setResult(p.result);
+        else applyVisibility();
+      });
+    }
+    const st = getState();
+    mode = st.mode;
+    if (st.result && key === "multi") setResult(st.result);   // por si el resultado ya existía (ambos escenarios ya construidos)
+    return { object3d: group, materials: [] };
+  },
+
+  update(frame) {
+    if (!shown()) { if (wantReq) { wantReq = false; idleDriver.request("runoff", false); } return; }
+    if (lights.sun) U.uSunI.value = lights.sun.intensity;
+    if (U.uZenith.value.getHex() !== _zen.set(A1_SKY.skyColor).getHex()) U.uZenith.value.set(A1_SKY.skyColor);
+    let anim = false;
+    if (quality.idleFps > 0) {
+      let vis = false;
+      for (const k in S) if (S[k].group && S[k].group.visible && scenarioFade[k] && scenarioFade[k].value > 0.02) vis = true;
+      if (vis) {
+        frustum.setFromProjectionMatrix(frame.viewProj);
+        _cam.set(frame.camPosScene.x, frame.camPosScene.y, frame.camPosScene.z);
+        const lo = lowAt((G.box.min.x + G.box.max.x) / 2, (G.box.min.z + G.box.max.z) / 2);   // caja bajada con el suelo (relieve en vivo)
+        _bb.copy(G.box); if (lo) _bb.translate(_lo.set(0, -lo, 0));
+        anim = _bb.distanceToPoint(_cam) < NAT.idleMaxDist && frustum.intersectsBox(_bb);
+      }
+    }
+    if (anim !== wantReq) { wantReq = anim; idleDriver.request("runoff", anim); }
+  },
+
+  /* Baja: sin animación de normales (idleFps 0). Las ondas quedan congeladas en una fase fija. */
+  onQuality(q) {
+    U.uFlowOn.value = q.idleFps > 0 ? 1 : 0;
+    if (!(q.idleFps > 0) && wantReq) { wantReq = false; idleDriver.request("runoff", false); }
+  },
+
+  dispose() {
+    wantReq = false; idleDriver.request("runoff", false);
+    for (const k in S) {
+      const s = S[k]; if (!s || !s.geom) continue;
+      s.geom.dispose(); s.mat.dispose(); if (s.tex) s.tex.dispose();
+    }
+    if (G) G.inTex.dispose();
+  },
+
+  stats(key) {
+    const s = S[key];
+    if (!s || !s.hasData) return {};   // simulador nunca prendido: no agrega claves (stats() idéntico al de antes)
+    const bytes = (s.data ? s.data.byteLength : 0) + (G && key === "inicial" ? G.nx * G.ny : 0);
+    return { runoffTris: s.tris, runoffParticles: 0, runoffTexMB: +(bytes * MB).toFixed(2) };
+  }
+};
+
+const _zen = new THREE.Color();

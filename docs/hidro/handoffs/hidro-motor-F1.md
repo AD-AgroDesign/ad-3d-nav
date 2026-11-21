@@ -158,3 +158,42 @@ Un mensaje a la vez (cola FIFO del worker); `state.js` junta recálculos en vuel
 - ¿Se quiere que el corredor del sintético cruce más vaguadas para que la reducción se parezca a la demo real (−38 % en una confluencia)? Hoy el campo
   baja la v media solo un 5,8 % y 58 ha frenan ≥ 16 %. No es un problema del motor, es del campo de prueba.
 - ¿Guardamos `Ae`/`Q` en el resultado para poder dibujar el ancho de los cauces por caudal en F3? Recomendación: sí, solo `Q` del escenario visible (Float32, 0,5 MB).
+
+---
+
+# F2 (Motor): borde corregido en la referencia y caudal `Q` en el resultado
+
+## Qué cambió
+- `docs/hidro/referencia/velocidad.py`: `box()` promedia solo las vecinas que existen (suma / cantidad de vecinas dentro de la grilla), igual que
+  `flow.js box3`. Antes rellenaba con ceros y dividía por 9. Quedó documentado en el docstring de `box()` y en el del script. Nada más cambió.
+- `dev/test/hydro.test.mjs`: se quitó la banda de 3 celdas; `S`, dirección, `v`, `h` y `dlog` se comparan en la grilla COMPLETA con las tolerancias de MODELO §5.
+  Se sumaron dos chequeos de `Q` (tipo y tamaño en ambos escenarios; `Q = i·Ae` por celda y máximo dentro del campo = `qPicoMaxM3s`).
+- `js/hydro/engine.js` (`evaluar`, `resultadoDe`) y `js/hydro/worker.js` (lista de transferibles): `inicial.Q` y `multi.Q`.
+
+## JS vs Python en grilla completa (referencia regenerada, 379×357 celdas, campo sintético)
+| Comparación (grilla completa) | Resultado | Tolerancia MODELO §5 |
+|---|---|---|
+| F: celdas con \|Δ\| ≤ 1e-3 m | 100 %, max 0 | ≥ 99,9 % |
+| S: rel p99 | 2,3e-13 | (≤ 1e-6) |
+| dirección media: \|Δ\| p99 | 3,7e-8 | (≤ 1e-5) |
+| v inicial / multi: mediana · p95 rel | 3e-13 % · 1,5e-12 % | ≤ 2 % · ≤ 5 % |
+| h inicial / multi: mediana rel | 6,8e-13 % | ≤ 2 % |
+| dlog: \|Δ\| p99 | 1,3e-8 | ≤ 0,02 |
+| Ae donde Ae > 10·A: max rel | 2,8e-15 | ≤ 1 % |
+| Estadísticos (v media, ha v > 0,3, ha frena, Q pico) | rel ≤ 0,41 % (reducción de v media), el resto ≤ 0,14 % | ≤ 2 % |
+Los números del campo no cambian respecto de F1 (v media 0,0852 → 0,0803 m/s, ha v > 0,3: 13,92 → 12,03, frena ≥ 16 %: 58,2 ha, Q pico 42,79 → 41,42 m³/s):
+el borde está fuera del campo. Pipeline completo 244 ms (node 22, linux/x64); recálculo por lluvia ~56 ms. Test: 61 ok, 0 fallas. `stamp_version --check` OK.
+
+## Formato actualizado del resultado
+`result.inicial` y `result.multi` = `{ h, v, Q }`, los tres `Float32Array(nx·ny)` TRANSFERIDOS por el worker (los dos escenarios siempre, para el fundido):
+`h` altura de lámina (m), `v` velocidad suavizada (m/s), `Q` caudal pico por celda (m³/s) = `rainMmH/3.6e6 · Ae` (el mismo que usa Manning; cambia con la lluvia y se
+recalcula en el mensaje `rain`). Fuera del campo también hay `Q` (la cuenca aguas arriba aporta); el `qPicoMaxM3s` de `stats` es solo dentro del campo.
+Costo: ~0,5 MB por escenario en el campo sintético. `state.js` no necesita cambios (`result` pasa tal cual).
+
+## Qué habría que cambiar en MODELO.md (no lo edité)
+- §3 punto 3/4/10 (cajas 3×3): aclarar "normalizada por las vecinas que existen en el borde de la grilla".
+- §5: agregar que la comparación es sobre la grilla completa y, si se quiere, `S` y dirección con las tolerancias de arriba.
+- Formato del resultado (si lo describe): sumar `Q` a `inicial`/`multi`.
+
+## Pendiente
+- Quedó resuelta la pregunta de F1 sobre `Q`: se devuelve en ambos escenarios (decisión del dueño). La deuda "Ae/Q no se devuelven" queda cerrada para `Q`; `Ae` sigue sin devolverse.

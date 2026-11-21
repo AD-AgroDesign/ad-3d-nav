@@ -10,16 +10,17 @@
    Con ?qa nunca arranca el tour ni la cámara solos: el splash se saltea desde
    la API y el tour/órbita solo corren si se piden (startTour/startOrbit).
    ==================================================================== */
-import { HOME_VIEW, state } from "../core/state.js?v=20261121";
-import { featureCentroid, mulberry32, ringAreaHa } from "../core/geo.js?v=20261121";
-import { map } from "../map/style.js?v=20261121";
-import { setScenario } from "../map/scenario.js?v=20261121";
-import { getCamera } from "../core/camera.js?v=20261121";
-import { LEVELS, setQuality } from "../core/quality.js?v=20261121";
-import { host } from "../render/host.js?v=20261121";
-import { PRESET_NAMES, atm, presetName, setPreset, uniforms } from "../render/lighting.js?v=20261121";
-import { RAZANTE_CAM, corridorCenterline, makeFlight } from "../tour/flight.js?v=20261121";
-import { startOrbit, startTour, stopOrbit, stopTour } from "../tour/tour.js?v=20261121";
+import { HOME_VIEW, state } from "../core/state.js?v=20261122";
+import { featureCentroid, mulberry32, ringAreaHa } from "../core/geo.js?v=20261122";
+import { map } from "../map/style.js?v=20261122";
+import { setScenario } from "../map/scenario.js?v=20261122";
+import { getCamera } from "../core/camera.js?v=20261122";
+import { LEVELS, setQuality } from "../core/quality.js?v=20261122";
+import * as hidro from "../hydro/state.js?v=20261122";   // F2: simulador de escorrentía
+import { host } from "../render/host.js?v=20261122";
+import { PRESET_NAMES, atm, presetName, setPreset, uniforms } from "../render/lighting.js?v=20261122";
+import { RAZANTE_CAM, corridorCenterline, makeFlight } from "../tour/flight.js?v=20261122";
+import { startOrbit, startTour, stopOrbit, stopTour } from "../tour/tour.js?v=20261122";
 
 (() => {
   const _q = new URLSearchParams(location.search);
@@ -207,6 +208,16 @@ import { startOrbit, startTour, stopOrbit, stopTour } from "../tour/tour.js?v=20
     /* Reemplaza Math.random por mulberry32(n): el tour (waypoints y corredor)
        pasa a ser reproducible. Solo existe en modo QA. */
     seed(n) { Math.random = mulberry32(n >>> 0); },
+    /* F2: simulador de escorrentía. ready es getter: cada lectura pide el resultado vigente. */
+    runoff: {
+      set: mode => hidro.setMode(mode),
+      rain: mmh => hidro.setRain(mmh, true),
+      get ready() { return hidro.ensureComputed(); },
+      stats() {
+        const { mode, rainMmH, available, reason, computing, error, result } = hidro.getState();
+        return { mode, rainMmH, available, reason, computing, error, result: result ? { stats: result.stats } : null };
+      },
+    },
     stats,
     frameTimes,
     views: computeViews,

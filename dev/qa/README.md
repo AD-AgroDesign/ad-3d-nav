@@ -21,6 +21,13 @@ node diff.mjs baseline out/despues --out out/diff --json out/diff.json --max-pct
 # con el simulador (desde F2)
 node capture.mjs --hide-ui --runoff natural,velocidad --views home,rasante --out out/sim
 ```
+Simulador (G1, desde F2):
+```bash
+node runoff.mjs --out out/runoff         # antes (apagado) / después (natural): home, cenital, general62 y 3 de cerca en la confluencia
+                                         # principal (C1 x V1), inicial y multi, + relieve apagado; medidas.json (stats, worker, texturas)
+node sheet.mjs --pair out/runoff/antes out/runoff/despues --cols 4 --cell 400 --out hoja_g1.jpg
+node panel.mjs --out out/panel --sheet hoja_panel.jpg   # bloque del simulador apagado/prendido/deshabilitado a 1440/830/500/375
+```
 Opciones de `capture.mjs`: `--base`, `--query` (default `fixture=demo_relieve`), `--extra` (default
 `&terreno=1&calidad=alta`), `--views all|lista`, `--scenario ini|multi|both`, `--hide-ui`, `--runoff modos`, `--wait ms`.
 

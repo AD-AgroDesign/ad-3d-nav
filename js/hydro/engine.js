@@ -1,11 +1,11 @@
 /* hydro/engine.js · orquestación PURA del cálculo (la usan el worker y los tests). Sin Three/DOM/MapLibre.
    Todo lo que depende de la lluvia está aparte (`evaluar`) del resto, porque Ae = acumulación de C·A no depende de la lluvia:
    un cambio del deslizador solo repite Manning + suavizado (milisegundos), no el relleno ni el flujo. */
-import { medianFilter, cellCenters } from "./grid.js?v=20261121";
-import { priorityFlood } from "./fill.js?v=20261121";
-import { mfdWeights, meanDirection, localSlope } from "./flow.js?v=20261121";
-import { tablaClases, rasterizarClases } from "./classes.js?v=20261121";
-import { acumular, manning, suavizarLog, diferenciaLog, estadisticos, haFrena } from "./runoff.js?v=20261121";
+import { medianFilter, cellCenters } from "./grid.js?v=20261122";
+import { priorityFlood } from "./fill.js?v=20261122";
+import { mfdWeights, meanDirection, localSlope } from "./flow.js?v=20261122";
+import { tablaClases, rasterizarClases } from "./classes.js?v=20261122";
+import { acumular, manning, suavizarLog, diferenciaLog, estadisticos, haFrena } from "./runoff.js?v=20261122";
 
 const ahora = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
 
@@ -39,13 +39,15 @@ export function evaluar(terreno, esc, rainMmH, P) {
   const t = ahora();
   const { h, vRaw } = manning(esc.Ae, terreno.S, esc.nM, meta.cell, rainMmH, P);
   const v = suavizarLog(vRaw, nx, ny, P);
-  return { h, v, ms: ahora() - t };
+  const iMs = rainMmH / 1000 / 3600, Q = new Float64Array(h.length);   // caudal pico por celda (m³/s) = i · Ae, el mismo que usa Manning
+  for (let id = 0; id < Q.length; id++) Q[id] = iMs * esc.Ae[id];
+  return { h, v, Q, ms: ahora() - t };
 }
 
 const f32 = a => Float32Array.from(a);
 
 /* Corre todo: raw (Float32Array del DEM de la grilla), features por escenario. Devuelve { terreno, esc, resultado }.
-   `resultado` = { meta, rainMmH, h/v por escenario, dlog, dirX, dirY, inside, stats }. */
+   `resultado` = { meta, rainMmH, h/v/Q por escenario, dlog, dirX, dirY, inside, stats }. */
 export function correrTodo(raw, meta, featuresPorEscenario, rainMmH, P) {
   const t0 = ahora();
   const H = medianFilter(raw, meta.nx, meta.ny);
@@ -80,8 +82,8 @@ export function resultadoDe(cache, rainMmH, P) {
   };
   return {
     meta, rainMmH, stats,
-    inicial: { h: f32(ei.h), v: f32(ei.v) },
-    multi: { h: f32(em.h), v: f32(em.v) },
+    inicial: { h: f32(ei.h), v: f32(ei.v), Q: f32(ei.Q) },
+    multi: { h: f32(em.h), v: f32(em.v), Q: f32(em.Q) },
     dlog, dirX: terreno.dirX.slice(), dirY: terreno.dirY.slice(), inside: insideU8   // copias: lo que se transfiere se desprende y el cache tiene que seguir vivo
   };
 }
