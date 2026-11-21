@@ -488,3 +488,60 @@ export const A5_FAUNA = {
   if ((q.has("debug") || q.has("qa")) && q.get("fauna") === "0") A5_FAUNA.enabled = false;
 }
 /* === A5: fin === */
+
+/* === HIDRO: inicio === */
+/* Simulador de escorrentía (js/hydro/**). Modelo y fuentes de cada número: docs/hidro/MODELO.md.
+   Los módulos de cálculo (grid/fill/flow/classes/runoff) son puros y corren también en el worker y en Node, donde
+   este archivo no se puede importar (toca window/location): reciben estos valores por parámetro (state.js los arma
+   con `paramsMotor()` y los manda en el mensaje al worker). Nada de números mágicos en hydro/. */
+export const HIDRO = {
+  /* --- lluvia --- */
+  rain: { default: 50, min: 10, max: 100, step: 5 },   // mm/h, intensidad en el pico (deslizador F3)
+  pCn: 80,                  // mm · lámina de diseño con la que se calcula C = Q_cn(P)/P (MODELO §2.6)
+  /* --- grilla --- */
+  zoom: 13,                 // DEM terrarium z13 (mismo que A6_TERRAIN.demZoom)
+  metrosPorPx0: 156543.03392,   // m/píxel a z0 en el ecuador (la celda es esto / 2^z · cos(lat))
+  margenCuencaM: 1500,      // m · margen alrededor del campo: el agua viene de afuera del lote
+  /* --- relleno y flujo --- */
+  epsFill: 1e-4,            // m · épsilon del Priority-Flood (Barnes 2014)
+  mfdP: 3,                  // exponente de Holmgren
+  contorno: { cardinal: 0.5, diagonal: 0.354 },   // largos de contorno de Quinn
+  sMin: 0.004,              // m/m · piso de la pendiente local
+  pasadasDir: 2,            // cajas 3×3 sobre la dirección media
+  pasadasPendiente: 2,      // cajas 3×3 sobre el DEM antes de derivar
+  eps: { dir: 1e-9, hMin: 1e-6, vMin: 1e-4 },   // normalización de la dirección · piso de h en v=q/h · piso de v en log
+  /* --- clases: _cls → CN (grupo B) y n de Manning (MODELO §3). "supuesto" = a validar por un especialista --- */
+  claseFuera: "agri",       // lo que no cae en ningún polígono se trata como agrícola
+  clases: {
+    "agri":          { cn: 78, n: 0.10 },   // TR-55 cultivo en hileras
+    "zona1":         { cn: 78, n: 0.10 },
+    "zona2":         { cn: 78, n: 0.10 },
+    "zona3":         { cn: 78, n: 0.10 },
+    "otros":         { cn: 78, n: 0.10 },
+    "corr-herb":     { cn: 61, n: 0.24 },   // TR-55 pastura buena, dense grasses
+    "parche-herb":   { cn: 61, n: 0.24 },
+    "corr-le":       { cn: 55, n: 0.40 },   // TR-55 bosque bueno, woods light underbrush
+    "parche-le":     { cn: 55, n: 0.40 },
+    "instalaciones": { cn: 86, n: 0.05 },   // supuesto
+    "camino":        { cn: 82, n: 0.03 },   // TR-55 caminos de tierra
+    "ganaderia":     { cn: 69, n: 0.15 },   // supuesto, a validar
+    "suelo-desnudo": { cn: 86, n: 0.05 },   // supuesto, a validar
+    "bajo":          { cn: 70, n: 0.24 },   // supuesto, a validar
+    "agua":          { cn: 98, n: 0.03 }    // supuesto
+  },
+  /* --- disponibilidad (MODELO §4): mismos umbrales que la activación automática del terreno --- */
+  disponibilidad: { desvioResidual: A6_TERRAIN.auto.desvioResidual, pendienteP95: A6_TERRAIN.auto.pendienteP95 },
+  /* --- estadísticos --- */
+  stats: { vAltaMs: 0.3, frenaDlog: -0.25 },   // ha con v > 0,3 m/s · "frena ≥ 16 %" = log2(v_multi/v_ini) < −0,25
+  /* --- visualización (la usan render y UI; el motor solo la guarda) --- */
+  vis: {
+    vMinMs: 0.02, vMaxMs: 1.5,             // rango de la paleta turbo (log10) y de la leyenda
+    marcasMs: [0.02, 0.05, 0.1, 0.2, 0.5, 1, 1.5],
+    hVisibleM: 0.02, hOpacoM: 0.2,         // lámina desde la que se ve el agua / donde ya es opaca
+    estelaSegundos: 320, estelaMinM: 45, estelaMaxM: 420,   // largo de estela ≈ v·320 s, acotado
+    difUmbral: 0.06, difSatura: -1.15      // saturado en −55 % de velocidad (log2(0,45) = −1,15)
+  },
+  /* --- worker --- */
+  worker: { tiempoMaxMs: 1500 }            // objetivo de PLAN §5 (los dos escenarios); solo informativo
+};
+/* === HIDRO: fin === */
