@@ -1,6 +1,6 @@
-import { CLASS_META, CLASS_ORDER } from "../core/config.js?v=20261125";
-import { state } from "../core/state.js?v=20261125";
-import { natureHa } from "../map/data.js?v=20261125";
+import { CLASS_META, CLASS_ORDER } from "../core/config.js?v=20261126";
+import { state } from "../core/state.js?v=20261126";
+import { natureHa } from "../map/data.js?v=20261126";
 
 /* ---------- Panel ---------- */
 export function fmtHa(v) {

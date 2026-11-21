@@ -15,7 +15,7 @@
    API:  buildGrassAtlas() → { texture, ms, msPaint, msMips }   (ms = tiempo total de generación)
          GRASS_ATLAS = { cols: 2, rows: 4, tile: 256, alphaRef: 0.42 }                                          */
 import * as THREE from "three";
-import { mulberry32 } from "../../core/geo.js?v=20261125";
+import { mulberry32 } from "../../core/geo.js?v=20261126";
 
 export const GRASS_ATLAS = { cols: 2, rows: 4, tile: 256, alphaRef: 0.42 };
 const TP = GRASS_ATLAS.tile, COLS = GRASS_ATLAS.cols, ROWS = GRASS_ATLAS.rows, AW = TP * COLS, AH = TP * ROWS;

@@ -1,8 +1,8 @@
 /* hydro/load.js · carga del DEM de la grilla (la parte con red; el cálculo es puro y vive en grid.js / engine.js).
    Usa terrain.hf si ya cubre bbox + margen de cuenca; si no (lo normal: terrain.hf solo trae ~0,01° de margen), baja un
    Heightfield propio a z13 con la misma URL que el visor. Corre en el hilo principal (red + PNG; el cálculo va al worker). */
-import { loadHeightfield } from "../terrain/heightfield.js?v=20261125";
-import { gridMeta, cropDem } from "./grid.js?v=20261125";
+import { loadHeightfield } from "../terrain/heightfield.js?v=20261126";
+import { gridMeta, cropDem } from "./grid.js?v=20261126";
 
 /* bboxCampo = [oeste, sur, este, norte] (del escenario inicial). hf = terrain.hf o null. P = parámetros HIDRO. demUrl = A6_TERRAIN.demUrl.
    Devuelve { meta, raw: Float32Array nx·ny, fuente: "terrain.hf" | "propio", msDem } o lanza si no se pudo bajar el DEM. */

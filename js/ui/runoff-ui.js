@@ -1,13 +1,14 @@
 /* ============ UI del Simulador de escorrentía (HIDRO · F2) ============
-   Bloque propio del panel, entre "Calidad" y el pie. La UI NO calcula ni decide: lee el estado de hydro/state.js (getState y el
+   Bloque propio, en su panel exclusivo #runoff-panel (botón #btn-runoff de la barra), separado de la tabla de contenidos. La UI NO calcula ni decide: lee el estado de hydro/state.js (getState y el
    evento "runoff") y llama setMode. El relieve se prende por core/relief.js (setReliefSession: solo esta visita, no pisa la preferencia guardada del conmutador de relieve).
    La disponibilidad depende de terrain.stats, que llega asíncrono: se re-evalúa al armar y en "runoff", "relief:state" y "scenario".
    Se arma solo al importarse (el #panel ya está en el HTML); también se exporta armarEscorrentia() por si hace falta llamarlo. */
-import { on } from "../core/events.js?v=20261125";
-import { relief, onRelief, setReliefSession } from "../core/relief.js?v=20261125";
-import { getState, setMode, setRain } from "../hydro/state.js?v=20261125";
-import { turboCss } from "../render/systems/runoff-turbo.js?v=20261125";   // misma paleta (y misma t) que el shader
-import { HIDRO } from "../core/config.js?v=20261125";
+import { on } from "../core/events.js?v=20261126";
+import { relief, onRelief, setReliefSession } from "../core/relief.js?v=20261126";
+import { getState, setMode, setRain } from "../hydro/state.js?v=20261126";
+import { turboCss } from "../render/systems/runoff-turbo.js?v=20261126";   // misma paleta (y misma t) que el shader
+import { registrarPanel, abrirPanel as abrirPanelExcl } from "./paneles-ui.js?v=20261126";
+import { HIDRO } from "../core/config.js?v=20261126";
 
 const MOTIVOS = {
   llano: "Campo llano: el modelo de terreno no alcanza para simular el escurrimiento",
@@ -76,7 +77,7 @@ function leyendaNatural() {
 let metr, metrDe = "", sw, seg, estado, leyenda, leyendaDe = "", lluvia, lluviaIn, lluviaVal, calcTimer = 0, calcVisible = false, marcaMapa, rotulo, nota, bloque, pedidoUrl = null, avisoRelieve = false, modoUrl = "off";   // "off" de arranque: apagado no toca la URL (cero efecto)
 
 export function armarEscorrentia() {
-  const panel = document.getElementById("panel");
+  const panel = document.getElementById("runoff-panel");
   if (!panel || document.getElementById("runoff-section")) return;
   bloque = document.createElement("div");
   bloque.className = "panel-section"; bloque.id = "runoff-section";
@@ -133,12 +134,28 @@ export function armarEscorrentia() {
   metr.id = "runoff-metricas"; metr.setAttribute("aria-label", "Métricas del escurrimiento");
 
   bloque.append(fila, estado, seg, lluvia, leyenda, metr, rotulo, nota);
-  panel.insertBefore(bloque, panel.querySelector(".panel-footer"));
+  panel.appendChild(bloque);
+  armarPanel(panel);
 
   // ?escorrentia=natural|velocidad|diferencia: se aplica en cuanto el campo admita el simulador
   const m = location.search.match(/[?&]escorrentia=([^&]*)/);
   if (m && VISTAS.some(v => v.id === m[1])) pedidoUrl = m[1];
+  if (pedidoUrl && !matchMedia("(max-width: 760px)").matches) abrirPanel(true);   // ?escorrentia: en escritorio el panel queda abierto
   pintar();
+}
+
+/* Panel propio (#runoff-panel): la exclusión con la tabla y los demás paneles y el estado del botón los resuelve paneles-ui.js */
+let panelSim, btnSim;
+function armarPanel(panel) {
+  panelSim = panel; btnSim = document.getElementById("btn-runoff");
+  registrarPanel(panel, { boton: btnSim, cerrar: document.getElementById("runoff-panel-close") });
+  sincBoton();
+}
+function abrirPanel(abrir) { if (panelSim) abrirPanelExcl(panelSim, abrir); }
+function sincBoton() {
+  if (!btnSim) return;
+  const s = getState();
+  btnSim.classList.toggle("runoff-prendido", s.mode !== "off" && s.available);   // puntito dorado: prendido con el panel cerrado
 }
 
 /* Marca chica sobre el mapa mientras el simulador está prendido (HIDRO.vis.marca). Apagado no existe en el DOM.
@@ -199,6 +216,7 @@ function pintar(s) {
   lluviaVal.textContent = s.rainMmH + " mm/h";
   lluviaIn.setAttribute("aria-valuetext", s.rainMmH + " milímetros por hora");
   marcarMapa(prendido);
+  sincBoton();
   bloque.setAttribute("aria-busy", String(!!calc));
   rotulo.textContent = "Ilustrativo · pico de una lluvia de " + s.rainMmH + " mm/h · no es un estudio hidrológico";
   let n = "";
