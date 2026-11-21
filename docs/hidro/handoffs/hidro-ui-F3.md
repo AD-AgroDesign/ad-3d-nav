@@ -41,3 +41,5 @@ lluvia (10–100 mm/h) y una marca "Ilustrativo · no es un estudio hidrológico
 
 ## Preguntas
 - ¿Querés que la marca vaya pegada a "campo sintético" aun pisando el panel en escritorio? Hoy está centrada abajo.
+
+- Marca sobre el mapa: más contraste (11,5 px, semibold, fondo rgba(10,18,12,.72), texto .95, sombra). Con el panel abierto en ≤ 830 px sigue debajo de la hoja (evitarlo implicaría pisar su texto); el panel ya trae el rótulo. Capturas: ui3/<ancho>-cerrado-compacto.png.
