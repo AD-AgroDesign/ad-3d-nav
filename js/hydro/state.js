@@ -12,13 +12,13 @@
              result    null o el resultado (ver más abajo); su rainMmH puede ir atrás de `rainMmH` mientras recalcula
              error     "" o el mensaje del último fallo
    Evento "runoff" (core/events.js): payload = getState() + { cambio: "mode"|"rain"|"availability"|"computing"|"result"|"error" }. */
-import { HIDRO, A6_TERRAIN } from "../core/config.js?v=20261128";
-import { state as appState } from "../core/state.js?v=20261128";
-import { emit } from "../core/events.js?v=20261128";
-import { terrain } from "../terrain/terrain.js?v=20261128";
-import { cargarEntradaGrilla } from "./load.js?v=20261128";
-import { sceneToCell } from "./grid.js?v=20261128";
-import { paramsMotor } from "./params.js?v=20261128";
+import { HIDRO, A6_TERRAIN } from "../core/config.js?v=20261129";
+import { state as appState } from "../core/state.js?v=20261129";
+import { emit } from "../core/events.js?v=20261129";
+import { terrain } from "../terrain/terrain.js?v=20261129";
+import { cargarEntradaGrilla } from "./load.js?v=20261129";
+import { sceneToCell } from "./grid.js?v=20261129";
+import { paramsMotor } from "./params.js?v=20261129";
 
 export { paramsMotor };
 
@@ -109,7 +109,7 @@ const featuresDe = key => appState.data[key].features.filter(f => f.geometry)
   .map(f => ({ cls: f.properties._cls, type: f.geometry.type, coordinates: f.geometry.coordinates }));
 
 function crearWorker() {
-  worker = new Worker(new URL("./worker.js?v=20261128", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=20261129", import.meta.url), { type: "module" });
   worker.onmessage = (ev) => {
     const m = ev.data, p = pendientes.get(m.id);
     if (!p) return;

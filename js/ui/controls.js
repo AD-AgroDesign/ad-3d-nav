@@ -1,10 +1,10 @@
-import { HOME_VIEW, state } from "../core/state.js?v=20261128";
-import { applyOpacity } from "../map/layers.js?v=20261128";
-import { setScenario } from "../map/scenario.js?v=20261128";
-import { map } from "../map/style.js?v=20261128";
-import { quality, setQuality } from "../core/quality.js?v=20261128";
-import { startOrbit, startTour, stopOrbit, stopTour } from "../tour/tour.js?v=20261128";
-import { armarQualityDD } from "./quality-dd.js?v=20261128";
+import { HOME_VIEW, state } from "../core/state.js?v=20261129";
+import { applyOpacity } from "../map/layers.js?v=20261129";
+import { setScenario } from "../map/scenario.js?v=20261129";
+import { map } from "../map/style.js?v=20261129";
+import { quality, setQuality } from "../core/quality.js?v=20261129";
+import { startOrbit, startTour, stopOrbit, stopTour } from "../tour/tour.js?v=20261129";
+import { armarQualityDD } from "./quality-dd.js?v=20261129";
 
 /* ---------- Selector de calidad (P-7): hoy sin efectos visibles ---------- */
 const qualitySel = document.getElementById("quality-select");

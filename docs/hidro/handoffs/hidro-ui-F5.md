@@ -35,3 +35,6 @@ Los avisos de desborde de `.runoff-marcas`/`.runoff-sr` en velocidad/diferencia 
 
 ## Opacidad del diseño en el panel del simulador
 Sección "Opacidad del diseño" arriba del bloque (`#runoff-opacity-slider` / `#runoff-opacity-val`, mismo h3, `.opacity-row`, rango 20–100). Sincronía con `#opacity-slider` por eventos, sin tocar `controls.js`: al mover el nuevo se escribe el valor allá y se despacha `input` (bandera `propio` evita el bucle); al moverse el de la tabla se refleja acá. Siempre visible. Verificado a 1440 y 375 px: mover uno actualiza el otro y `#opacity-val`.
+
+## Ajustes: tres secciones separadas
+Calidad / Hora del día / Relieve con la misma línea fina (`rgba(255,255,255,.08)`, a todo el ancho) y el mismo espaciado (16 px) que `.panel-section`. Solo CSS en la sección HIDRO sobre `#ajustes-panel` (margen negativo, porque los módulos agregan sus filas a `#quality-section` en runtime y no conviene envolver nodos). Desplegable de calidad y sin scrollbar verificados a 1440 y 375 px.
