@@ -31,6 +31,7 @@ import water from "./systems/water.js?v=20261121";   // A4: agua por shader
 import { bindReliefFrame, fitSpheres, growthU, heightAt, onReliefStep, patchGrowth, terrain } from "../terrain/terrain.js?v=20261121";   // A6: relieve (heightAt real; terrain.active)
 import shadows from "./systems/shadows.js?v=20261121";   // A3: sombras de árboles (pase propio + receptor + blobs)
 import fauna from "./systems/fauna.js?v=20261121";   // A5: aves y polinizadores
+import runoff from "./systems/runoff.js?v=20261121"; // F2: simulador de escorrentía (inerte con el simulador apagado)
 
 const SCENARIOS = ["inicial", "multi"];
 
@@ -220,3 +221,4 @@ host.register(ground);   // A4
 host.register(water);   // A4: agua
 host.register(shadows);   // A3
 host.register(fauna);   // A5
+host.register(runoff);  // F2
