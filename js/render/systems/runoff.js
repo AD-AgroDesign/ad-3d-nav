@@ -41,23 +41,8 @@ import { getState } from "../../hydro/state.js?v=20261122";
 import { pxToLonLat } from "../../hydro/grid.js?v=20261122";
 import { getWaveTex } from "./water.js?v=20261122";
 
-/* ---------- diales de esta vista (→ HIDRO: proponer como HIDRO.vis.natural en la próxima ronda del motor) ---------- */
-const NAT = {   // → HIDRO
-  colShallow: "#60a0c4", colDeep: "#1e5280",   // MODELO §6: somero → profundo
-  yOff: A4_GROUND.yOffRelief + 0.04,           // m sobre heightAt: por encima del suelo (0,08) y del margen de la malla de MapLibre
-  alphaMin: 0.20,                              // alfa de la lámina recién visible (h ≈ hVisibleM)
-  alphaMax: 0.95,                              // alfa con lámina ≥ hOpacoM
-  edgeNoise: 0.6,                              // celdas · distorsión de dominio del borde (ruido estático)
-  outside: 0.35,                               // alfa relativa FUERA del campo (la cuenca de aporte, atenuada)
-  gain: 0.82,                                  // igual que A4_WATER.gain: calibración del cuerpo
-  waveScale: [5, 11],                          // m · período de las dos capas de normales
-  waveSlope: 0.30,                             // pendiente máx. de las normales
-  waveFade: [160, 600],                        // m · las ondas se aplanan con la distancia
-  cycle: 2.0,                                  // s · ciclo de las dos fases cruzadas del flowmap
-  speedBase: 0.15, speedGain: 2.0,             // rapidez visual de las ondas (m/s) = base + gain·v (la v real, 0,02–1,5 m/s, se ve lentísima)
-  reflection: 0.55, spec: [300, 0.8], f0: 0.02,
-  idleMaxDist: 1500                            // m · más lejos no hace falta animar en reposo
-};
+/* ---------- diales: HIDRO.vis.natural (antes constante local NAT) ---------- */
+const NAT = HIDRO.vis.natural;
 
 /* ---------- shaders ---------- */
 const VS =
