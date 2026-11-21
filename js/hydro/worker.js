@@ -7,6 +7,7 @@
      { type: "rain", id, rainMmH }          recalcula con la lluvia nueva sobre lo ya calculado (Manning + suavizado)
    Salida:
      { type: "result", id, result, ms }     result = ver engine.js resultadoDe; todos los Float32Array/Uint8Array van transferidos
+                    (inicial.{h,v,Q} y multi.{h,v,Q}: h = altura m, v = velocidad m/s suavizada, Q = caudal pico m³/s; los dos escenarios siempre)
      { type: "error", id, message }
    Un mensaje a la vez; si llega otro mientras tanto, queda en la cola del worker y state.js descarta las respuestas viejas por id. */
 import { correrTodo, resultadoDe } from "./engine.js?v=20261121";
@@ -15,7 +16,7 @@ let cache = null, params = null;
 
 function buffers(r) {
   const out = [];
-  for (const k of ["inicial", "multi"]) out.push(r[k].h.buffer, r[k].v.buffer);
+  for (const k of ["inicial", "multi"]) out.push(r[k].h.buffer, r[k].v.buffer, r[k].Q.buffer);
   out.push(r.dlog.buffer, r.dirX.buffer, r.dirY.buffer, r.inside.buffer);
   return out;
 }
