@@ -10,6 +10,7 @@ Uso:
 Requiere: numpy, pillow, shapely (pip install numpy pillow shapely). Baja tiles de s3.amazonaws.com (se cachean).
 Salida: <out>/meta_vel.json (parámetros + estadísticos) y, con --dump, <out>/grid.npz con H, F, Ae, v, h, dirX, dirY por
 escenario (para comparar con el port JS en los tests de F1).
+F2: box() promedia solo las vecinas que existen (igual que flow.js box3); antes sesgaba el borde de la grilla.
 """
 import argparse, heapq, io, json, math, re, unicodedata, urllib.request
 from pathlib import Path
@@ -105,11 +106,15 @@ def shift(A, di, dj, fill):
     return out
 
 def box(A):
-    acc = np.zeros_like(A)
+    """Media 3x3 de las vecinas que EXISTEN (en el borde de la grilla divide por 4 o 6, no por 9).
+    Corrección F2: la versión original rellenaba con ceros y dividía siempre por 9, lo que sesgaba hacia 0 las 2-3 celdas
+    del borde (pendientes enormes en el DEM suavizado, log v tirado hacia v = 1 m/s). Ahora es igual a flow.js box3."""
+    acc = np.zeros_like(A); cnt = np.zeros_like(A)
     for dj in (-1, 0, 1):
         for di in (-1, 0, 1):
             acc += shift(A, di, dj, 0)
-    return acc / 9
+            cnt += shift(np.ones_like(A), di, dj, 0)
+    return acc / cnt
 
 pad = np.pad(H0, 1, mode="edge")
 H = np.median(np.stack([pad[1 + dj:1 + dj + ny, 1 + di:1 + di + nx] for dj in (-1, 0, 1) for di in (-1, 0, 1)]), axis=0)
