@@ -107,11 +107,11 @@ Bloque "Simulador de escorrentía" del panel (debajo de "Relieve del terreno"). 
 dónde se junta el agua en el pico de una lluvia (por defecto 50 mm/h), calculada en el navegador sobre el modelo de terreno
 (DEM) del campo. Es **ilustrativo: no es un estudio hidrológico**, y la lámina de agua está exagerada a propósito para que se vea.
 Al prenderlo se prende también el relieve del terreno (lo necesita). Si el campo es llano o no hay modelo de terreno, el
-interruptor queda deshabilitado y el panel dice por qué. La vista "Velocidad" figura como "próximamente".
+interruptor queda deshabilitado y el panel dice por qué. La vista **Velocidad** pinta la rapidez del agua con una paleta turbo en escala logarítmica (leyenda en m/s) y estelas más largas donde el agua va más rápido. El deslizador **Lluvia (mm/h)** (10–100, de a 5) recalcula al soltarlo. Mientras el simulador está prendido, una marca sobre el mapa recuerda que es ilustrativo.
 
 | Parámetro | Efecto |
 |---|---|
-| `?escorrentia=natural` | abre con el simulador prendido (se aplica en cuanto el campo admite el simulador); el visor lo mantiene en la URL al prender o apagar |
+| `?escorrentia=natural` o `?escorrentia=velocidad` | abre con el simulador prendido en esa vista (se aplica en cuanto el campo admite el simulador); el visor lo mantiene en la URL al prender o apagar |
 
 ## Publicación (caché)
 
