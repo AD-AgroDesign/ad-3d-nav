@@ -3,12 +3,12 @@
    evento "runoff") y llama setMode. El relieve se prende por core/relief.js (setReliefSession: solo esta visita, no pisa la preferencia guardada del conmutador de relieve).
    La disponibilidad depende de terrain.stats, que llega asíncrono: se re-evalúa al armar y en "runoff", "relief:state" y "scenario".
    Se arma solo al importarse (el #panel ya está en el HTML); también se exporta armarEscorrentia() por si hace falta llamarlo. */
-import { on } from "../core/events.js?v=20261126";
-import { relief, onRelief, setReliefSession } from "../core/relief.js?v=20261126";
-import { getState, setMode, setRain } from "../hydro/state.js?v=20261126";
-import { turboCss } from "../render/systems/runoff-turbo.js?v=20261126";   // misma paleta (y misma t) que el shader
-import { registrarPanel, abrirPanel as abrirPanelExcl } from "./paneles-ui.js?v=20261126";
-import { HIDRO } from "../core/config.js?v=20261126";
+import { on } from "../core/events.js?v=20261127";
+import { relief, onRelief, setReliefSession } from "../core/relief.js?v=20261127";
+import { getState, setMode, setRain } from "../hydro/state.js?v=20261127";
+import { turboCss } from "../render/systems/runoff-turbo.js?v=20261127";   // misma paleta (y misma t) que el shader
+import { registrarPanel, abrirPanel as abrirPanelExcl } from "./paneles-ui.js?v=20261127";
+import { HIDRO } from "../core/config.js?v=20261127";
 
 const MOTIVOS = {
   llano: "Campo llano: el modelo de terreno no alcanza para simular el escurrimiento",
@@ -85,7 +85,7 @@ export function armarEscorrentia() {
   const fila = document.createElement("div");
   fila.id = "runoff-fila";
   const lab = document.createElement("span");
-  lab.className = "runoff-label"; lab.id = "runoff-label"; lab.textContent = "Simulador de escorrentía";
+  lab.className = "runoff-label"; lab.id = "runoff-label"; lab.textContent = "Mostrar simulación";
   sw = document.createElement("button");
   sw.type = "button"; sw.id = "runoff-sw"; sw.setAttribute("role", "switch"); sw.setAttribute("aria-labelledby", "runoff-label");
   sw.setAttribute("aria-describedby", "runoff-estado"); sw.innerHTML = '<span class="runoff-knob"></span>';
@@ -218,7 +218,7 @@ function pintar(s) {
   marcarMapa(prendido);
   sincBoton();
   bloque.setAttribute("aria-busy", String(!!calc));
-  rotulo.textContent = "Ilustrativo · pico de una lluvia de " + s.rainMmH + " mm/h · no es un estudio hidrológico";
+  rotulo.textContent = "Ilustrativo · Pico de una lluvia de " + s.rainMmH + " mm/h · No es un estudio hidrológico";
   let n = "";
   if (prendido && !relief.active) n = "El relieve está apagado: el agua se ve mejor con el relieve del terreno prendido.";
   else if (prendido && avisoRelieve) n = "Prendimos el relieve del terreno para esta visita: el agua lo necesita para verse.";

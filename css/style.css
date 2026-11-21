@@ -608,9 +608,10 @@ html, body { height: 100%; overflow: hidden; background: var(--ad-green-dark); }
   .panel-extra .panel-section:first-of-type { padding-right: 44px; }
 }
 .panel-extra-close:focus-visible, #btn-runoff:focus-visible, #btn-ajustes:focus-visible { outline: 2px solid var(--ad-gold); outline-offset: 2px; }
-/* desplegable de calidad dentro de Ajustes: el panel recorta lo que desborda y es corto, así que siempre abre hacia abajo y el panel gana lugar mientras está abierto */
-#ajustes-panel #quality-dd.arriba #quality-menu { top: calc(100% + 6px); bottom: auto; }
-#ajustes-panel:has(#quality-dd.open) { padding-bottom: 150px; }
+/* Ajustes: el contenido es corto, así que el panel no recorta (overflow visible): el menú de calidad se dibuja por encima del borde, sin scrollbar
+   (antes el menú oculto, absoluto, agrandaba el área desplazable y aparecía una barra permanente). En escritorio abre hacia abajo; en la hoja inferior, hacia arriba. */
+#ajustes-panel { overflow: visible; }
+@media (min-width: 831px) { #ajustes-panel #quality-dd.arriba #quality-menu { top: calc(100% + 6px); bottom: auto; } }
 /* puntito dorado: simulador prendido con el panel cerrado */
 #btn-runoff { position: relative; }
 #btn-runoff.runoff-prendido:not(.active)::after { content: ""; position: absolute; top: 5px; right: 5px; width: 7px; height: 7px; border-radius: 50%; background: var(--ad-gold); box-shadow: 0 0 0 1.5px rgba(10, 18, 12, .85); }
