@@ -13,8 +13,8 @@
 <meta property="og:image" content="img/portada.jpg">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" type="image/png" href="img/logo.png">
-<link rel="stylesheet" href="vendor/maplibre-gl.css?v=20261129">
-<link rel="stylesheet" href="css/style.css?v=20261129">
+<link rel="stylesheet" href="vendor/maplibre-gl.css?v=20261130">
+<link rel="stylesheet" href="css/style.css?v=20261130">
 </head>
 <body>
 
@@ -126,6 +126,19 @@
       </div>
     </div>
     <div class="topbar-tools">
+      <button id="btn-ajustes" type="button" title="Ajustes de la vista" aria-label="Ajustes de la vista" aria-controls="ajustes-panel" aria-expanded="false">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>
+        </svg>
+      </button>
+      <button id="btn-panel" aria-controls="panel" aria-expanded="true" title="Mostrar / ocultar panel">☰</button>
+      <button id="btn-runoff" type="button" title="Simulador de escorrentía" aria-label="Simulador de escorrentía" aria-controls="runoff-panel" aria-expanded="false">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M8.5 3.5 C8.5 3.5 4 8.6 4 11.6 a4.5 4.5 0 0 0 9 0 C13 8.6 8.5 3.5 8.5 3.5 Z"/>
+          <path d="M11.5 19.5 H20.5"/>
+          <path d="M17.5 16.5 20.5 19.5 17.5 22"/>
+        </svg>
+      </button>
       <button id="btn-capture" title="Capturar imagen de la vista">
         <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M4 8.5 h2.5 L8 6.5 h8 L17.5 8.5 H20 a1.5 1.5 0 0 1 1.5 1.5 v8 a1.5 1.5 0 0 1 -1.5 1.5 H4 a1.5 1.5 0 0 1 -1.5 -1.5 v-8 A1.5 1.5 0 0 1 4 8.5 Z"/>
@@ -137,19 +150,6 @@
           <path d="M8 3.5 H4.5 A1 1 0 0 0 3.5 4.5 V8 M16 3.5 H19.5 A1 1 0 0 1 20.5 4.5 V8 M8 20.5 H4.5 A1 1 0 0 1 3.5 19.5 V16 M16 20.5 H19.5 A1 1 0 0 0 20.5 19.5 V16"/>
         </svg>
       </button>
-      <button id="btn-runoff" type="button" title="Simulador de escorrentía" aria-label="Simulador de escorrentía" aria-controls="runoff-panel" aria-expanded="false">
-        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M8.5 3.5 C8.5 3.5 4 8.6 4 11.6 a4.5 4.5 0 0 0 9 0 C13 8.6 8.5 3.5 8.5 3.5 Z"/>
-          <path d="M11.5 19.5 H20.5"/>
-          <path d="M17.5 16.5 20.5 19.5 17.5 22"/>
-        </svg>
-      </button>
-      <button id="btn-ajustes" type="button" title="Ajustes de la vista" aria-label="Ajustes de la vista" aria-controls="ajustes-panel" aria-expanded="false">
-        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>
-        </svg>
-      </button>
-      <button id="btn-panel" aria-controls="panel" aria-expanded="true" title="Mostrar / ocultar panel">☰</button>
       <button id="btn-logout" title="Cerrar sesión">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M14.5 3.5H18a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2h-3.5"/>
@@ -266,9 +266,9 @@
 <script type="importmap">
 { "imports": { "three": "./vendor/three.module.js" } }
 </script>
-<script src="js/auth.js?v=20261129"></script>
+<script src="js/auth.js?v=20261130"></script>
 <!-- Punto de entrada ES (módulos diferidos: corre después de auth.js, que deja la
      bandera AD_ACCESS_READY si el acceso se valida antes). Al publicar, subir la fecha del ?v= para saltear la caché. -->
-<script type="module" src="js/app.js?v=20261129"></script>
+<script type="module" src="js/app.js?v=20261130"></script>
 </body>
 </html>

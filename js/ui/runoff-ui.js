@@ -3,12 +3,12 @@
    evento "runoff") y llama setMode. El relieve se prende por core/relief.js (setReliefSession: solo esta visita, no pisa la preferencia guardada del conmutador de relieve).
    La disponibilidad depende de terrain.stats, que llega asíncrono: se re-evalúa al armar y en "runoff", "relief:state" y "scenario".
    Se arma solo al importarse (el #panel ya está en el HTML); también se exporta armarEscorrentia() por si hace falta llamarlo. */
-import { on } from "../core/events.js?v=20261129";
-import { relief, onRelief, setReliefSession } from "../core/relief.js?v=20261129";
-import { getState, setMode, setRain } from "../hydro/state.js?v=20261129";
-import { turboCss } from "../render/systems/runoff-turbo.js?v=20261129";   // misma paleta (y misma t) que el shader
-import { registrarPanel, abrirPanel as abrirPanelExcl } from "./paneles-ui.js?v=20261129";
-import { HIDRO } from "../core/config.js?v=20261129";
+import { on } from "../core/events.js?v=20261130";
+import { relief, onRelief, setReliefSession } from "../core/relief.js?v=20261130";
+import { getState, setMode, setRain } from "../hydro/state.js?v=20261130";
+import { turboCss } from "../render/systems/runoff-turbo.js?v=20261130";   // misma paleta (y misma t) que el shader
+import { registrarPanel, abrirPanel as abrirPanelExcl } from "./paneles-ui.js?v=20261130";
+import { HIDRO } from "../core/config.js?v=20261130";
 
 const MOTIVOS = {
   llano: "Campo llano: el modelo de terreno no alcanza para simular el escurrimiento",

@@ -1,8 +1,8 @@
 /* ============ Conmutador "Relieve del terreno" (A1 · conmutadores sin recarga, 2026-11-13) ============
    Switch compacto de dos estados debajo de "Hora del día" (dentro de #quality-section). La lógica y el puente con A6 viven en
    core/relief.js; acá solo DOM, estados (activo / llano / aviso de apagado automático) y eventos. */
-import { relief, onRelief, setReliefUser } from "../core/relief.js?v=20261129";
-import { on } from "../core/events.js?v=20261129";
+import { relief, onRelief, setReliefUser } from "../core/relief.js?v=20261130";
+import { on } from "../core/events.js?v=20261130";
 
 const TXT_LLANO = "Este campo es llano", TXT_SIN_DEM = "Relieve no disponible en este campo", TXT_AUTO = "Relieve desactivado para mejorar la fluidez";
 let sw, nota, aviso = false;
