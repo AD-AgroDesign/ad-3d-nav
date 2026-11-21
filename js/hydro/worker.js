@@ -10,7 +10,7 @@
                     (inicial.{h,v,Q} y multi.{h,v,Q}: h = altura m, v = velocidad m/s suavizada, Q = caudal pico m³/s; los dos escenarios siempre)
      { type: "error", id, message }
    Un mensaje a la vez; si llega otro mientras tanto, queda en la cola del worker y state.js descarta las respuestas viejas por id. */
-import { correrTodo, resultadoDe } from "./engine.js?v=20261125";
+import { correrTodo, resultadoDe } from "./engine.js?v=20261126";
 
 let cache = null, params = null;
 

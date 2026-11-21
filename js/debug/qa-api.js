@@ -10,17 +10,17 @@
    Con ?qa nunca arranca el tour ni la cámara solos: el splash se saltea desde
    la API y el tour/órbita solo corren si se piden (startTour/startOrbit).
    ==================================================================== */
-import { HOME_VIEW, state } from "../core/state.js?v=20261125";
-import { featureCentroid, mulberry32, ringAreaHa } from "../core/geo.js?v=20261125";
-import { map } from "../map/style.js?v=20261125";
-import { setScenario } from "../map/scenario.js?v=20261125";
-import { getCamera } from "../core/camera.js?v=20261125";
-import { LEVELS, setQuality } from "../core/quality.js?v=20261125";
-import * as hidro from "../hydro/state.js?v=20261125";   // F2: simulador de escorrentía
-import { host } from "../render/host.js?v=20261125";
-import { PRESET_NAMES, atm, presetName, setPreset, uniforms } from "../render/lighting.js?v=20261125";
-import { RAZANTE_CAM, corridorCenterline, makeFlight } from "../tour/flight.js?v=20261125";
-import { startOrbit, startTour, stopOrbit, stopTour } from "../tour/tour.js?v=20261125";
+import { HOME_VIEW, state } from "../core/state.js?v=20261126";
+import { featureCentroid, mulberry32, ringAreaHa } from "../core/geo.js?v=20261126";
+import { map } from "../map/style.js?v=20261126";
+import { setScenario } from "../map/scenario.js?v=20261126";
+import { getCamera } from "../core/camera.js?v=20261126";
+import { LEVELS, setQuality } from "../core/quality.js?v=20261126";
+import * as hidro from "../hydro/state.js?v=20261126";   // F2: simulador de escorrentía
+import { host } from "../render/host.js?v=20261126";
+import { PRESET_NAMES, atm, presetName, setPreset, uniforms } from "../render/lighting.js?v=20261126";
+import { RAZANTE_CAM, corridorCenterline, makeFlight } from "../tour/flight.js?v=20261126";
+import { startOrbit, startTour, stopOrbit, stopTour } from "../tour/tour.js?v=20261126";
 
 (() => {
   const _q = new URLSearchParams(location.search);

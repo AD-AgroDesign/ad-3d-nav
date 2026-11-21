@@ -14,24 +14,24 @@
    Todos los métodos salvo id y build son opcionales.
    ctx = { THREE, toScene, heightAt, quality, shaderlib, uniforms, config, rng }. */
 import * as THREE from "three";
-import * as config from "../core/config.js?v=20261125";
-import { updateCamera } from "../core/camera.js?v=20261125";
-import { emit, hasListeners, on } from "../core/events.js?v=20261125";
-import { mulberry32 } from "../core/geo.js?v=20261125";
-import { quality } from "../core/quality.js?v=20261125";
-import { HOME_VIEW, state } from "../core/state.js?v=20261125";
-import { applyCampoLighting, applyRenderSettings, createLights, uniforms, updateFog } from "./lighting.js?v=20261125";   // A1: updateFog (niebla)
-import { idleDriver } from "./idle.js?v=20261125";   // lazo único de repintado en reposo (Ola 4)
-import * as shaderlib from "./shaderlib.js?v=20261125";
-import { scenarioFade } from "./shaderlib.js?v=20261125";   // A1: uniforme de fade dither por escenario
-import trees from "./systems/trees.js?v=20261125";
-import grass from "./systems/grass.js?v=20261125";
-import ground from "./systems/ground.js?v=20261125";   // A4: suelo por shader + surcos
-import water from "./systems/water.js?v=20261125";   // A4: agua por shader
-import { bindReliefFrame, fitSpheres, growthU, heightAt, onReliefStep, patchGrowth, terrain } from "../terrain/terrain.js?v=20261125";   // A6: relieve (heightAt real; terrain.active)
-import shadows from "./systems/shadows.js?v=20261125";   // A3: sombras de árboles (pase propio + receptor + blobs)
-import fauna from "./systems/fauna.js?v=20261125";   // A5: aves y polinizadores
-import runoff from "./systems/runoff.js?v=20261125"; // F2: simulador de escorrentía (inerte con el simulador apagado)
+import * as config from "../core/config.js?v=20261126";
+import { updateCamera } from "../core/camera.js?v=20261126";
+import { emit, hasListeners, on } from "../core/events.js?v=20261126";
+import { mulberry32 } from "../core/geo.js?v=20261126";
+import { quality } from "../core/quality.js?v=20261126";
+import { HOME_VIEW, state } from "../core/state.js?v=20261126";
+import { applyCampoLighting, applyRenderSettings, createLights, uniforms, updateFog } from "./lighting.js?v=20261126";   // A1: updateFog (niebla)
+import { idleDriver } from "./idle.js?v=20261126";   // lazo único de repintado en reposo (Ola 4)
+import * as shaderlib from "./shaderlib.js?v=20261126";
+import { scenarioFade } from "./shaderlib.js?v=20261126";   // A1: uniforme de fade dither por escenario
+import trees from "./systems/trees.js?v=20261126";
+import grass from "./systems/grass.js?v=20261126";
+import ground from "./systems/ground.js?v=20261126";   // A4: suelo por shader + surcos
+import water from "./systems/water.js?v=20261126";   // A4: agua por shader
+import { bindReliefFrame, fitSpheres, growthU, heightAt, onReliefStep, patchGrowth, terrain } from "../terrain/terrain.js?v=20261126";   // A6: relieve (heightAt real; terrain.active)
+import shadows from "./systems/shadows.js?v=20261126";   // A3: sombras de árboles (pase propio + receptor + blobs)
+import fauna from "./systems/fauna.js?v=20261126";   // A5: aves y polinizadores
+import runoff from "./systems/runoff.js?v=20261126"; // F2: simulador de escorrentía (inerte con el simulador apagado)
 
 const SCENARIOS = ["inicial", "multi"];
 
