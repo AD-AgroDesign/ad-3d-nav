@@ -612,6 +612,12 @@ html, body { height: 100%; overflow: hidden; background: var(--ad-green-dark); }
    (antes el menú oculto, absoluto, agrandaba el área desplazable y aparecía una barra permanente). En escritorio abre hacia abajo; en la hoja inferior, hacia arriba. */
 #ajustes-panel { overflow: visible; }
 @media (min-width: 831px) { #ajustes-panel #quality-dd.arriba #quality-menu { top: calc(100% + 6px); bottom: auto; } }
+/* opacidad del diseño repetida en el panel del simulador: mismo aspecto que #opacity-slider / #opacity-val (que se estilan por id) */
+#runoff-opacity-slider { flex: 1; -webkit-appearance: none; appearance: none; height: 5px; border-radius: 3px; background: linear-gradient(90deg, var(--ad-green-mid), var(--ad-green-bright)); outline: none; cursor: pointer; }
+#runoff-opacity-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--ad-gold); border: 2px solid #1d1607; box-shadow: 0 2px 8px rgba(0,0,0,.4); cursor: grab; }
+#runoff-opacity-slider::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--ad-gold); border: 2px solid #1d1607; cursor: grab; }
+#runoff-opacity-slider:focus-visible { outline: 2px solid var(--ad-gold); outline-offset: 4px; }
+#runoff-opacity-val { font-size: 12.5px; font-variant-numeric: tabular-nums; color: var(--ad-gold); font-weight: 700; min-width: 40px; text-align: right; }
 /* puntito dorado: simulador prendido con el panel cerrado */
 #btn-runoff { position: relative; }
 #btn-runoff.runoff-prendido:not(.active)::after { content: ""; position: absolute; top: 5px; right: 5px; width: 7px; height: 7px; border-radius: 50%; background: var(--ad-gold); box-shadow: 0 0 0 1.5px rgba(10, 18, 12, .85); }
