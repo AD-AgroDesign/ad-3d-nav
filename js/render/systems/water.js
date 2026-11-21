@@ -39,7 +39,7 @@ const wanted = () => CFG.enabled && !((params.has("qa") || params.has("debug")) 
    envoltura. RG = pendiente (x,z) codificada 0..1 alrededor de 0,5; B = altura (variación del reborde y de la profundidad). */
 const WN = 256;
 let waveTex = null;
-function getWaveTex() {
+export function getWaveTex() {
   if (waveTex) return waveTex;
   const N = WN, h = new Float32Array(N * N);
   let seed = 0x5eed0a4;
