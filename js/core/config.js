@@ -539,7 +539,6 @@ export const HIDRO = {
     marcasMs: [0.02, 0.05, 0.1, 0.2, 0.5, 1, 1.5],
     hVisibleM: 0.02, hOpacoM: 0.2,         // lámina desde la que se ve el agua / donde ya es opaca
     estelaSegundos: 320, estelaMinM: 45, estelaMaxM: 420,   // largo de estela ≈ v·320 s, acotado
-    difUmbral: 0.06, difSatura: -1.15,     // saturado en −55 % de velocidad (log2(0,45) = −1,15)
     /* lámina de agua "natural" (sistema runoff.js; antes la constante NAT) */
     natural: {
       colShallow: "#60a0c4", colDeep: "#1e5280",   // somero → profundo (MODELO §6)
@@ -560,7 +559,11 @@ export const HIDRO = {
     /* mapa de velocidad: turbo sobre log10(v) en [vMinMs, vMaxMs] */
     velocidad: {
       opacidad: 0.85,                              // alfa del mapa sobre el satélite
-      bordeSuaveCeldas: 3                          // celdas · difuminado del borde del campo
+      bordeSuaveCeldas: 3,                         // celdas · difuminado del borde del campo
+      /* subida del agua sobre el relieve (uLift; en runoff.js era LIFT/uLift0): y += liftDist·max(dist_cam − liftDistDesdeM, 0) + liftFijoM.
+         liftDist (m por m) y liftDistDesdeM aplican a TODAS las capas (natural, velocidad, estelas); liftFijoM solo a velocidad y estelas (la natural no lo usa) */
+      liftDist: 0.002, liftDistDesdeM: 600, liftFijoM: 0.4,
+      haloM: 300                                   // m · el mapa se desvanece a 0 a esta distancia del borde del campo
     },
     /* partículas de flujo */
     particulas: {
@@ -572,7 +575,32 @@ export const HIDRO = {
       exageracion: 160,
       anchoPx: 1.75,                               // px · ancho de la estela
       alfaCabeza: 0.9,                             // alfa en la cabeza (la cola se desvanece)
-      estaticasBaja: 3000                          // estelas estáticas precalculadas en Baja (sin animación)
+      estaticasBaja: 3000,                         // estelas estáticas precalculadas en Baja (sin animación)
+      factorMovil: 0.5,                            // × presupuesto de partículas con IS_MOBILE (G2-1a); lo aplica el render
+      idleMaxDistM: 8000,                          // m · las estelas se animan en reposo hasta esta distancia de la cámara (la natural: 1500)
+      yExtraM: 0.06,                               // m · sobre la grilla del mapa de velocidad
+      pesoFuera: 0.05,                             // peso de reaparición de una celda fuera del campo vs una de adentro
+      pesoRapidez: 2.0,                            // peso extra en celdas rápidas (cauces angostos)
+      fadeInS: 0.4, fadeOutS: 0.6,                 // s · envolvente de alfa al nacer / al morir
+      distAlfa: [1500, 5000, 0.5],                 // m · alfa pleno hasta [0], baja a [2]× hacia [1]
+      distFrac: [2500, 7000, 0.35],                // m · fracción de estelas dibujadas: todas hasta [0], [2] hacia [1]
+      rasante: [0.10, 0.55, 0.06],                 // seno de elevación de la vista: alfa × [2] bajo [0], pleno desde [1]
+      pasoColaM: 6,                                // m · paso máximo al marchar la cola
+      giroColaCos: 0.5,                            // coseno mínimo entre pasos de la cola (60°); si no, se corta
+      subdivBaja: 3                                // subdivisiones por tramo en Baja (estelas fijas)
+    },
+    /* vista Diferencia (MODELO §6): log2(v_multi/v_ini) divergente; frena = azul, acelera = naranja/rojo */
+    diferencia: {
+      umbral: 0.06, saturacion: -1.15,             // única fuente (antes difUmbral/difSatura); saturado en −55 % de velocidad (log2(0,45) = −1,15)
+      colFrena: ["#96cdff", "#1946c8"],            // de umbral a saturación, desaturando hacia el satélite
+      colAcelera: ["#ffbe8c", "#c8321e"],
+      opacidad: 0.85,                              // igual que velocidad
+      traza: {                                     // contorno punteado del diseño (corredores y parches)
+        clases: ["corr-herb", "corr-le", "parche-herb", "parche-le"],
+        color: "#ffffff", alfa: 0.9, rayaPx: 8, huecoPx: 6, anchoPx: 1.5
+      },
+      /* métricas del panel: nombres exactos en result.stats (ver handoff F4) */
+      metricas: ["inicial.haVMayor", "multi.haVMayor", "inicial.vMediaMs", "multi.vMediaMs", "frenaHa"]
     },
     marca: { texto: "Ilustrativo · no es un estudio hidrológico" }   // marca chica sobre el mapa mientras el simulador está prendido
   },

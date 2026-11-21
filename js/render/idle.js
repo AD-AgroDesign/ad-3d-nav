@@ -8,7 +8,7 @@
    Corre solo si algún owner está activo; no suma en movimiento (repinta solo si el último frame fue hace más de un
    intervalo); apagado con idleFps = 0 (Baja), document.hidden o uTime congelado (freezeTime de QA: 2 frames iguales).
    Vive en su propio módulo (y host.idleDriver lo expone) para que los sistemas lo importen sin ciclo con host.js. */
-import { quality } from "../core/quality.js?v=20261123";
+import { quality } from "../core/quality.js?v=20261124";
 
 const on = new Map();                       // owner → bool
 let map = null, timer = 0, lastUT = NaN, sameT = 0, hook = false;

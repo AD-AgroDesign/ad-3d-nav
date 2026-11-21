@@ -57,3 +57,13 @@ Las capturas salen a 1280x720 (`--size`) para que la línea base commiteada pese
   la semilla (`seed(1)`). Las teselas de satélite y DEM vienen de la red: si falta alguna, repetir.
 - `diff.mjs` sale con 1 si algún par supera `--max-pct`. Métrica: delta YIQ tipo pixelmatch + ΔE76 medio global y por grilla.
 - `capture.mjs` sale con 1 si la consola tuvo errores.
+
+Simulador, Diferencia y pulido (G3, desde F4):
+```bash
+node difer.mjs --out out/g3                 # apagado / natural / velocidad / diferencia (home, cenital, general62, conf-obl, conf-cen, conf-ras; inicial y multi), Baja, relieve apagado,
+                                            # fundido de escenarios (draws), tiempos del worker y recálculo por lluvia. --base/--vers para correrlo contra otra rama (p. ej. G2: --vers 20261123 --modes off,natural,velocidad)
+node apertura.mjs --a http://localhost:8220 --b <base> --out out/apertura.json   # pedidos de red al abrir con el simulador apagado, nueva vs. base (la base debe tener ?qa: G0 en adelante)
+node llano.mjs --out out/llano              # estado deshabilitado: ?terreno=0 (sin-dem) y llano forzado pisando terrain.stats
+node movil.mjs --out out/movil              # estelas a la mitad con isMobile (375x812 y 500x900) en Alta/Media/Baja vs. escritorio
+node panel_g3.mjs --base http://localhost:8220 --out out/panel_g3 --sheet hoja_panel.jpg   # panel en las tres vistas con métricas a 1440/830/500/375 (<= 500 con isMobile) y la marca
+```

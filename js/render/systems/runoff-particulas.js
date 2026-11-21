@@ -18,24 +18,25 @@
    de velocidad) + un margen, y el vertex shader resta la bajada viva a6Low (sin hundirse con el relieve apagándose).
    Baja: sin animación; `estaticasBaja` estelas precalculadas (mismo armado de cola, una sola subida de textura). */
 import * as THREE from "three";
-import { HIDRO } from "../../core/config.js?v=20261123";
-import { GLSL_DECL, withReliefU } from "../../terrain/terrain.js?v=20261123";
-import { GLSL_ADFOG, GLSL_FOG_UNIFORMS, scenarioFade } from "../shaderlib.js?v=20261123";
+import { HIDRO, IS_MOBILE } from "../../core/config.js?v=20261124";
+import { GLSL_DECL, withReliefU } from "../../terrain/terrain.js?v=20261124";
+import { GLSL_ADFOG, GLSL_FOG_UNIFORMS, scenarioFade } from "../shaderlib.js?v=20261124";
 
 const VIS = HIDRO.vis, PV = VIS.particulas;
 const NP = Math.max(2, PV.puntosEstela | 0);
 const TEXW = 2048;                 // ancho de la textura de puntos (texels); alto = ceil(P·NP / TEXW)
-const Y_EXTRA = 0.06;              // m · sobre la grilla del mapa de velocidad (que ya está sobre el suelo)   // → HIDRO
-const OUTSIDE_W = 0.05;            // peso de reaparición de una celda FUERA del campo respecto de una de adentro   // → HIDRO
-const SPEED_W = 2.0;               // extra de peso en celdas rápidas (cauces: angostos y las partículas salen enseguida)   // → HIDRO
-const FADE_IN = 0.4, FADE_OUT = 0.6;   // s · envolvente de alfa al nacer / al morir   // → HIDRO
+const Y_EXTRA = PV.yExtraM;        // m · sobre la grilla del mapa de velocidad (que ya está sobre el suelo)
+const OUTSIDE_W = PV.pesoFuera;    // peso de reaparición de una celda FUERA del campo respecto de una de adentro
+const SPEED_W = PV.pesoRapidez;    // extra de peso en celdas rápidas (cauces: angostos y las partículas salen enseguida)
+const FADE_IN = PV.fadeInS, FADE_OUT = PV.fadeOutS;   // s · envolvente de alfa al nacer / al morir
 const DT_MAX = 0.1;                // s · tope del paso (volver de una pestaña dormida no tira las partículas al mar)
-const DIST_ALFA = [1500, 5000, 0.5];   // m · alfa pleno hasta [0], baja a [2] (× alfa) hacia [1]: de lejos el campo se lee por el mapa, no por una mancha blanca   // → HIDRO
-const DIST_FRAC = [2500, 7000, 0.35];  // m · fracción de estelas dibujadas: todas hasta [0], [2] hacia [1] (rango del draw, sin reasignar)   // → HIDRO
-const GRAZE = [0.10, 0.55, 0.06];   // seno del ángulo de elevación de la vista: alfa × [2] por debajo de [0], pleno desde [1] (el rasante no se vuelve una banda blanca)   // → HIDRO
-const STEP_M = 6;                  // m · paso máximo al marchar la cola (menos que una celda: la cola sigue las curvas, sin saltos entre celdas)   // → HIDRO
-const TURN_COS = 0.5;              // coseno mínimo entre pasos sucesivos al marchar la cola (60°); si no, la cola se corta   // → HIDRO
-const STATIC_SUB = 3;               // subdivisiones por tramo en Baja (estelas fijas: 3000 · 7 · 3 · 2 = 126 k tris)   // → HIDRO
+const DIST_ALFA = PV.distAlfa;     // m · alfa pleno hasta [0], baja a [2] (× alfa) hacia [1]: de lejos el campo se lee por el mapa, no por una mancha blanca
+const DIST_FRAC = PV.distFrac;     // m · fracción de estelas dibujadas: todas hasta [0], [2] hacia [1] (rango del draw, sin reasignar)
+const GRAZE = PV.rasante;          // seno del ángulo de elevación de la vista: alfa × [2] por debajo de [0], pleno desde [1]
+const STEP_M = PV.pasoColaM;       // m · paso máximo al marchar la cola (menos que una celda: sigue las curvas)
+const TURN_COS = PV.giroColaCos;   // coseno mínimo entre pasos sucesivos al marchar la cola; si no, la cola se corta
+const STATIC_SUB = PV.subdivBaja;  // subdivisiones por tramo en Baja (estelas fijas)
+const LIFT_FROM = (s => /[.e]/.test(s) ? s : s + ".0")(String(+VIS.velocidad.liftDistDesdeM));   // literal float de GLSL
 const FEATHER = 0.6;               // px · suavizado del borde de la cinta
 
 /* SUB = subdivisiones por tramo de la cola (define; 1 = animadas, más en Baja): cada tramo entre dos puntos se dibuja como un tramo de
@@ -46,7 +47,7 @@ const VS = GLSL_DECL +
   "varying vec3 vWp;\nvarying float vA;\nvarying float vSide;\n" +
   "vec3 pt(int p, int k) { int i = p * NP + k; return texelFetch(tP, ivec2(i % TW, i / TW), 0).xyz; }\n" +
   "uniform vec3 uCamPos;\nuniform float uLift;\nuniform float uLift0;\n" +
-  "vec4 clipOf(vec3 q, out vec3 wp) {\n  vec4 w = modelMatrix * vec4(q, 1.0);\n  w.y -= a6Low(w.xz);\n  w.y += uLift * max(length(uCamPos - w.xyz) - 600.0, 0.0) + uLift0;\n  wp = w.xyz;\n  return projectionMatrix * viewMatrix * w;\n}\n" +
+  "vec4 clipOf(vec3 q, out vec3 wp) {\n  vec4 w = modelMatrix * vec4(q, 1.0);\n  w.y -= a6Low(w.xz);\n  w.y += uLift * max(length(uCamPos - w.xyz) - " + LIFT_FROM + ", 0.0) + uLift0;\n  wp = w.xyz;\n  return projectionMatrix * viewMatrix * w;\n}\n" +
   "void main() {\n" +
   "  int p = gl_InstanceID, v = gl_VertexID >> 1;\n" +
   "  float side = float((gl_VertexID & 1) * 2 - 1);\n" +
@@ -238,7 +239,8 @@ export function createParticles(ctx, key, shared, getCanvas) {
     mesh, mat,
     /** Presupuesto según la calidad: "anim" (partículas animadas), "static" (Baja) u "off". */
     configure(q) {
-      const nAnim = (PV.presupuesto[q.name] | 0), nStat = q.name === "baja" ? (PV.estaticasBaja | 0) : 0;
+      const fm = IS_MOBILE ? PV.factorMovil : 1;   // celulares: la mitad (G2-1a)
+      const nAnim = Math.round((PV.presupuesto[q.name] | 0) * fm), nStat = q.name === "baja" ? Math.round((PV.estaticasBaja | 0) * fm) : 0;
       const m = nAnim > 0 ? "anim" : nStat > 0 ? "static" : "off", n = m === "anim" ? nAnim : m === "static" ? nStat : 0;
       if (m === mode && n === want) return;
       mode = m; want = n; alloc(0); mesh.visible = false;

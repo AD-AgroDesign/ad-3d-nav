@@ -38,8 +38,9 @@ export function mkdirp(d) { fs.mkdirSync(d, { recursive: true }); return d; }
 // `query` es la parte que elige el campo: por defecto el campo sintético (`fixture=demo_relieve`).
 // SwiftShader es lento: los timeouts son generosos.
 export async function openViewer(browser, { base = 'http://localhost:8080', query = 'fixture=demo_relieve', extra = '',
-  viewport = { width: 1600, height: 900 } } = {}) {
-  const ctx = await browser.newContext({ viewport, deviceScaleFactor: 1 });
+  viewport = { width: 1600, height: 900 }, ctxOpts = {} } = {}) {
+  // ctxOpts: p. ej. { isMobile: true, hasTouch: true } para emular un celular (IS_MOBILE del visor mira max-width: 760px)
+  const ctx = await browser.newContext({ viewport, deviceScaleFactor: 1, ...ctxOpts });
   const page = await ctx.newPage();
   const errors = [];
   page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') errors.push(`[${m.type()}] ${m.text()}`); });

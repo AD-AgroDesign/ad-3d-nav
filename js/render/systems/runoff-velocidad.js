@@ -12,17 +12,18 @@
    con una rampa de la misma anchura. La salida pasa por la conversión sRGB → lineal → colorspace_fragment del renderer: en
    pantalla el color es exactamente turboCss(t) (la leyenda de la UI). Sin tone mapping (es un mapa de datos, no una superficie iluminada). */
 import * as THREE from "three";
-import { HIDRO } from "../../core/config.js?v=20261123";
-import { GLSL_DECL, withReliefU } from "../../terrain/terrain.js?v=20261123";
-import { GLSL_ADFOG, GLSL_FOG_UNIFORMS, scenarioFade } from "../shaderlib.js?v=20261123";
-import { GLSL_TURBO } from "./runoff-turbo.js?v=20261123";
+import { HIDRO } from "../../core/config.js?v=20261124";
+import { GLSL_DECL, withReliefU } from "../../terrain/terrain.js?v=20261124";
+import { GLSL_ADFOG, GLSL_FOG_UNIFORMS, scenarioFade } from "../shaderlib.js?v=20261124";
+import { GLSL_TURBO } from "./runoff-turbo.js?v=20261124";
 
 const VEL = HIDRO.vis.velocidad;
+const LIFT_FROM = (s => /[.e]/.test(s) ? s : s + ".0")(String(+VEL.liftDistDesdeM));   // literal float de GLSL
 
 const VS =
   "varying vec3 vWp;\n" +
   "uniform vec3 uCamPos;\nuniform float uLift;\nuniform float uLift0;\n" +
-  "void main() {\n  vec4 w = modelMatrix * vec4(position, 1.0);\n  w.y -= a6Low(w.xz);\n  w.y += uLift * max(length(uCamPos - w.xyz) - 600.0, 0.0) + uLift0;\n  vWp = w.xyz;\n" +
+  "void main() {\n  vec4 w = modelMatrix * vec4(position, 1.0);\n  w.y -= a6Low(w.xz);\n  w.y += uLift * max(length(uCamPos - w.xyz) - " + LIFT_FROM + ", 0.0) + uLift0;\n  vWp = w.xyz;\n" +
   "  gl_Position = projectionMatrix * viewMatrix * w;\n}\n";
 
 /* uG = afín escena→celda · uN = tamaño de la grilla · uVel = (log10 vMin, 1/rango log10, opacidad, alfa fuera) · uBorde = celdas */
