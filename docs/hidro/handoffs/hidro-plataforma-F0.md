@@ -89,3 +89,13 @@ Tamaño y forma salen de un tirón: cambiar la semilla cambia todo el diseño; e
 ## Preguntas
 - ¿Prefieren corredores con trazo curvo (más realista, más trabajo) antes de G0, o alcanza con rectos?
 - ¿Se quiere que la marca "campo sintético" también aparezca en el staging cuando se entra con login (no aplica hoy: el modo fixture es solo con `?fixture`)?
+
+## F2 · integración
+
+- `js/render/host.js`: import y `host.register(runoff)` después de fauna. `js/app.js`: import de `ui/runoff-ui.js` junto a presets-ui.
+- `js/debug/qa-api.js`: `__nav3d.runoff = { set(mode), rain(mmh), ready (getter → ensureComputed()), stats() }` (stats sin arrays: mode, rainMmH, available, reason, computing, error, result.stats).
+- `stamp_version --check`: OK (200 especificadores, versión 20261121).
+- Verificación (Chromium + SwiftShader, `?fixture=demo_relieve&qa&terreno=1&calidad=alta`):
+  - Apagado: bloque "Simulador de escorrentía" presente, interruptor `aria-checked=false`, `available=true`. El único Worker es el blob de MapLibre (ninguno de `hydro/worker.js`). Pedidos a s3.amazonaws.com: 23, todos del visor (DEM).
+  - `set("natural")` → true; `await ready` trae resultado; `result.stats`: campoHa 495,2, celda 15,18 m (379×357), reducción de velocidad media 5,77 %, frena 58,2 ha, total 203 ms. Interruptor pasa a `true`, se crea `hydro/worker.js` recién ahí y no hay pedidos nuevos a s3.
+  - Consola: sin errores; solo avisos de rendimiento de SwiftShader ("GPU stall due to ReadPixels").
