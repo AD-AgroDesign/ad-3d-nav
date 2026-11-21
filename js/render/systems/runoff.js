@@ -3,7 +3,8 @@
 
    Qué dibuja: la lámina de agua `h` (m) que calcula el motor (js/hydro, worker) sobre la grilla de la cuenca (~15 m por celda)
    como cintas de agua que confluyen hacia los cauces. La lámina real es de milímetros: la visible está exagerada a propósito
-   (la leyenda de la UI lo dice). Solo se ve con getState().mode === "natural"; "velocidad" y "diferencia" quedan ocultas (F3/F4).
+   (la leyenda de la UI lo dice). Se ve con getState().mode === "natural". F3 agrega "velocidad": mapa turbo de log10(v) (runoff-velocidad.js, misma malla y datos pero
+   con un índice que cubre toda la grilla) + estelas de partículas en CPU (runoff-particulas.js); "diferencia" queda oculta (F4).
 
    Ciclo de vida (el host construye UNA vez, sin reconstrucción posterior):
      - build(): grupo invisible, malla vacía y material por escenario. Cero costo con el simulador apagado: no hay texturas, no se
@@ -40,6 +41,9 @@ import { GLSL_DECL, lowAt, terrain, withReliefU } from "../../terrain/terrain.js
 import { getState } from "../../hydro/state.js?v=20261122";
 import { pxToLonLat } from "../../hydro/grid.js?v=20261122";
 import { getWaveTex } from "./water.js?v=20261122";
+import { makeVelocityMaterial } from "./runoff-velocidad.js?v=20261122";
+import { createParticles } from "./runoff-particulas.js?v=20261122";
+export { turboCss } from "./runoff-turbo.js?v=20261122";   // la leyenda de la UI importa la paleta desde acá
 
 /* ---------- diales: HIDRO.vis.natural (antes constante local NAT) ---------- */
 const NAT = HIDRO.vis.natural;
@@ -124,6 +128,12 @@ const FS =
   "  gl_FragColor.rgb = mix(gl_FragColor.rgb, uFogColor, adFog(dist));\n" +
   "}\n";
 
+/* Cámara y niebla, compartidos por referencia con lighting.js: los usan los tres materiales (natural, velocidad, estelas). */
+const SHARED = {
+  uCamPos: uniforms.uCamPos,
+  uFogColor: uniforms.uFogColor, uFogNear: uniforms.uFogNear, uFogFar: uniforms.uFogFar, uFogMax: uniforms.uFogMax, uFogRel: uniforms.uFogRel
+};
+
 const U = {   // uniforms comunes a los dos escenarios (compartidos por referencia con lighting.js donde existen)
   uCamPos: uniforms.uCamPos, uTime: uniforms.uTime,
   uSunDir: uniforms.uSunDir, uSunColor: uniforms.uSunColor, uHemiSky: uniforms.uHemiSky, uHemiGround: uniforms.uHemiGround,
@@ -155,18 +165,40 @@ function makeMaterial(key) {
 }
 
 /* ---------- estado ---------- */
-const S = {};          // key → { group, mesh, mat, geom, idx, data, tex, tris, hasData }
-let G = null;          // grilla compartida: { nx, ny, gx0, gy0, pos, inTex, aff, box, nz }
+const S = {};          // key → { group, mesh, mat, geom, idx, data, tex, tris, hasData, vmesh, vmat, vgeom, part }
+let G = null;          // grilla compartida: { nx, ny, gx0, gy0, pos, inTex, aff, box, idxAll (índice completo, perezoso) }
+let lastRes = null;    // último resultado del motor
 let mode = "off";      // espejo de getState().mode (evento "runoff")
 let wantReq = false;   // último valor pasado a idleDriver.request("runoff", …)
 let ctxRef = null, subscribed = false;
 const MB = 1 / 1048576;
 
-const shown = () => mode === "natural" && !!G && terrain.active;
+const shown = () => (mode === "natural" || mode === "velocidad") && !!G && terrain.active;
+
+/* Índice de TODA la grilla (mapa de velocidad): se arma una vez, perezoso (con el simulador en "natural" no se paga), y lo
+   comparten los dos escenarios. */
+function ensureFieldIndex() {
+  if (!G || G.idxAll) return;
+  const { nx, ny } = G, ix = new Uint32Array(6 * (nx - 1) * (ny - 1));
+  let c = 0;
+  for (let j = 0; j < ny - 1; j++) for (let i = 0, q = j * nx; i < nx - 1; i++, q++) {
+    ix[c++] = q; ix[c++] = q + nx; ix[c++] = q + 1; ix[c++] = q + 1; ix[c++] = q + nx; ix[c++] = q + nx + 1;
+  }
+  G.idxAll = new THREE.BufferAttribute(ix, 1);
+  for (const k in S) S[k].vgeom.setIndex(G.idxAll);
+}
 
 function applyVisibility() {
-  const on_ = shown();
-  for (const k in S) S[k].group.visible = on_ && S[k].hasData;
+  const on_ = shown(), vel = on_ && mode === "velocidad";
+  if (vel) ensureFieldIndex();
+  for (const k in S) {
+    const s = S[k], ok = on_ && s.hasData;
+    s.group.visible = ok;
+    s.mesh.visible = mode === "natural";
+    s.vmesh.visible = vel;
+    s.part.show(ok && vel);
+  }
+  if (mode === "off") for (const k in S) S[k].part.release();   // simulador apagado: devuelve la memoria de las estelas
   if (!on_ && wantReq) { wantReq = false; idleDriver.request("runoff", false); }
   map.triggerRepaint();
 }
@@ -174,7 +206,7 @@ function applyVisibility() {
 /* Hornea la grilla de vértices (una vez por cuenca): x,z lineales (Mercator es lineal en la escena), y = heightAt + yOff. */
 function initGrid(ctx, meta) {
   const { nx, ny, gx0, gy0, z } = meta;
-  if (G) { G.pos.dispose?.(); G.inTex.dispose(); G = null; }
+  if (G) { G.pos.dispose?.(); G.inTex.dispose(); G = null; for (const k in S) S[k].vgeom.setIndex(null); }
   // columnas: lon solo depende de i; filas: lat solo de j (esquinas de píxel, convención de terrain.hf)
   const [xa, za] = ctx.toScene(...pxToLonLat(gx0, gy0, z)), [xb, zb] = ctx.toScene(...pxToLonLat(gx0 + nx, gy0 + ny, z));
   const dx = (xb - xa) / nx, dz = (zb - za) / ny;
@@ -203,12 +235,15 @@ function initGrid(ctx, meta) {
     s.data = new Float32Array(nx * ny * 4);
     s.mat.uniforms.uG.value.copy(G.aff); s.mat.uniforms.uN.value.set(nx, ny);
     s.mat.uniforms.tIn.value = inTex; s.mat.uniforms.tWave.value = getWaveTex();
+    s.vgeom.setAttribute("position", G.pos);
+    s.vmat.uniforms.uG.value.copy(G.aff); s.vmat.uniforms.uN.value.set(nx, ny); s.vmat.uniforms.tIn.value = inTex;
   }
 }
 
 /* Reemplaza los datos de los dos escenarios con el resultado vigente (primera vez y cada recálculo por lluvia). */
 function setResult(res) {
   if (!ctxRef || !res || !res.meta) return;
+  lastRes = res;
   const m = res.meta;
   if (!G || G.nx !== m.nx || G.ny !== m.ny || G.gx0 !== m.gx0 || G.gy0 !== m.gy0) initGrid(ctxRef, m);
   const n = m.nx * m.ny, thr = HIDRO.vis.hVisibleM * 0.5;   // el borde empieza en 0,6·hVisible (con el ruido de h, 0,45): 0,5 lo cubre
@@ -224,7 +259,7 @@ function setResult(res) {
       s.tex = new THREE.DataTexture(d, m.nx, m.ny, THREE.RGBAFormat, THREE.FloatType);
       s.tex.internalFormat = "RGBA32F"; s.tex.magFilter = s.tex.minFilter = THREE.NearestFilter; s.tex.generateMipmaps = false; s.tex.flipY = false;
       s.tex.wrapS = s.tex.wrapT = THREE.ClampToEdgeWrapping; s.tex.unpackAlignment = 4;
-      s.mat.uniforms.tD.value = s.tex;
+      s.mat.uniforms.tD.value = s.tex; s.vmat.uniforms.tD.value = s.tex;
     }
     s.tex.needsUpdate = true;
     // índice: solo los cuadros que pueden mostrar agua. El bilineal no supera el máximo de sus esquinas, y la distorsión de dominio del
@@ -239,6 +274,7 @@ function setResult(res) {
       ix[c++] = q; ix[c++] = q + nx; ix[c++] = q + 1; ix[c++] = q + 1; ix[c++] = q + nx; ix[c++] = q + nx + 1;
     }
     s.idx.needsUpdate = true; s.geom.setDrawRange(0, c); s.tris = c / 3; s.hasData = true;
+    s.part.setField(G, res, r);   // campo de advección nuevo (lluvia incluida): referencias, sin reconstruir
   }
   applyVisibility();
 }
@@ -260,7 +296,17 @@ export default {
     const mesh = new THREE.Mesh(geom, mat);
     mesh.frustumCulled = false; mesh.renderOrder = -9.5; mesh.name = "hidro-runoff-" + key;
     group.add(mesh);
-    S[key] = { group, mesh, mat, geom, idx: null, data: null, tex: null, tris: 0, hasData: false };
+    // mapa de velocidad: malla propia (comparte posiciones y, perezoso, el índice completo) y estelas (un draw call)
+    const vgeom = new THREE.BufferGeometry();
+    vgeom.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), 1e6);
+    const vmat = makeVelocityMaterial(key, SHARED);
+    const vmesh = new THREE.Mesh(vgeom, vmat);
+    vmesh.frustumCulled = false; vmesh.renderOrder = -9.5; vmesh.name = "hidro-runoff-vel-" + key; vmesh.visible = false;
+    group.add(vmesh);
+    const part = createParticles(ctx, key, SHARED, () => map.getCanvas());
+    part.configure(quality);
+    group.add(part.mesh);
+    S[key] = { group, mesh, mat, geom, idx: null, data: null, tex: null, tris: 0, hasData: false, vmesh, vmat, vgeom, part };
     if (!subscribed) {   // una sola suscripción para los dos escenarios
       subscribed = true;
       on("runoff", p => {
@@ -277,12 +323,13 @@ export default {
 
   update(frame) {
     if (!shown()) { if (wantReq) { wantReq = false; idleDriver.request("runoff", false); } return; }
-    if (lights.sun) U.uSunI.value = lights.sun.intensity;
-    if (U.uZenith.value.getHex() !== _zen.set(A1_SKY.skyColor).getHex()) U.uZenith.value.set(A1_SKY.skyColor);
+    const vel = mode === "velocidad";
+    if (!vel && lights.sun) U.uSunI.value = lights.sun.intensity;
+    if (!vel && U.uZenith.value.getHex() !== _zen.set(A1_SKY.skyColor).getHex()) U.uZenith.value.set(A1_SKY.skyColor);
     let anim = false;
     if (quality.idleFps > 0) {
       let vis = false;
-      for (const k in S) if (S[k].group && S[k].group.visible && scenarioFade[k] && scenarioFade[k].value > 0.02) vis = true;
+      for (const k in S) if (S[k].group && S[k].group.visible && scenarioFade[k] && scenarioFade[k].value > 0.02 && (!vel || S[k].part.animated)) vis = true;
       if (vis) {
         frustum.setFromProjectionMatrix(frame.viewProj);
         _cam.set(frame.camPosScene.x, frame.camPosScene.y, frame.camPosScene.z);
@@ -291,12 +338,23 @@ export default {
         anim = _bb.distanceToPoint(_cam) < NAT.idleMaxDist && frustum.intersectsBox(_bb);
       }
     }
+    if (vel) {   // estelas: un paso por frame, solo de los escenarios visibles (en el fundido, los dos: se cruzan con uFade)
+      const dt = Math.max(0, frame.dt || 0) / 1000;
+      for (const k in S) {
+        const part = S[k].part;
+        if (!part.mesh.visible || !(scenarioFade[k] && scenarioFade[k].value > 0.02)) continue;
+        part.setViewport();
+        if (anim) part.tick(dt);
+      }
+    }
     if (anim !== wantReq) { wantReq = anim; idleDriver.request("runoff", anim); }
   },
 
   /* Baja: sin animación de normales (idleFps 0). Las ondas quedan congeladas en una fase fija. */
   onQuality(q) {
     U.uFlowOn.value = q.idleFps > 0 ? 1 : 0;
+    for (const k in S) { S[k].part.configure(q); if (S[k].hasData && lastRes) S[k].part.setField(G, lastRes, lastRes[k]); }
+    if (G) applyVisibility();
     if (!(q.idleFps > 0) && wantReq) { wantReq = false; idleDriver.request("runoff", false); }
   },
 
@@ -304,7 +362,7 @@ export default {
     wantReq = false; idleDriver.request("runoff", false);
     for (const k in S) {
       const s = S[k]; if (!s || !s.geom) continue;
-      s.geom.dispose(); s.mat.dispose(); if (s.tex) s.tex.dispose();
+      s.geom.dispose(); s.mat.dispose(); s.vgeom.dispose(); s.vmat.dispose(); s.part.dispose(); if (s.tex) s.tex.dispose();
     }
     if (G) G.inTex.dispose();
   },
@@ -312,9 +370,14 @@ export default {
   stats(key) {
     const s = S[key];
     if (!s || !s.hasData) return {};   // simulador nunca prendido: no agrega claves (stats() idéntico al de antes)
-    const bytes = (s.data ? s.data.byteLength : 0) + (G && key === "inicial" ? G.nx * G.ny : 0);
-    return { runoffTris: s.tris, runoffParticles: 0, runoffTexMB: +(bytes * MB).toFixed(2) };
+    const fieldTris = G ? 2 * (G.nx - 1) * (G.ny - 1) : 0;
+    const bytes = (s.data ? s.data.byteLength : 0) + (G && key === "inicial" ? G.nx * G.ny + (G.idxAll ? G.idxAll.array.byteLength : 0) : 0);
+    return { runoffTris: (mode === "velocidad" ? fieldTris : s.tris) + s.part.tris, runoffParticles: s.part.count,
+      runoffTexMB: +(bytes * MB + s.part.texMB).toFixed(2) };
   }
 };
+
+/* Para la verificación: tiempo medio (ms, CPU) del paso de partículas por escenario. */
+export function particleTiming() { const o = {}; for (const k in S) o[k] = +S[k].part.tickMs.toFixed(3); return o; }
 
 const _zen = new THREE.Color();
