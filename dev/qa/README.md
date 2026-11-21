@@ -5,7 +5,7 @@ Capturas deterministas del visor y diff de imágenes. No es parte del sitio (el 
 ## Instalación (una vez por entorno)
 ```bash
 cd dev/qa
-npm install
+npm ci                                   # playwright fijado en 1.63.0 (package-lock.json)
 npx playwright install chromium          # si faltan librerías del sistema: npx playwright install --with-deps chromium
 ```
 
@@ -23,6 +23,14 @@ node capture.mjs --hide-ui --runoff natural,velocidad --views home,rasante --out
 ```
 Opciones de `capture.mjs`: `--base`, `--query` (default `fixture=demo_relieve`), `--extra` (default
 `&terreno=1&calidad=alta`), `--views all|lista`, `--scenario ini|multi|both`, `--hide-ui`, `--runoff modos`, `--wait ms`.
+
+Hoja de contacto y anchos de pantalla:
+```bash
+node sheet.mjs baseline --out ../../docs/hidro/compuertas/G0/hoja_linea_base.jpg          # grilla vista · escenario
+node sheet.mjs --pair baseline out/despues --out hoja_antes_despues.jpg                    # pares antes/después
+node anchos.mjs --widths 1440,900,830,500,375 --out out/anchos                             # home con UI + desborde
+```
+Las capturas salen a 1280x720 (`--size`) para que la línea base commiteada pese ~13 MB.
 
 ## Notas
 - Sin GPU, WebGL corre por SwiftShader (`QA_GPU=swiftshader`, default). Las imágenes sirven para comparar; los tiempos por

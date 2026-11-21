@@ -2,14 +2,14 @@
 // Uso:
 //   node capture.mjs [--base http://localhost:8080] [--query fixture=demo_relieve] [--extra "&terreno=1&calidad=alta"]
 //                    [--views all|cenital,home,rasante,...] [--scenario ini|multi|both] [--hide-ui]
-//                    [--runoff off,natural,velocidad,diferencia] [--wait 1500] --out <dir>
-// Salida: <out>/<inicial|multi>[-<modo>]-<vista>.png (1600x900), views.json, stats.json, console.json
+//                    [--runoff off,natural,velocidad,diferencia] [--wait 1500] [--size 1280x720] --out <dir>
+// Salida: <out>/<inicial|multi>[-<modo>]-<vista>.png (--size, default 1280x720), views.json, stats.json, console.json
 // --runoff usa window.__nav3d.runoff.set(modo) (existe desde F2); sin el flag, no lo toca.
 import { parseArgs, launchHeadless, openViewer, hideUI, gpuRenderer, mkdirp, fs, path } from './lib.mjs';
 
 const a = parseArgs(process.argv.slice(2), {
   base: 'http://localhost:8080', query: 'fixture=demo_relieve', extra: '&terreno=1&calidad=alta',
-  views: 'all', scenario: 'both', out: './out', wait: '1500'
+  views: 'all', scenario: 'both', out: './out', wait: '1500', size: '1280x720'
 });
 const scen = { ini: ['inicial'], inicial: ['inicial'], multi: ['multi'], both: ['inicial', 'multi'] }[a.scenario];
 if (!scen) throw new Error('--scenario debe ser ini|multi|both');
@@ -17,7 +17,7 @@ const modes = a.runoff ? a.runoff.split(',') : [null];
 const dir = mkdirp(a.out);
 
 const browser = await launchHeadless();
-const { ctx, page, errors, url } = await openViewer(browser, { base: a.base, query: a.query, extra: a.extra });
+const { ctx, page, errors, url } = await openViewer(browser, { base: a.base, query: a.query, extra: a.extra, viewport: { width: +a.size.split('x')[0], height: +a.size.split('x')[1] } });
 console.log('abierto', url);
 if (a['hide-ui']) await hideUI(page);
 await page.evaluate(() => { window.__nav3d.freezeTime(12.5); window.__nav3d.seed(1); });
