@@ -1,6 +1,6 @@
 /* hydro/params.js · los diales de HIDRO que necesita el cálculo, en un objeto plano clonable (postMessage).
    Es el único módulo de hydro/ (además de state.js) que importa config.js: el worker y los módulos puros reciben esto por parámetro. */
-import { HIDRO } from "../core/config.js?v=20261127";
+import { HIDRO } from "../core/config.js?v=20261128";
 
 export function paramsMotor() {
   const H = HIDRO;
