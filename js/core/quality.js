@@ -4,8 +4,8 @@
    (map.setPixelRatio) y el MSAA queda el del arranque hasta la próxima carga (ver setQuality).
    Prioridad: ?calidad=<nivel> en la URL > localStorage ("ad_calidad") > detección.
    Consumidores: A1 (MSAA/pixelRatio), A2 (LOD), A3 (sombras), A4 (suelo/agua), A5 (fauna), A6 (terreno), idleDriver (render/idle.js). */
-import { IS_MOBILE } from "./config.js?v=20261128";
-import { emit, on } from "./events.js?v=20261128";
+import { IS_MOBILE } from "./config.js?v=20261129";
+import { emit, on } from "./events.js?v=20261129";
 
 export const LEVELS = ["ultra", "alta", "media", "baja"];
 
@@ -122,7 +122,7 @@ export const qualityIdle = () => _applying;   // solo QA: espera a que termine e
 
 export async function applyPixelRatio() {
   try {
-    const { map } = await import("../map/style.js?v=20261128");
+    const { map } = await import("../map/style.js?v=20261129");
     if (map.setPixelRatio) map.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality.pixelRatioCap));
   } catch (e) { /* sin mapa: nada que ajustar */ }
 }
@@ -157,7 +157,7 @@ function fadeCapture() {
 async function fadeRun(c) {
   if (!c || !c.isConnected) return;
   try {
-    const { map } = await import("../map/style.js?v=20261128");
+    const { map } = await import("../map/style.js?v=20261129");
     /* el mapa ya muestra el nivel nuevo: se espera un frame con él antes de empezar a desvanecer */
     await new Promise(r => { const t = setTimeout(r, 400); map.once("render", () => { clearTimeout(t); r(); }); map.triggerRepaint(); });
     await new Promise(r => requestAnimationFrame(() => r()));
