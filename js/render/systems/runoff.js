@@ -50,8 +50,8 @@ const NAT = HIDRO.vis.natural;
 
 /* ---------- shaders ---------- */
 const VS =
-  "varying vec3 vWp;\n" +
-  "void main() {\n  vec4 w = modelMatrix * vec4(position, 1.0);\n  w.y -= a6Low(w.xz);\n  vWp = w.xyz;\n" +
+  "varying vec3 vWp;\nuniform vec3 uCamPos;\nuniform float uLift;\n" +
+  "void main() {\n  vec4 w = modelMatrix * vec4(position, 1.0);\n  w.y -= a6Low(w.xz);\n  w.y += uLift * max(length(uCamPos - w.xyz) - 600.0, 0.0);\n  vWp = w.xyz;\n" +
   "  gl_Position = projectionMatrix * viewMatrix * w;\n}\n";
 
 /* uG = afín escena→celda (fx = x·G.x + G.y ; fy = z·G.z + G.w) · uN = tamaño de la grilla
@@ -131,7 +131,8 @@ const FS =
 /* Subida de las capas de velocidad y estelas proporcional a la distancia a la cámara (m por m): lejos, la malla de terreno de MapLibre
    (LOD grueso) asoma por encima de la nuestra (fina) y la tapa a manchones; con 0,002 no se ve ni en la cenital a varios km y en
    el rasante son centímetros. La lámina natural (F2) no la usa (no cambia su aspecto). */
-const LIFT = 0.002;   // → HIDRO
+const LIFT = 0.002;   // → HIDRO  (la subida empieza a 600 m de la cámara: de cerca no se mueve nada)
+const HALO_M = 300;   // m · en Velocidad el mapa se desvanece a 0 a esta distancia del borde del campo   // → HIDRO
 const PART_IDLE_MAX = 8000;   // m · las estelas se ven (y se animan) desde mucho más lejos que las ondas del agua natural (1500 m)   // → HIDRO
 
 /* Cámara y niebla, compartidos por referencia con lighting.js: los usan los tres materiales (natural, velocidad, estelas). */
@@ -141,7 +142,7 @@ const SHARED = {
 };
 
 const U = {   // uniforms comunes a los dos escenarios (compartidos por referencia con lighting.js donde existen)
-  uCamPos: uniforms.uCamPos, uTime: uniforms.uTime,
+  uCamPos: uniforms.uCamPos, uTime: uniforms.uTime, uLift: SHARED.uLift,
   uSunDir: uniforms.uSunDir, uSunColor: uniforms.uSunColor, uHemiSky: uniforms.uHemiSky, uHemiGround: uniforms.uHemiGround,
   uFogColor: uniforms.uFogColor, uFogNear: uniforms.uFogNear, uFogFar: uniforms.uFogFar, uFogMax: uniforms.uFogMax, uFogRel: uniforms.uFogRel,
   uSunI: { value: 1 },
@@ -181,16 +182,48 @@ const MB = 1 / 1048576;
 
 const shown = () => (mode === "natural" || mode === "velocidad") && !!G && terrain.active;
 
+/* Halo del campo (Velocidad): 1 dentro, cae linealmente a 0 a HALO_M metros del borde. Distancia por chamfer 3-4 (dos pasadas, en CPU,
+   una vez por resultado) → R8 con filtrado lineal que leen el mapa y las estelas. */
+function buildHalo(inside) {
+  const { nx, ny } = G, n = nx * ny, d = G.dist || (G.dist = new Float32Array(n)), INF = 1e9;
+  for (let i = 0; i < n; i++) d[i] = inside[i] ? 0 : INF;
+  for (let j = 0; j < ny; j++) for (let i = 0, q = j * nx; i < nx; i++, q++) {
+    let v = d[q];
+    if (i > 0 && d[q - 1] + 3 < v) v = d[q - 1] + 3;
+    if (j > 0) {
+      if (d[q - nx] + 3 < v) v = d[q - nx] + 3;
+      if (i > 0 && d[q - nx - 1] + 4 < v) v = d[q - nx - 1] + 4;
+      if (i < nx - 1 && d[q - nx + 1] + 4 < v) v = d[q - nx + 1] + 4;
+    }
+    d[q] = v;
+  }
+  const cells = HALO_M / G.cellM, out = G.haloTex.image.data;
+  for (let j = ny - 1; j >= 0; j--) for (let i = nx - 1, q = j * nx + i; i >= 0; i--, q--) {
+    let v = d[q];
+    if (i < nx - 1 && d[q + 1] + 3 < v) v = d[q + 1] + 3;
+    if (j < ny - 1) {
+      if (d[q + nx] + 3 < v) v = d[q + nx] + 3;
+      if (i < nx - 1 && d[q + nx + 1] + 4 < v) v = d[q + nx + 1] + 4;
+      if (i > 0 && d[q + nx - 1] + 4 < v) v = d[q + nx - 1] + 4;
+    }
+    d[q] = v;
+    const h = 1 - v / 3 / cells;
+    out[q] = h <= 0 ? 0 : h >= 1 ? 255 : (h * 255 + 0.5) | 0;
+  }
+  G.haloTex.needsUpdate = true;
+}
+
 /* Índice de TODA la grilla (mapa de velocidad): se arma una vez, perezoso (con el simulador en "natural" no se paga), y lo
    comparten los dos escenarios. */
 function ensureFieldIndex() {
   if (!G || G.idxAll) return;
-  const { nx, ny } = G, ix = new Uint32Array(6 * (nx - 1) * (ny - 1));
+  const { nx, ny } = G, ix = new Uint32Array(6 * (nx - 1) * (ny - 1)), hl = G.haloTex.image.data;
   let c = 0;
   for (let j = 0; j < ny - 1; j++) for (let i = 0, q = j * nx; i < nx - 1; i++, q++) {
+    if (!(hl[q] | hl[q + 1] | hl[q + nx] | hl[q + nx + 1])) continue;   // fuera del halo no hay nada que dibujar
     ix[c++] = q; ix[c++] = q + nx; ix[c++] = q + 1; ix[c++] = q + 1; ix[c++] = q + nx; ix[c++] = q + nx + 1;
   }
-  G.idxAll = new THREE.BufferAttribute(ix, 1);
+  G.idxAll = new THREE.BufferAttribute(ix.slice(0, c), 1); G.vTris = c / 3;
   for (const k in S) S[k].vgeom.setIndex(G.idxAll);
 }
 
@@ -212,7 +245,7 @@ function applyVisibility() {
 /* Hornea la grilla de vértices (una vez por cuenca): x,z lineales (Mercator es lineal en la escena), y = heightAt + yOff. */
 function initGrid(ctx, meta) {
   const { nx, ny, gx0, gy0, z } = meta;
-  if (G) { G.pos.dispose?.(); G.inTex.dispose(); G = null; for (const k in S) S[k].vgeom.setIndex(null); }
+  if (G) { G.pos.dispose?.(); G.inTex.dispose(); G.haloTex.dispose(); G = null; for (const k in S) S[k].vgeom.setIndex(null); }
   // columnas: lon solo depende de i; filas: lat solo de j (esquinas de píxel, convención de terrain.hf)
   const [xa, za] = ctx.toScene(...pxToLonLat(gx0, gy0, z)), [xb, zb] = ctx.toScene(...pxToLonLat(gx0 + nx, gy0 + ny, z));
   const dx = (xb - xa) / nx, dz = (zb - za) / ny;
@@ -229,7 +262,10 @@ function initGrid(ctx, meta) {
   const inTex = new THREE.DataTexture(new Uint8Array(nx * ny), nx, ny, THREE.RedFormat, THREE.UnsignedByteType);
   inTex.magFilter = inTex.minFilter = THREE.LinearFilter; inTex.generateMipmaps = false; inTex.flipY = false;
   inTex.wrapS = inTex.wrapT = THREE.ClampToEdgeWrapping; inTex.unpackAlignment = 1; inTex.needsUpdate = true;
-  G = { nx, ny, gx0, gy0, pos: new THREE.BufferAttribute(pos, 3), inTex, mk: new Uint8Array(nx * ny), mk2: new Uint8Array(nx * ny),
+  const haloTex = new THREE.DataTexture(new Uint8Array(nx * ny), nx, ny, THREE.RedFormat, THREE.UnsignedByteType);
+  haloTex.magFilter = haloTex.minFilter = THREE.LinearFilter; haloTex.generateMipmaps = false; haloTex.flipY = false;
+  haloTex.wrapS = haloTex.wrapT = THREE.ClampToEdgeWrapping; haloTex.unpackAlignment = 1; haloTex.needsUpdate = true;
+  G = { nx, ny, gx0, gy0, haloTex, cellM: meta.cell, pos: new THREE.BufferAttribute(pos, 3), inTex, mk: new Uint8Array(nx * ny), mk2: new Uint8Array(nx * ny),
     aff: new THREE.Vector4(1 / dx, -xa / dx, 1 / dz, -za / dz),   // fx = (x − xa)/dx ; fy = (z − za)/dz
     box: new THREE.Box3(new THREE.Vector3(xa, ymin, za), new THREE.Vector3(xa + nx * dx, ymax, za + ny * dz)) };
   for (const k in S) {
@@ -242,8 +278,8 @@ function initGrid(ctx, meta) {
     s.mat.uniforms.uG.value.copy(G.aff); s.mat.uniforms.uN.value.set(nx, ny);
     s.mat.uniforms.tIn.value = inTex; s.mat.uniforms.tWave.value = getWaveTex();
     s.vgeom.setAttribute("position", G.pos);
-    s.vmat.uniforms.uG.value.copy(G.aff); s.vmat.uniforms.uN.value.set(nx, ny); s.vmat.uniforms.tIn.value = inTex;
-    { const u = s.part.mat.uniforms; u.uG.value.copy(G.aff); u.uN.value.set(nx, ny); u.tIn.value = inTex; }
+    s.vmat.uniforms.uG.value.copy(G.aff); s.vmat.uniforms.uN.value.set(nx, ny); s.vmat.uniforms.tIn.value = haloTex;
+    { const u = s.part.mat.uniforms; u.uG.value.copy(G.aff); u.uN.value.set(nx, ny); u.tIn.value = haloTex; }
   }
 }
 
@@ -257,6 +293,8 @@ function setResult(res) {
   const ins = G.inTex.image.data;
   for (let i = 0; i < n; i++) ins[i] = res.inside[i] ? 255 : 0;
   G.inTex.needsUpdate = true;
+  buildHalo(res.inside);
+  G.idxAll = null;   // el índice de Velocidad depende del halo: se rehace al mostrar
   for (const k in S) {
     const s = S[k], r = res[k];
     if (!r) continue;
@@ -347,10 +385,13 @@ export default {
     }
     if (vel) {   // estelas: un paso por frame, solo de los escenarios visibles (en el fundido, los dos: se cruzan con uFade)
       const dt = Math.max(0, frame.dt || 0) / 1000;
+      _cam.set(frame.camPosScene.x, frame.camPosScene.y, frame.camPosScene.z);
+      const dCam = G.box.distanceToPoint(_cam);   // sin la bajada viva: alcanza para un LOD
       for (const k in S) {
         const part = S[k].part;
         if (!part.mesh.visible || !(scenarioFade[k] && scenarioFade[k].value > 0.02)) continue;
         part.setViewport();
+        part.setDist(dCam);
         if (anim) part.tick(dt);
       }
     }
@@ -377,7 +418,7 @@ export default {
   stats(key) {
     const s = S[key];
     if (!s || !s.hasData) return {};   // simulador nunca prendido: no agrega claves (stats() idéntico al de antes)
-    const fieldTris = G ? 2 * (G.nx - 1) * (G.ny - 1) : 0;
+    const fieldTris = G && G.vTris || 0;
     const bytes = (s.data ? s.data.byteLength : 0) + (G && key === "inicial" ? G.nx * G.ny + (G.idxAll ? G.idxAll.array.byteLength : 0) : 0);
     return { runoffTris: (mode === "velocidad" ? fieldTris : s.tris) + s.part.tris, runoffParticles: s.part.count,
       runoffTexMB: +(bytes * MB + s.part.texMB).toFixed(2) };

@@ -123,3 +123,23 @@ Servidor 8170, Playwright (`dev/qa`), `?fixture=demo_relieve&qa&terreno=1&calida
 - ¿Las estelas fuera del campo (atenuadas ×0,35) están bien, o prefieren que no haya (peso 0)? Hoy ~20 % de las partículas nacen afuera.
 - ¿Se arregla también la natural en la cenital con el `uLift` (rompe el "diff 0 %" de la natural solo en vistas lejanas)?
 - ¿Aceptan 4–6 ms de CPU en Alta como punto de partida a validar con `?fps` en su equipo?
+
+## Ronda 2 (decisiones del orquestador)
+1. **Densidad por distancia (estelas)**: alfa × `mix(1, 0,5, smoothstep(1500, 5000 m, distancia))` en el vertex shader (`DIST_ALFA`), y fracción
+   dibujada `1 → 0,35` entre 2500 y 7000 m (`DIST_FRAC`, rango de instancias del draw, sin reasignar; también se simulan solo las dibujadas).
+   Home: 14 120 de 15 000; cenital: 11 854. Primer intento (1200/4000/0,3) dejaba las estelas casi invisibles en la cenital; quedó 1500/5000/0,5.
+   En la home se lee el mapa de colores con las estelas como textura fina encima.
+2. **Halo del campo en Velocidad**: `inside` → distancia chamfer 3-4 en CPU al llegar cada resultado (`buildHalo`, 135 k celdas, dos pasadas) →
+   textura R8 lineal (1 dentro, 0 a `HALO_M` = 300 m del borde) que reemplaza a `tIn` en el mapa de velocidad y las estelas (alfa fuera ya no usa
+   `natural.outside`). El índice de Velocidad ahora solo incluye los cuadros con halo > 0 (269 k → 233–265 k tris según vista; ~106 k en Baja) y se
+   rehace por resultado. Las estelas nacen dentro del campo (peso 1) o en el halo (peso 0,05 × halo). Natural no cambia (35 % fuera).
+3. **LIFT también en Agua natural**, pero ahora arranca a 600 m de la cámara: `y += 0,002 · max(dist − 600, 0)` (en los tres shaders). Con la versión
+   anterior (desde 0) de cerca a 300 m levantaba 0,6 m y movía el agua (0,77 % de diff en conf-obl); con el umbral, de cerca ~0,07 %.
+   Cambio visual de natural, documentado: en la cenital desaparecen los manchones (antes el agua se cortaba en tramos; ahora los cauces salen
+   continuos). Diff natural antes/después: home 0,35 %, cenital 0,74 %, conf-obl 0,07 % (todo por el LIFT, es una mejora a propósito).
+4. Constantes `// → HIDRO` quedan en mis archivos hasta F4 (nuevas: `HALO_M`, `DIST_ALFA`, `DIST_FRAC`).
+
+Verificación: capturas en `.../scratchpad/f3/r2/` (`alta/{inicial,multi}-{home,cenital,conf-obl}.png`, `baja/inicial-home.png`,
+`nat-antes/` y `nat-despues/` {home,cenital,conf-obl} de la natural, `apagado/`). Simulador apagado vs `dev/qa/baseline`: 12 pares, peor 0,0095 %
+(ruido), `stats()` sin claves nuevas. Prendido Alta home: 12 draws, 14 120 estelas, `runoffTexMB` 4,80 / 3,91. Consola sin errores (salvo GPU stall).
+Deuda: el halo se mide al borde de `inside` del motor (celdas de 15 m): borde con la forma del campo, no un círculo.
