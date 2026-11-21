@@ -1,10 +1,10 @@
 /* ============ UI del Simulador de escorrentía (HIDRO · F2) ============
    Bloque propio del panel, entre "Calidad" y el pie. La UI NO calcula ni decide: lee el estado de hydro/state.js (getState y el
-   evento "runoff") y llama setMode. El relieve se prende por core/relief.js (setReliefUser), como el conmutador de relieve-ui.js.
+   evento "runoff") y llama setMode. El relieve se prende por core/relief.js (setReliefSession: solo esta visita, no pisa la preferencia guardada del conmutador de relieve).
    La disponibilidad depende de terrain.stats, que llega asíncrono: se re-evalúa al armar y en "runoff", "relief:state" y "scenario".
    Se arma solo al importarse (el #panel ya está en el HTML); también se exporta armarEscorrentia() por si hace falta llamarlo. */
 import { on } from "../core/events.js?v=20261121";
-import { relief, onRelief, setReliefUser } from "../core/relief.js?v=20261121";
+import { relief, onRelief, setReliefSession } from "../core/relief.js?v=20261121";
 import { getState, setMode } from "../hydro/state.js?v=20261121";
 
 const MOTIVOS = {
@@ -74,7 +74,7 @@ function alternar() {
 }
 
 function prender() {
-  if (!relief.active && relief.available !== false) { avisoRelieve = true; setReliefUser(true); }
+  if (!relief.active && relief.available !== false) { avisoRelieve = true; setReliefSession(true); }   // solo esta visita: no guarda ad_relieve
   setMode("natural");
 }
 
@@ -106,7 +106,7 @@ function pintar(s) {
   rotulo.textContent = "Ilustrativo · pico de una lluvia de " + s.rainMmH + " mm/h · no es un estudio hidrológico";
   let n = "";
   if (prendido && !relief.active) n = "El relieve está apagado: el agua se ve mejor con el relieve del terreno prendido.";
-  else if (prendido && avisoRelieve) n = "Prendimos el relieve del terreno: el agua lo necesita para verse.";
+  else if (prendido && avisoRelieve) n = "Prendimos el relieve del terreno para esta visita: el agua lo necesita para verse.";
   nota.textContent = n; nota.hidden = !n;
   if (modoUrl !== s.mode && !(pedidoUrl && s.mode === "off")) { modoUrl = s.mode; url(s.mode); }
 }
