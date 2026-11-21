@@ -101,6 +101,18 @@ tour ni cámara automáticos); `?debug` expone `__nav3d`, `__map` y `__state` si
 `?agua=off`, `?a4=off`, `?fauna=0`, `?hillshade=0|1`, `?aa=0`, `?tm=` y `?exp=` (tone mapping), y los diales `?a1=`, `?a2=`, `?a3=`, `?a5=` (JSON). `?rasante=v1|v2|v3` (altura de la cámara del rasante) vale con `?qa`/`?debug` o con `?local` en un host de desarrollo.
 `?local` carga los datos de `data/` en vez de Supabase y solo funciona en `localhost`, `127.0.0.1`, `[::1]` y `*.localhost`.
 
+## Simulador de escorrentía
+
+Bloque "Simulador de escorrentía" del panel (debajo de "Relieve del terreno"). El interruptor prende la vista **Agua natural**:
+dónde se junta el agua en el pico de una lluvia (por defecto 50 mm/h), calculada en el navegador sobre el modelo de terreno
+(DEM) del campo. Es **ilustrativo: no es un estudio hidrológico**, y la lámina de agua está exagerada a propósito para que se vea.
+Al prenderlo se prende también el relieve del terreno (lo necesita). Si el campo es llano o no hay modelo de terreno, el
+interruptor queda deshabilitado y el panel dice por qué. La vista "Velocidad" figura como "próximamente".
+
+| Parámetro | Efecto |
+|---|---|
+| `?escorrentia=natural` | abre con el simulador prendido (se aplica en cuanto el campo admite el simulador); el visor lo mantiene en la URL al prender o apagar |
+
 ## Publicación (caché)
 
 GitHub Pages sirve con `Cache-Control: max-age=600`: sin versionar, un navegador puede mezclar módulos viejos y nuevos hasta 10 min.
