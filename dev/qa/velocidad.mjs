@@ -19,7 +19,7 @@ const a = parseArgs(process.argv.slice(2), { base: 'http://localhost:8080', wait
 const only = new Set(a.only.split(','));
 const [W, H] = a.size.split('x').map(Number);
 const CONF = [-59.26342964, -37.40855088];   // confluencia principal del campo SINTÉTICO (ver runoff.mjs)
-const VERS = '20261122';                     // versión de caché de los imports relativos (para particleTiming)
+const VERS = '20261123';                     // versión de caché de los imports relativos (para particleTiming)
 const dir = n => mkdirp(path.join(a.out, n));
 const medidas = { vistas: {}, fundido: null, lluvia: {}, particulas: {} };
 const consola = {};

@@ -101,3 +101,32 @@ En home la lámina se ve algo más tenue que en G1 (a distancia el LIFT la despe
 - Fps y primer prendido en celular no medibles acá; la CPU de las estelas (4-5 ms en esta máquina) en un celular medio puede ser varias veces mayor.
 - Las estelas no son deterministas: no hay diff pixel a pixel posible en Velocidad; se compara la paleta y la forma.
 - Las capturas dependen de las teselas de hoy.
+
+## Repasada final (rama hidro/f3-velocidad en 8cbd3ee, caché 20261123)
+Mismos scripts, servidor propio en 8190, Chromium + SwiftShader, 1280x720, `freezeTime(12.5)`, `seed(1)`. Cambió solo `velocidad.mjs`: la constante `VERS` de `particleTiming()` quedó en 20261122 y devolvía `{}` (import duplicado); ahora 20261123.
+Hojas regeneradas (pisan las anteriores): `hoja_g2.jpg` (14 pares), `hoja_lluvia.jpg`, `hoja_panel.jpg`. `hoja_natural_lift.jpg` sin cambios (Agua natural no se tocó).
+
+**Veredicto: APROBADO.**
+
+| punto | resultado |
+|---|---|
+| Apagado vs `baseline` (12 vistas) | peor 0,1487 % (1 370 px, multi-rasante-medio, la vista del pasto que ya se movía); resto <= 0,0004 %. Repetida sola, esa vista da 0 % contra la base: ruido de orden de pasto, no cambio. Límite 0,5 % OK |
+| `stats()` apagado | draws y triángulos idénticos salvo multi-rasante (18 → 17; 135 985 → 129 703) y multi-rasante-medio (36 → 34), variación de streaming de pasto ya vista en G1; sin claves `runoff*`; 0 workers al abrir |
+| Draw calls prendido (Velocidad, Alta) | +2 en todas las vistas (límite 6); en el fundido inicial → multi: apagado 24, natural 26, velocidad 28 (+4) |
+| runoffTris Alta | 232 922 (cenital) a 276 966 (confluencia); home 264 646. Estelas 11 854-15 000 |
+| runoffTris Baja | home 185 574 (2 824 estelas), conf-obl 192 966 (3 000). Antes ~110 k: las curvas suaves suman triángulos (costo de la ronda 3) |
+| runoffTexMB | Alta 4,80 + 3,91 = 8,71 MB (límite 16); Baja 3,33 |
+| Worker | primer cálculo `total` 215 ms (relleno 38, pesos 26, dir/pendiente 39, acumulación 24, clases 3); pared hasta `ready` 626 ms. Recálculo por lluvia 46-57 ms (10, 50, 100 mm/h). 1 solo worker |
+| CPU de estelas `particleTiming()` | 5,05 ms (inicial) y 5,13 ms (multi) por frame en home Alta, SwiftShader compartiendo CPU; referencia relativa, vs 4,0-4,3 en la pasada anterior (+~0,8 ms). Fps: los mide el dueño |
+| Consola | solo los 4 warnings "GPU stall due to ReadPixels" de SwiftShader (idénticos a la base); 0 errores, 0 nuevos |
+| `stamp_version --check` | OK, 212 especificadores, versión única 20261123 |
+| `hydro.test.mjs` | 61 ok, 0 fallas |
+| Panel 1440/830/500/375 | `scrollWidth == innerWidth`; marcas de la leyenda terminan 10-22 px dentro del panel; el chequeo heurístico lista `.runoff-marcas` por `scrollWidth` interno (rótulos de la regla), no es desborde visible. Deslizador 10-100 con aria |
+
+Confirmaciones visuales (Alta/Baja, capturas en `dev/qa/out/final`, no commiteadas):
+- Polilíneas angulares en Baja: **se fueron**. En conf-obl las estelas fijas son curvas suaves. Quedan unas pocas largas y casi rectas (arriba a la izquierda y abajo), sin quiebres.
+- Manchitas oscuras en conf-cen: **se fueron** (mapa limpio, solo un rayado muy leve en el borde izquierdo).
+- Banda blanca al horizonte en conf-ras: **se fue**; cielo y horizonte limpios, las estelas se atenúan al rasante.
+- Marca "Ilustrativo": ahora es una píldora oscura con texto blanco; se lee sobre el satélite claro a 1440 y 375 px (con el panel cerrado), sin pisar la atribución ni "campo sintético". A 375 px queda justo encima del cartel de atribución desplegado, sin solaparse.
+
+Para el dueño: fps con estelas en su equipo y en celular (CPU de estelas ~5 ms/frame acá; Baja ahora ~190 k triángulos de estelas+mapa).
