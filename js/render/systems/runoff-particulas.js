@@ -37,7 +37,8 @@ const VS = GLSL_DECL +
   "uniform sampler2D tP;\nuniform vec2 uPx;\nuniform float uHalf;\n" +
   "varying vec3 vWp;\nvarying float vA;\nvarying float vSide;\n" +
   "vec4 pt(int p, int k) { int i = p * NP + k; return texelFetch(tP, ivec2(i % TW, i / TW), 0); }\n" +
-  "vec4 clipOf(vec3 q, out vec3 wp) {\n  vec4 w = modelMatrix * vec4(q, 1.0);\n  w.y -= a6Low(w.xz);\n  wp = w.xyz;\n  return projectionMatrix * viewMatrix * w;\n}\n" +
+  "uniform vec3 uCamPos;\nuniform float uLift;\n" +
+  "vec4 clipOf(vec3 q, out vec3 wp) {\n  vec4 w = modelMatrix * vec4(q, 1.0);\n  w.y -= a6Low(w.xz);\n  w.y += uLift * length(uCamPos - w.xyz);\n  wp = w.xyz;\n  return projectionMatrix * viewMatrix * w;\n}\n" +
   "void main() {\n" +
   "  int p = gl_InstanceID, k = gl_VertexID >> 1;\n" +
   "  float side = float((gl_VertexID & 1) * 2 - 1);\n" +
@@ -58,12 +59,15 @@ const VS = GLSL_DECL +
 const FS =
   "precision highp float;\n" +
   "varying vec3 vWp;\nvarying float vA;\nvarying float vSide;\n" +
-  "uniform vec3 uCamPos;\nuniform float uFade;\nuniform float uHalf;\nuniform float uCore;\nuniform float uAlfa;\n" +
+  "uniform vec3 uCamPos;\nuniform float uFade;\nuniform float uHalf;\nuniform float uCore;\nuniform float uAlfa;\nuniform float uOut;\n" +
+  "uniform sampler2D tIn;\nuniform vec4 uG;\nuniform vec2 uN;\n" +
   GLSL_FOG_UNIFORMS + GLSL_ADFOG +
   "void main() {\n" +
   "  float dpx = abs(vSide) * uHalf;\n" +
   "  float cov = clamp(uCore + 0.5 - dpx, 0.0, 1.0);\n" +
-  "  float a = cov * vA * uAlfa * uFade;\n" +
+  "  vec2 f = vec2(vWp.x * uG.x + uG.y, vWp.z * uG.z + uG.w);\n" +
+  // fuera del campo se atenúa igual que el mapa de velocidad (HIDRO.vis.natural.outside)
+  "  float a = cov * vA * uAlfa * uFade * mix(uOut, 1.0, texture2D(tIn, (f + 0.5) / uN).r);\n" +
   "  if (a < 0.004) discard;\n" +
   "  float dist = length(uCamPos - vWp);\n" +
   "  gl_FragColor = vec4(mix(vec3(1.0), uFogColor, adFog(dist)), a);\n" +
@@ -83,7 +87,8 @@ export function createParticles(ctx, key, shared, getCanvas) {
   const mat = new THREE.ShaderMaterial({
     vertexShader: VS, fragmentShader: FS,
     uniforms: { ...shared, ...withReliefU({}), uFade: scenarioFade[key] || { value: 1 }, tP: { value: null },
-      uPx: { value: new THREE.Vector2(0.002, 0.002) }, uHalf: { value: 1 }, uCore: { value: 1 }, uAlfa: { value: PV.alfaCabeza } }
+      uPx: { value: new THREE.Vector2(0.002, 0.002) }, uHalf: { value: 1 }, uCore: { value: 1 }, uAlfa: { value: PV.alfaCabeza }, uOut: { value: VIS.natural.outside },
+      tIn: { value: null }, uG: { value: new THREE.Vector4(1, 0, 1, 0) }, uN: { value: new THREE.Vector2(1, 1) } }
   });
   mat.side = THREE.DoubleSide; mat.depthTest = true; mat.depthWrite = false; mat.transparent = false;
   mat.polygonOffset = true; mat.polygonOffsetFactor = -3; mat.polygonOffsetUnits = -6;   // sobre el mapa de velocidad (−2, −4)

@@ -21,7 +21,8 @@ const VEL = HIDRO.vis.velocidad;
 
 const VS =
   "varying vec3 vWp;\n" +
-  "void main() {\n  vec4 w = modelMatrix * vec4(position, 1.0);\n  w.y -= a6Low(w.xz);\n  vWp = w.xyz;\n" +
+  "uniform vec3 uCamPos;\nuniform float uLift;\n" +
+  "void main() {\n  vec4 w = modelMatrix * vec4(position, 1.0);\n  w.y -= a6Low(w.xz);\n  w.y += uLift * length(uCamPos - w.xyz);\n  vWp = w.xyz;\n" +
   "  gl_Position = projectionMatrix * viewMatrix * w;\n}\n";
 
 /* uG = afín escena→celda · uN = tamaño de la grilla · uVel = (log10 vMin, 1/rango log10, opacidad, alfa fuera) · uBorde = celdas */

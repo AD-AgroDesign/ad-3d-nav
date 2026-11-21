@@ -128,9 +128,15 @@ const FS =
   "  gl_FragColor.rgb = mix(gl_FragColor.rgb, uFogColor, adFog(dist));\n" +
   "}\n";
 
+/* Subida de las capas de velocidad y estelas proporcional a la distancia a la cámara (m por m): lejos, la malla de terreno de MapLibre
+   (LOD grueso) asoma por encima de la nuestra (fina) y la tapa a manchones; con 0,002 no se ve ni en la cenital a varios km y en
+   el rasante son centímetros. La lámina natural (F2) no la usa (no cambia su aspecto). */
+const LIFT = 0.002;   // → HIDRO
+const PART_IDLE_MAX = 8000;   // m · las estelas se ven (y se animan) desde mucho más lejos que las ondas del agua natural (1500 m)   // → HIDRO
+
 /* Cámara y niebla, compartidos por referencia con lighting.js: los usan los tres materiales (natural, velocidad, estelas). */
 const SHARED = {
-  uCamPos: uniforms.uCamPos,
+  uCamPos: uniforms.uCamPos, uLift: { value: LIFT },
   uFogColor: uniforms.uFogColor, uFogNear: uniforms.uFogNear, uFogFar: uniforms.uFogFar, uFogMax: uniforms.uFogMax, uFogRel: uniforms.uFogRel
 };
 
@@ -237,6 +243,7 @@ function initGrid(ctx, meta) {
     s.mat.uniforms.tIn.value = inTex; s.mat.uniforms.tWave.value = getWaveTex();
     s.vgeom.setAttribute("position", G.pos);
     s.vmat.uniforms.uG.value.copy(G.aff); s.vmat.uniforms.uN.value.set(nx, ny); s.vmat.uniforms.tIn.value = inTex;
+    { const u = s.part.mat.uniforms; u.uG.value.copy(G.aff); u.uN.value.set(nx, ny); u.tIn.value = inTex; }
   }
 }
 
@@ -335,7 +342,7 @@ export default {
         _cam.set(frame.camPosScene.x, frame.camPosScene.y, frame.camPosScene.z);
         const lo = lowAt((G.box.min.x + G.box.max.x) / 2, (G.box.min.z + G.box.max.z) / 2);   // caja bajada con el suelo (relieve en vivo)
         _bb.copy(G.box); if (lo) _bb.translate(_lo.set(0, -lo, 0));
-        anim = _bb.distanceToPoint(_cam) < NAT.idleMaxDist && frustum.intersectsBox(_bb);
+        anim = _bb.distanceToPoint(_cam) < (vel ? PART_IDLE_MAX : NAT.idleMaxDist) && frustum.intersectsBox(_bb);
       }
     }
     if (vel) {   // estelas: un paso por frame, solo de los escenarios visibles (en el fundido, los dos: se cruzan con uFade)
