@@ -205,3 +205,32 @@ Valores existentes sin cambios. Se agregó:
 - `particulas`: `presupuesto` {ultra 20000, alta 15000, media 8000, baja 0}, `vidaS` [2, 6], `puntosEstela` 8, `exageracion` 160, `anchoPx` 1.75, `alfaCabeza` 0.9, `estaticasBaja` 3000.
   Cuenta de `exageracion`: la cola abarca ~2 s de historia a velocidad visual v·exageracion, entonces largo = v·exageracion·2 = v·320 (`estelaSegundos`) → 160.
 - `marca.texto`: "Ilustrativo · no es un estudio hidrológico".
+
+## F4 (diales de pulido en `HIDRO.vis`)
+Valores existentes sin cambios; el render los lee después (no toqué `js/render/**`).
+
+| Constante del render | Clave de HIDRO | Valor |
+|---|---|---|
+| `LIFT` (runoff.js) | `vis.velocidad.liftDist` | 0.002 (m por m; aplica a natural, velocidad y estelas) |
+| el `600.0` del shader | `vis.velocidad.liftDistDesdeM` | 600 |
+| `uLift0` | `vis.velocidad.liftFijoM` | 0.4 (solo velocidad y estelas; la natural no lo usa) |
+| `HALO_M` | `vis.velocidad.haloM` | 300 |
+| `PART_IDLE_MAX` | `vis.particulas.idleMaxDistM` | 8000 |
+| `Y_EXTRA` | `vis.particulas.yExtraM` | 0.06 |
+| `OUTSIDE_W` | `vis.particulas.pesoFuera` | 0.05 |
+| `SPEED_W` | `vis.particulas.pesoRapidez` | 2.0 |
+| `FADE_IN` / `FADE_OUT` | `vis.particulas.fadeInS` / `fadeOutS` | 0.4 / 0.6 |
+| `DIST_ALFA` | `vis.particulas.distAlfa` | [1500, 5000, 0.5] |
+| `DIST_FRAC` | `vis.particulas.distFrac` | [2500, 7000, 0.35] |
+| `GRAZE` | `vis.particulas.rasante` | [0.10, 0.55, 0.06] |
+| `STEP_M` | `vis.particulas.pasoColaM` | 6 |
+| `TURN_COS` | `vis.particulas.giroColaCos` | 0.5 |
+| `STATIC_SUB` | `vis.particulas.subdivBaja` | 3 |
+| (nuevo, G2-1a) | `vis.particulas.factorMovil` | 0.5 (× presupuesto con `IS_MOBILE`; lo aplica el render) |
+
+Vista Diferencia: `vis.diferencia` = `umbral` 0.06, `saturacion` -1.15 (mismos valores que `difUmbral`/`difSatura`, que siguen), `colFrena` [#96cdff, #1946c8], `colAcelera` [#ffbe8c, #c8321e], `opacidad` 0.85, `traza` {clases corr-herb/corr-le/parche-herb/parche-le, color #ffffff, alfa 0.9, rayaPx 8, huecoPx 6, anchoPx 1.5}.
+
+Stats para la UI (en `result.stats`, ya existentes; `HIDRO.vis.diferencia.metricas` los lista):
+- ha con v > 0,3 m/s: `stats.inicial.haVMayor` → `stats.multi.haVMayor`
+- velocidad media: `stats.inicial.vMediaMs` → `stats.multi.vMediaMs` (m/s); también `stats.reduccionVMediaPct`
+- ha donde frena ≥ 16 %: `stats.frenaHa`; total del campo: `stats.campoHa`
