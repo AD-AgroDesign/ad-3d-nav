@@ -103,7 +103,7 @@ tour ni cámara automáticos); `?debug` expone `__nav3d`, `__map` y `__state` si
 
 ## Simulador de escorrentía
 
-Bloque "Simulador de escorrentía" del panel (debajo de "Relieve del terreno"). El interruptor prende la vista **Agua natural**:
+Bloque "Simulador de escorrentía" en su propio panel, que se abre con el botón de la gota con flecha de la barra superior (un panel a la vez: tabla ☰, simulador y ajustes se excluyen; con el simulador prendido y el panel cerrado, el botón lleva un puntito dorado). Calidad, hora del día y relieve viven ahora en el panel "Ajustes" (botón de controles deslizantes). El interruptor prende la vista **Agua natural**:
 dónde se junta el agua en el pico de una lluvia (por defecto 50 mm/h), calculada en el navegador sobre el modelo de terreno
 (DEM) del campo. Es **ilustrativo: no es un estudio hidrológico**, y la lámina de agua está exagerada a propósito para que se vea.
 Al prenderlo se prende también el relieve del terreno (lo necesita). Si el campo es llano o no hay modelo de terreno, el
@@ -111,7 +111,7 @@ interruptor queda deshabilitado y el panel dice por qué. La vista **Velocidad**
 
 | Parámetro | Efecto |
 |---|---|
-| `?escorrentia=natural` o `?escorrentia=velocidad` | abre con el simulador prendido en esa vista (se aplica en cuanto el campo admite el simulador); el visor lo mantiene en la URL al prender o apagar |
+| `?escorrentia=natural` o `?escorrentia=velocidad` | abre con el simulador prendido en esa vista y su panel abierto en escritorio (se aplica en cuanto el campo admite el simulador); el visor lo mantiene en la URL al prender o apagar |
 
 ## Publicación (caché)
 
