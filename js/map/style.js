@@ -1,6 +1,6 @@
-import { HOME_VIEW } from "../core/state.js?v=20261124";
-import { msaaEnabled, resolveQuality } from "../core/quality.js?v=20261124";
-import { atm, lights, onAtmosphere, setRepaint } from "../render/lighting.js?v=20261124";   // A1 (3.1): modo de hora vigente (cielo y ráster los pone este archivo)
+import { HOME_VIEW } from "../core/state.js?v=20261125";
+import { msaaEnabled, resolveQuality } from "../core/quality.js?v=20261125";
+import { atm, lights, onAtmosphere, setRepaint } from "../render/lighting.js?v=20261125";   // A1 (3.1): modo de hora vigente (cielo y ráster los pone este archivo)
 
 /* A1 (1.3, D): ajuste de color del satélite (raster-*) para que ráster y 3D parezcan la misma foto.
    Valores base en config.js A1_RASTER (mediodía); los modos de hora (3.1, lighting.js) los interpolan y vienen en `atm`. */

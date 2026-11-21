@@ -14,15 +14,15 @@
    apagada en calidad Baja (fauna = 0); Media = 50 %. Tiempo: uniforms.uTime (lo congela __nav3d.freezeTime) y
    funciones cerradas del tiempo (sin integrar dt: T5 no aplica salvo en el lazo de reposo, que usa max(0, …)). */
 import * as THREE from "three";
-import { idleDriver } from "../idle.js?v=20261124";
-import { A5_FAUNA, TREE_SPECIES } from "../../core/config.js?v=20261124";
-import { state } from "../../core/state.js?v=20261124";
-import { scatterInClasses } from "../../core/geo.js?v=20261124";
-import { quality } from "../../core/quality.js?v=20261124";
-import { uniforms } from "../lighting.js?v=20261124";
-import { patch } from "../shaderlib.js?v=20261124";
-import { lowAt, terrain } from "../../terrain/terrain.js?v=20261124";
-import { cellSeed, chainShader, partitionCells, shuffleDet } from "./chunks.js?v=20261124";
+import { idleDriver } from "../idle.js?v=20261125";
+import { A5_FAUNA, TREE_SPECIES } from "../../core/config.js?v=20261125";
+import { state } from "../../core/state.js?v=20261125";
+import { scatterInClasses } from "../../core/geo.js?v=20261125";
+import { quality } from "../../core/quality.js?v=20261125";
+import { uniforms } from "../lighting.js?v=20261125";
+import { patch } from "../shaderlib.js?v=20261125";
+import { lowAt, terrain } from "../../terrain/terrain.js?v=20261125";
+import { cellSeed, chainShader, partitionCells, shuffleDet } from "./chunks.js?v=20261125";
 
 const C = A5_FAUNA, CB = C.birds, CF = C.butterflies;
 const TAU = Math.PI * 2;

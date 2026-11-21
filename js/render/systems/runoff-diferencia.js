@@ -16,9 +16,9 @@
       apoyarse en el relieve (la subdivisión es colineal: la línea es exactamente la del GIS). La altura sale de la misma grilla que el mapa
       (sin z-fighting con él), más yExtraM, y el vertex shader aplica a6Low y la subida por distancia como el resto de las capas. */
 import * as THREE from "three";
-import { HIDRO } from "../../core/config.js?v=20261124";
-import { GLSL_DECL, withReliefU } from "../../terrain/terrain.js?v=20261124";
-import { GLSL_ADFOG, GLSL_FOG_UNIFORMS } from "../shaderlib.js?v=20261124";
+import { HIDRO } from "../../core/config.js?v=20261125";
+import { GLSL_DECL, withReliefU } from "../../terrain/terrain.js?v=20261125";
+import { GLSL_ADFOG, GLSL_FOG_UNIFORMS } from "../shaderlib.js?v=20261125";
 
 const VIS = HIDRO.vis, DIF = VIS.diferencia, TR = DIF.traza;
 const MAX_SEG_M = 10;            // m · tramo máximo de la traza (apoyo en el relieve; menos que una celda de 15 m)
