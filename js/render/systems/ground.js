@@ -30,13 +30,13 @@
        dibuja esta capa) + polygonOffset, apoyados en heightAt, con normales del relieve para que reciban el sol
        como la ladera real. Sin terreno nada cambia. */
 import * as THREE from "three";
-import { A4_FURROWS, A4_GROUND, WOODY_BASE } from "../../core/config.js?v=20261120";
-import { HOME_VIEW, params } from "../../core/state.js?v=20261120";
-import { quality } from "../../core/quality.js?v=20261120";
-import { map } from "../../map/style.js?v=20261120";
-import { chainShader } from "./chunks.js?v=20261120";
-import { mulberry32 } from "../../core/geo.js?v=20261120";
-import { extOpacityProp, GLSL_DECL, withReliefU } from "../../terrain/terrain.js?v=20261120";   // A6: relieve
+import { A4_FURROWS, A4_GROUND, WOODY_BASE } from "../../core/config.js?v=20261121";
+import { HOME_VIEW, params } from "../../core/state.js?v=20261121";
+import { quality } from "../../core/quality.js?v=20261121";
+import { map } from "../../map/style.js?v=20261121";
+import { chainShader } from "./chunks.js?v=20261121";
+import { mulberry32 } from "../../core/geo.js?v=20261121";
+import { extOpacityProp, GLSL_DECL, withReliefU } from "../../terrain/terrain.js?v=20261121";   // A6: relieve
 
 /* ---------- parámetros efectivos (config + URL) ---------- */
 const DBG = params.has("qa") || params.has("debug");

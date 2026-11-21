@@ -18,8 +18,8 @@
    Colores de vértice en sRGB (host.js los pasa a lineal con el chunk srgbVC, como las matas).
    Las semillas son fijas (mulberry32): la misma geometría en cada carga. */
 import * as THREE from "three";
-import { mulberry32 } from "../../core/geo.js?v=20261120";
-import { TREE_BAKE } from "../../core/config.js?v=20261120";
+import { mulberry32 } from "../../core/geo.js?v=20261121";
+import { TREE_BAKE } from "../../core/config.js?v=20261121";
 
 const ATLAS = 512, TILE_PX = 256, PAD = 0.03;
 const TILE = { tala: 0, algarrobo: 1, chanar: 2, bark: 3 };
