@@ -1,8 +1,8 @@
-import { CLASS_META } from "../core/config.js?v=20261127";
-import { pointInPolygon } from "../core/geo.js?v=20261127";
-import { state } from "../core/state.js?v=20261127";
-import { map } from "./style.js?v=20261127";
-import { fmtHa } from "../ui/panel.js?v=20261127";
+import { CLASS_META } from "../core/config.js?v=20261128";
+import { pointInPolygon } from "../core/geo.js?v=20261128";
+import { state } from "../core/state.js?v=20261128";
+import { map } from "./style.js?v=20261128";
+import { fmtHa } from "../ui/panel.js?v=20261128";
 
 /* ---------- Interactividad ---------- */
 export function setupInteractivity() {

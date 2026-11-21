@@ -30,21 +30,21 @@
    apagado, así que el desempate entre ellos es solo el orden; contra la malla de terreno de MapLibre se usa depthTest +
    polygonOffset(−2, −4) (mismo criterio que suelo y agua) y yOff por encima del suelo. */
 import * as THREE from "three";
-import { A1_SKY, A4_GROUND, HIDRO } from "../../core/config.js?v=20261127";
-import { quality } from "../../core/quality.js?v=20261127";
-import { on } from "../../core/events.js?v=20261127";
-import { idleDriver } from "../idle.js?v=20261127";
-import { map } from "../../map/style.js?v=20261127";
-import { lights, uniforms } from "../lighting.js?v=20261127";
-import { GLSL_ADFOG, GLSL_FOG_UNIFORMS, scenarioFade } from "../shaderlib.js?v=20261127";
-import { GLSL_DECL, lowAt, terrain, withReliefU } from "../../terrain/terrain.js?v=20261127";
-import { getState } from "../../hydro/state.js?v=20261127";
-import { pxToLonLat } from "../../hydro/grid.js?v=20261127";
-import { getWaveTex } from "./water.js?v=20261127";
-import { makeVelocityMaterial } from "./runoff-velocidad.js?v=20261127";
-import { createParticles } from "./runoff-particulas.js?v=20261127";
-import { makeDifMaterial, makeDlogTex, createTraza } from "./runoff-diferencia.js?v=20261127";
-export { turboCss } from "./runoff-turbo.js?v=20261127";   // la leyenda de la UI importa la paleta desde acá
+import { A1_SKY, A4_GROUND, HIDRO } from "../../core/config.js?v=20261128";
+import { quality } from "../../core/quality.js?v=20261128";
+import { on } from "../../core/events.js?v=20261128";
+import { idleDriver } from "../idle.js?v=20261128";
+import { map } from "../../map/style.js?v=20261128";
+import { lights, uniforms } from "../lighting.js?v=20261128";
+import { GLSL_ADFOG, GLSL_FOG_UNIFORMS, scenarioFade } from "../shaderlib.js?v=20261128";
+import { GLSL_DECL, lowAt, terrain, withReliefU } from "../../terrain/terrain.js?v=20261128";
+import { getState } from "../../hydro/state.js?v=20261128";
+import { pxToLonLat } from "../../hydro/grid.js?v=20261128";
+import { getWaveTex } from "./water.js?v=20261128";
+import { makeVelocityMaterial } from "./runoff-velocidad.js?v=20261128";
+import { createParticles } from "./runoff-particulas.js?v=20261128";
+import { makeDifMaterial, makeDlogTex, createTraza } from "./runoff-diferencia.js?v=20261128";
+export { turboCss } from "./runoff-turbo.js?v=20261128";   // la leyenda de la UI importa la paleta desde acá
 
 /* ---------- diales: HIDRO.vis.natural (antes constante local NAT) ---------- */
 const NAT = HIDRO.vis.natural, VEL = HIDRO.vis.velocidad, PV = HIDRO.vis.particulas, DIF = HIDRO.vis.diferencia;

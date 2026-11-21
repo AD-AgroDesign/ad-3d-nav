@@ -3,12 +3,12 @@
    evento "runoff") y llama setMode. El relieve se prende por core/relief.js (setReliefSession: solo esta visita, no pisa la preferencia guardada del conmutador de relieve).
    La disponibilidad depende de terrain.stats, que llega asíncrono: se re-evalúa al armar y en "runoff", "relief:state" y "scenario".
    Se arma solo al importarse (el #panel ya está en el HTML); también se exporta armarEscorrentia() por si hace falta llamarlo. */
-import { on } from "../core/events.js?v=20261127";
-import { relief, onRelief, setReliefSession } from "../core/relief.js?v=20261127";
-import { getState, setMode, setRain } from "../hydro/state.js?v=20261127";
-import { turboCss } from "../render/systems/runoff-turbo.js?v=20261127";   // misma paleta (y misma t) que el shader
-import { registrarPanel, abrirPanel as abrirPanelExcl } from "./paneles-ui.js?v=20261127";
-import { HIDRO } from "../core/config.js?v=20261127";
+import { on } from "../core/events.js?v=20261128";
+import { relief, onRelief, setReliefSession } from "../core/relief.js?v=20261128";
+import { getState, setMode, setRain } from "../hydro/state.js?v=20261128";
+import { turboCss } from "../render/systems/runoff-turbo.js?v=20261128";   // misma paleta (y misma t) que el shader
+import { registrarPanel, abrirPanel as abrirPanelExcl } from "./paneles-ui.js?v=20261128";
+import { HIDRO } from "../core/config.js?v=20261128";
 
 const MOTIVOS = {
   llano: "Campo llano: el modelo de terreno no alcanza para simular el escurrimiento",
@@ -134,7 +134,7 @@ export function armarEscorrentia() {
   metr.id = "runoff-metricas"; metr.setAttribute("aria-label", "Métricas del escurrimiento");
 
   bloque.append(fila, estado, seg, lluvia, leyenda, metr, rotulo, nota);
-  panel.appendChild(bloque);
+  panel.append(armarOpacidad(), bloque);
   armarPanel(panel);
 
   // ?escorrentia=natural|velocidad|diferencia: se aplica en cuanto el campo admita el simulador
@@ -142,6 +142,25 @@ export function armarEscorrentia() {
   if (m && VISTAS.some(v => v.id === m[1])) pedidoUrl = m[1];
   if (pedidoUrl && !matchMedia("(max-width: 760px)").matches) abrirPanel(true);   // ?escorrentia: en escritorio el panel queda abierto
   pintar();
+}
+
+/* "Opacidad del diseño" también acá (el de la tabla sigue donde está). Se sincronizan por eventos sobre #opacity-slider, sin tocar controls.js:
+   al mover este se escribe el valor allá y se despacha "input" (corre la lógica existente); al moverse aquel se refleja acá.
+   Bucle: una bandera ignora el "input" que despachamos nosotros; reflejar no despacha nada. */
+function armarOpacidad() {
+  const orig = document.getElementById("opacity-slider");
+  const sec = document.createElement("div");
+  sec.className = "panel-section"; sec.id = "runoff-opacity-section";
+  sec.innerHTML = '<h3>Opacidad del diseño</h3><div class="opacity-row"><input type="range" id="runoff-opacity-slider" min="20" max="100" value="100" aria-label="Opacidad del diseño"><span id="runoff-opacity-val">100%</span></div>';
+  const inp = sec.querySelector("input"), val = sec.querySelector("#runoff-opacity-val");
+  let propio = false;
+  const reflejar = v => { inp.value = v; val.textContent = inp.value + "%"; };
+  if (orig) {
+    reflejar(orig.value);
+    inp.addEventListener("input", () => { val.textContent = inp.value + "%"; orig.value = inp.value; propio = true; orig.dispatchEvent(new Event("input")); propio = false; });
+    orig.addEventListener("input", () => { if (!propio) reflejar(orig.value); });
+  }
+  return sec;
 }
 
 /* Panel propio (#runoff-panel): la exclusión con la tabla y los demás paneles y el estado del botón los resuelve paneles-ui.js */

@@ -25,15 +25,15 @@
    recalcula con cada caja nueva), con prueba de profundidad + polygonOffset; el crecimiento de los casters y de los blobs
    usa el uniforme de crecimiento de A6 (growthU) en vez de scale.y (el host no escala el grupo con terreno). */
 import * as THREE from "three";
-import { A3_SHADOWS as CFG } from "../../core/config.js?v=20261127";
-import { quality } from "../../core/quality.js?v=20261127";
-import { state } from "../../core/state.js?v=20261127";
-import { map } from "../../map/style.js?v=20261127";
-import { uniforms } from "../lighting.js?v=20261127";
-import { GLSL_ADFOG, GLSL_FOG_UNIFORMS, scenarioFade } from "../shaderlib.js?v=20261127";
-import { chainShader } from "./chunks.js?v=20261127";
-import trees from "./trees.js?v=20261127";
-import { GLSL_DECL, fitSpheres, growthU, patchGrowth, terrain, withReliefU } from "../../terrain/terrain.js?v=20261127";   // A6: receptor y casters sobre el relieve
+import { A3_SHADOWS as CFG } from "../../core/config.js?v=20261128";
+import { quality } from "../../core/quality.js?v=20261128";
+import { state } from "../../core/state.js?v=20261128";
+import { map } from "../../map/style.js?v=20261128";
+import { uniforms } from "../lighting.js?v=20261128";
+import { GLSL_ADFOG, GLSL_FOG_UNIFORMS, scenarioFade } from "../shaderlib.js?v=20261128";
+import { chainShader } from "./chunks.js?v=20261128";
+import trees from "./trees.js?v=20261128";
+import { GLSL_DECL, fitSpheres, growthU, patchGrowth, terrain, withReliefU } from "../../terrain/terrain.js?v=20261128";   // A6: receptor y casters sobre el relieve
 
 const URL = new URLSearchParams(location.search);
 const MODE = (URL.has("qa") || URL.has("debug")) ? URL.get("sombras") : null;   // solo ?qa/?debug: ?sombras=0 apaga todo · ?sombras=blobs solo blobs

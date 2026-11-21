@@ -1,11 +1,11 @@
 /* hydro/engine.js · orquestación PURA del cálculo (la usan el worker y los tests). Sin Three/DOM/MapLibre.
    Todo lo que depende de la lluvia está aparte (`evaluar`) del resto, porque Ae = acumulación de C·A no depende de la lluvia:
    un cambio del deslizador solo repite Manning + suavizado (milisegundos), no el relleno ni el flujo. */
-import { medianFilter, cellCenters } from "./grid.js?v=20261127";
-import { priorityFlood } from "./fill.js?v=20261127";
-import { mfdWeights, meanDirection, localSlope } from "./flow.js?v=20261127";
-import { tablaClases, rasterizarClases } from "./classes.js?v=20261127";
-import { acumular, manning, suavizarLog, diferenciaLog, estadisticos, haFrena } from "./runoff.js?v=20261127";
+import { medianFilter, cellCenters } from "./grid.js?v=20261128";
+import { priorityFlood } from "./fill.js?v=20261128";
+import { mfdWeights, meanDirection, localSlope } from "./flow.js?v=20261128";
+import { tablaClases, rasterizarClases } from "./classes.js?v=20261128";
+import { acumular, manning, suavizarLog, diferenciaLog, estadisticos, haFrena } from "./runoff.js?v=20261128";
 
 const ahora = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
 
