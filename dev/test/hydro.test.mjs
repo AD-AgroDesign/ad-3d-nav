@@ -231,18 +231,17 @@ if (!ref) {
   const T = prepararTerreno(Float64Array.from(A.H), meta, P);
   const centros = cellCenters(meta);
   const esc = { inicial: prepararEscenario(T, F.inicial, centros, P), multi: prepararEscenario(T, F.multi, centros, P) };
-  // banda de 3 celdas: la referencia rellena con ceros las cajas del borde (ver handoff); ahí no se compara
-  const BAND = 3, interior = k => { const i = k % meta.nx, j = (k - i) / meta.nx; return i >= BAND && j >= BAND && i < meta.nx - BAND && j < meta.ny - BAND; };
-  const idxI = []; for (let k = 0; k < N; k++) if (interior(k)) idxI.push(k);
+  // grilla COMPLETA (F2: la referencia ya promedia solo las vecinas que existen, igual que box3: no hay banda de borde excluida)
+  const idxI = []; for (let k = 0; k < N; k++) idxI.push(k);
   const cuantil = (arr, q) => { const a = Float64Array.from(arr).sort(); return a[Math.min(a.length - 1, Math.floor(q * (a.length - 1)))]; };
 
   let nF = 0; for (let k = 0; k < N; k++) if (Math.abs(T.F[k] - A.F[k]) <= 1e-3) nF++;
   let dFmax = 0; for (let k = 0; k < N; k++) dFmax = Math.max(dFmax, Math.abs(T.F[k] - A.F[k]));
   check("F: |Δ| ≤ 1e-3 m en ≥ 99,9 % de las celdas", nF / N >= 0.999, `${(100 * nF / N).toFixed(3)} % · max|Δ| = ${dFmax.toExponential(2)} m`);
   const dS = idxI.map(k => rel(T.S[k], A.S[k]));
-  check("S (pendiente local, interior): rel p99 ≤ 1e-6", cuantil(dS, 0.99) <= 1e-6, "p99 " + cuantil(dS, 0.99).toExponential(2));
+  check("S (pendiente local, grilla completa): rel p99 ≤ 1e-6", cuantil(dS, 0.99) <= 1e-6, "p99 " + cuantil(dS, 0.99).toExponential(2));
   const dDir = idxI.map(k => Math.hypot(T.dirX[k] - A.dirX[k], T.dirY[k] - A.dirY[k]));
-  check("dirección media (interior): |Δ| p99 ≤ 1e-5", cuantil(dDir, 0.99) <= 1e-5, "p99 " + cuantil(dDir, 0.99).toExponential(2));
+  check("dirección media (grilla completa): |Δ| p99 ≤ 1e-5", cuantil(dDir, 0.99) <= 1e-5, "p99 " + cuantil(dDir, 0.99).toExponential(2));
 
   // inside: JS (scanline, centro de celda) vs shapely.contains_xy
   let dIn = 0; for (let k = 0; k < N; k++) if ((esc.inicial.cubierto[k] === 1) !== (A.inside[k] === 1)) dIn++;
@@ -263,11 +262,9 @@ if (!ref) {
     const v = suavizarLog(M.vRaw, meta.nx, meta.ny, P);
     stJs[key] = { v, M };
     const eV = idxI.map(k => rel(v[k], A[key + "_v"][k]));
-    const eVall = []; for (let k = 0; k < N; k++) eVall.push(rel(v[k], A[key + "_v"][k]));
-    check(`v ${key} (interior): mediana rel ≤ 2 % y p95 ≤ 5 %`, cuantil(eV, 0.5) <= 0.02 && cuantil(eV, 0.95) <= 0.05, `mediana ${(100 * cuantil(eV, 0.5)).toExponential(2)} % · p95 ${(100 * cuantil(eV, 0.95)).toExponential(2)} %`);
-    console.log(`       v ${key} (grilla entera, informativo, incluye el borde sesgado de la referencia): mediana ${(100 * cuantil(eVall, 0.5)).toExponential(2)} % · p95 ${(100 * cuantil(eVall, 0.95)).toFixed(3)} % · p99.9 ${(100 * cuantil(eVall, 0.999)).toFixed(2)} %`);
+    check(`v ${key} (grilla completa): mediana rel ≤ 2 % y p95 ≤ 5 %`, cuantil(eV, 0.5) <= 0.02 && cuantil(eV, 0.95) <= 0.05, `mediana ${(100 * cuantil(eV, 0.5)).toExponential(2)} % · p95 ${(100 * cuantil(eV, 0.95)).toExponential(2)} %`);
     const eH = idxI.filter(k => A[key + "_h"][k] > 1e-4).map(k => rel(M.h[k], A[key + "_h"][k]));
-    check(`h ${key} (interior): mediana rel ≤ 2 % y p95 ≤ 5 %`, cuantil(eH, 0.5) <= 0.02 && cuantil(eH, 0.95) <= 0.05, `mediana ${(100 * cuantil(eH, 0.5)).toExponential(2)} %`);
+    check(`h ${key} (grilla completa): mediana rel ≤ 2 % y p95 ≤ 5 %`, cuantil(eH, 0.5) <= 0.02 && cuantil(eH, 0.95) <= 0.05, `mediana ${(100 * cuantil(eH, 0.5)).toExponential(2)} %`);
     // conservación sobre el campo real
     const sal = salidaPorBordes(Ae, T.W), ent = esc[key].peso.reduce((a, b) => a + b, 0);
     check(`conservación ${key}: Σ C·A = salida por bordes (rel ≤ 1e-6)`, rel(sal, ent) <= 1e-6, "rel " + rel(sal, ent).toExponential(2));
@@ -293,11 +290,17 @@ if (!ref) {
     cmp("ha donde frena ≥ 16 %", st.frenaHa, mj.frena_ha, 0.02);
     cmp("reducción de v media (%)", st.reduccionVMediaPct, mj.reduccion_v_media_pct, 0.03);
   } else { saltados++; console.log("  AVISO: sin DEM de red, los estadísticos del campo se comparan con la H de la referencia más abajo, no con meta_vel.json"); }
-  // dlog vs referencia (interior)
+  // dlog vs referencia (grilla completa)
   const eD = idxI.map(k => Math.abs(r.dlog[k] - A.dlog[k]));
-  check("dlog = log2(v_multi/v_inicial) (interior): |Δ| p99 ≤ 0,02", cuantil(eD, 0.99) <= 0.02, "p99 " + cuantil(eD, 0.99).toExponential(2));
+  check("dlog = log2(v_multi/v_inicial) (grilla completa): |Δ| p99 ≤ 0,02", cuantil(eD, 0.99) <= 0.02, "p99 " + cuantil(eD, 0.99).toExponential(2));
   // el resultado transferible
   check("salidas son Float32Array/Uint8Array del tamaño de la grilla", r.inicial.v instanceof Float32Array && r.dlog instanceof Float32Array && r.inside instanceof Uint8Array && r.dirX.length === N && r.multi.h.length === N);
+  { const iM = r.rainMmH / 3.6e6, AeM = full.cache.esc.multi.Ae, AeI = full.cache.esc.inicial.Ae;
+    let mx = 0, dq = 0;
+    for (let k = 0; k < N; k++) { if (r.inside[k]) mx = Math.max(mx, r.inicial.Q[k]);   // el pico de stats es solo dentro del campo
+      dq = Math.max(dq, rel(r.multi.Q[k], iM * AeM[k]), rel(r.inicial.Q[k], iM * AeI[k])); }
+    check("Q por celda: Float32Array del tamaño de la grilla en ambos escenarios", r.inicial.Q instanceof Float32Array && r.multi.Q instanceof Float32Array && r.inicial.Q.length === N && r.multi.Q.length === N);
+    check("Q = i · Ae por celda (rel ≤ 1e-6) y máx dentro del campo = Q pico de stats", dq <= 1e-6 && rel(mx, r.stats.inicial.qPicoMaxM3s) <= 1e-6, `máx Q ${mx.toFixed(4)} m³/s · max rel ${dq.toExponential(2)}`); }
   // recálculo por lluvia: lineal en Ae y mucho más barato
   const t1 = performance.now(); const r2 = resultadoDe(full.cache, 100, P); const msRain = performance.now() - t1;
   check("lluvia ×2 → v y Q mayores (Q exactamente ×2)", r2.stats.inicial.vMediaMs > r.stats.inicial.vMediaMs && rel(r2.stats.inicial.qPicoMaxM3s, 2 * r.stats.inicial.qPicoMaxM3s) < 1e-12);
