@@ -39,9 +39,12 @@ const pct = d => { const p = Math.round(100 * (Math.pow(2, d) - 1)); return (p >
 function leyendaDiferencia() {
   const D = HIDRO.vis.diferencia, sat = Math.abs(D.saturacion), um = Math.abs(D.umbral), f = Math.abs(HIDRO.stats.frenaDlog);
   const pos = d => Math.round((0.5 - d / (2 * sat)) * 1000) / 10;   // dlog > 0 (acelera) a la izquierda, < 0 (frena) a la derecha
-  const pu = Math.round(um / sat * 500) / 10;                        // media zona "igual" (|dlog| < umbral): transparente
-  const stops = [D.colAcelera[1] + " 0%", D.colAcelera[0] + " " + (50 - pu) + "%", "rgba(128,128,128,.25) 50%", D.colFrena[0] + " " + (50 + pu) + "%", D.colFrena[1] + " 100%"];
-  const marcas = [sat, f, 0, -f, -sat].map((d, i, a) => {
+  // mismo trazado que el shader (runoff-diferencia.js): color sRGB lineal en |dlog| de umbral a saturación (colX[0] → colX[1]);
+  // alfa 0 hasta el umbral y rampa de 0,7·umbral por encima. La barra es lineal en dlog, así que los cortes coinciden.
+  const x = d => Math.round((50 + d / sat * 50) * 10) / 10, rampa = um * 1.7;
+  const c0 = hex => { const n = parseInt(hex.slice(1), 16); return "rgba(" + (n >> 16) + "," + (n >> 8 & 255) + "," + (n & 255) + ",0)"; };
+  const stops = [D.colAcelera[1] + " 0%", D.colAcelera[0] + " " + x(-rampa) + "%", c0(D.colAcelera[0]) + " " + x(-um) + "%", c0(D.colFrena[0]) + " " + x(um) + "%", D.colFrena[0] + " " + x(rampa) + "%", D.colFrena[1] + " 100%"];
+  const marcas = [sat, f, -f, -sat].map((d, i, a) => {
     const borde = i === 0 ? " runoff-m-ini" : i === a.length - 1 ? " runoff-m-fin" : "";
     return '<span class="runoff-marca' + borde + '" style="left:' + pos(d) + '%"><i></i>' + pct(d) + "</span>";
   }).join("");
