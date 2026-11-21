@@ -30,17 +30,17 @@
 
    QA (solo ?qa/?debug): ?pastoms=<ms de presupuesto> · window.__nav3dGrass { settle(), flush(), stats(), budget(ms) }. */
 import * as THREE from "three";
-import { A2_PASTO as PC, WIND_IDLE_DIST } from "../../core/config.js?v=20261121";
-import { quality } from "../../core/quality.js?v=20261121";
-import { params } from "../../core/state.js?v=20261121";
-import { mulberry32 } from "../../core/geo.js?v=20261121";
-import { patch } from "../shaderlib.js?v=20261121";
-import { idleDriver } from "../idle.js?v=20261121";
-import { applyAO, applyLod, cellSeed, chainShader } from "./chunks.js?v=20261121";
-import { map } from "../../map/style.js?v=20261121";
-import { fitSpheres, lowAt, terrain } from "../../terrain/terrain.js?v=20261121";   // A6 relieve en vivo
-import { uniforms } from "../lighting.js?v=20261121";
-import { GRASS_ATLAS, GRASS_TILE_COUNT, createAtlasJob } from "./grassgen.js?v=20261121";
+import { A2_PASTO as PC, WIND_IDLE_DIST } from "../../core/config.js?v=20261122";
+import { quality } from "../../core/quality.js?v=20261122";
+import { params } from "../../core/state.js?v=20261122";
+import { mulberry32 } from "../../core/geo.js?v=20261122";
+import { patch } from "../shaderlib.js?v=20261122";
+import { idleDriver } from "../idle.js?v=20261122";
+import { applyAO, applyLod, cellSeed, chainShader } from "./chunks.js?v=20261122";
+import { map } from "../../map/style.js?v=20261122";
+import { fitSpheres, lowAt, terrain } from "../../terrain/terrain.js?v=20261122";   // A6 relieve en vivo
+import { uniforms } from "../lighting.js?v=20261122";
+import { GRASS_ATLAS, GRASS_TILE_COUNT, createAtlasJob } from "./grassgen.js?v=20261122";
 
 const DBG = params.has("qa") || params.has("debug");
 /* ?pastocfg={"nearM":40,"lodPow":0.8,"byQuality":{"alta":{"R":300,"dens":1}}} se mezcla sobre A2_PASTO (solo ?qa/?debug; para afinar diales con capturas) */

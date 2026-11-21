@@ -1,5 +1,5 @@
-import { state } from "../core/state.js?v=20261121";
-import { map } from "../map/style.js?v=20261121";
+import { state } from "../core/state.js?v=20261122";
+import { map } from "../map/style.js?v=20261122";
 
 /* Eje central aproximado de un corredor (polígono alargado): vértices del
    anillo exterior proyectados sobre el eje principal (PCA) y promediados

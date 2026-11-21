@@ -29,17 +29,17 @@
    apagado, así que el desempate entre ellos es solo el orden; contra la malla de terreno de MapLibre se usa depthTest +
    polygonOffset(−2, −4) (mismo criterio que suelo y agua) y yOff por encima del suelo. */
 import * as THREE from "three";
-import { A1_SKY, A4_GROUND, HIDRO } from "../../core/config.js?v=20261121";
-import { quality } from "../../core/quality.js?v=20261121";
-import { on } from "../../core/events.js?v=20261121";
-import { idleDriver } from "../idle.js?v=20261121";
-import { map } from "../../map/style.js?v=20261121";
-import { lights, uniforms } from "../lighting.js?v=20261121";
-import { GLSL_ADFOG, GLSL_FOG_UNIFORMS, scenarioFade } from "../shaderlib.js?v=20261121";
-import { GLSL_DECL, lowAt, terrain, withReliefU } from "../../terrain/terrain.js?v=20261121";
-import { getState } from "../../hydro/state.js?v=20261121";
-import { pxToLonLat } from "../../hydro/grid.js?v=20261121";
-import { getWaveTex } from "./water.js?v=20261121";
+import { A1_SKY, A4_GROUND, HIDRO } from "../../core/config.js?v=20261122";
+import { quality } from "../../core/quality.js?v=20261122";
+import { on } from "../../core/events.js?v=20261122";
+import { idleDriver } from "../idle.js?v=20261122";
+import { map } from "../../map/style.js?v=20261122";
+import { lights, uniforms } from "../lighting.js?v=20261122";
+import { GLSL_ADFOG, GLSL_FOG_UNIFORMS, scenarioFade } from "../shaderlib.js?v=20261122";
+import { GLSL_DECL, lowAt, terrain, withReliefU } from "../../terrain/terrain.js?v=20261122";
+import { getState } from "../../hydro/state.js?v=20261122";
+import { pxToLonLat } from "../../hydro/grid.js?v=20261122";
+import { getWaveTex } from "./water.js?v=20261122";
 
 /* ---------- diales de esta vista (→ HIDRO: proponer como HIDRO.vis.natural en la próxima ronda del motor) ---------- */
 const NAT = {   // → HIDRO

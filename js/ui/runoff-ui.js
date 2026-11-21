@@ -3,9 +3,9 @@
    evento "runoff") y llama setMode. El relieve se prende por core/relief.js (setReliefSession: solo esta visita, no pisa la preferencia guardada del conmutador de relieve).
    La disponibilidad depende de terrain.stats, que llega asíncrono: se re-evalúa al armar y en "runoff", "relief:state" y "scenario".
    Se arma solo al importarse (el #panel ya está en el HTML); también se exporta armarEscorrentia() por si hace falta llamarlo. */
-import { on } from "../core/events.js?v=20261121";
-import { relief, onRelief, setReliefSession } from "../core/relief.js?v=20261121";
-import { getState, setMode } from "../hydro/state.js?v=20261121";
+import { on } from "../core/events.js?v=20261122";
+import { relief, onRelief, setReliefSession } from "../core/relief.js?v=20261122";
+import { getState, setMode } from "../hydro/state.js?v=20261122";
 
 const MOTIVOS = {
   llano: "Campo llano: el modelo de terreno no alcanza para simular el escurrimiento",
