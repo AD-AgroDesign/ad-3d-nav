@@ -143,3 +143,19 @@ Verificación: capturas en `.../scratchpad/f3/r2/` (`alta/{inicial,multi}-{home,
 `nat-antes/` y `nat-despues/` {home,cenital,conf-obl} de la natural, `apagado/`). Simulador apagado vs `dev/qa/baseline`: 12 pares, peor 0,0095 %
 (ruido), `stats()` sin claves nuevas. Prendido Alta home: 12 draws, 14 120 estelas, `runoffTexMB` 4,80 / 3,91. Consola sin errores (salvo GPU stall).
 Deuda: el halo se mide al borde de `inside` del motor (celdas de 15 m): borde con la forma del campo, no un círculo.
+
+## Ronda 3
+1. **Baja, "polilíneas angulares"**: eran las cuerdas de la cola (8 puntos, hasta 60 m entre puntos en los cauces rápidos) que doblan en las curvas
+   de confluencia. Dos arreglos: (a) la cola se marcha con pasos RK2 cortos (`STEP_M` = 6 m, menos de media celda) y se corta si el rumbo gira más
+   de 60° entre pasos (`TURN_COS` 0,5: zigzags de celdas sin salida); (b) el vertex shader dibuja cada tramo como spline Catmull-Rom (`SUB`
+   subdivisiones por tramo, `STATIC_SUB` = 3 en Baja y 1 en las animadas): curvas suaves que pasan por los puntos. Costo: +95 k tris en Baja
+   (3000 · 7 · 3 · 2 = 126 k de estelas).
+2. **Manchitas oscuras ovaladas en la cenital de cerca**: son del simulador, no de otro sistema. Ocultando mallas una por una desaparecen solo al
+   ocultar el mapa de velocidad: son la malla de terreno de MapLibre asomando por encima de la capa a < 0,3 m (patrón regular = teselado de la
+   malla; las veía solo en la cenital cerca porque el LIFT empieza a 600 m). Arreglo: subida fija `uLift0` = 0,4 m en el mapa y las estelas
+   (probado 0,1: quedan puntitos; 0,3: casi limpio; 0,4 de margen). La natural no la usa (sin cambio).
+3. **Rasante**: alfa de las estelas × `mix(0,06, 1, smoothstep(0,10, 0,55, seno de la elevación de la vista))` (`GRAZE`): el horizonte deja de ser una
+   banda blanca; el mapa de colores sigue igual.
+Verificación (`.../scratchpad/f3/r3/`): `antes/` y `despues/` (conf-cen, conf-ras inicial/multi, Alta), `antes-baja/` y `despues-baja/` (home y conf-obl),
+`off-baja/` (Baja sin simulador, para ver los polígonos), `who/` (diagnóstico de las manchitas). Simulador apagado vs baseline: 12 pares, peor 0,0128 %
+(ruido). Consola limpia (salvo GPU stall). `stamp_version --check` OK. Constantes nuevas `// → HIDRO`: `uLift0`, `STEP_M`, `TURN_COS`, `GRAZE`, `STATIC_SUB`.

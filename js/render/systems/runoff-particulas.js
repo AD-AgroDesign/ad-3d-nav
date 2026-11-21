@@ -32,31 +32,43 @@ const FADE_IN = 0.4, FADE_OUT = 0.6;   // s · envolvente de alfa al nacer / al 
 const DT_MAX = 0.1;                // s · tope del paso (volver de una pestaña dormida no tira las partículas al mar)
 const DIST_ALFA = [1500, 5000, 0.5];   // m · alfa pleno hasta [0], baja a [2] (× alfa) hacia [1]: de lejos el campo se lee por el mapa, no por una mancha blanca   // → HIDRO
 const DIST_FRAC = [2500, 7000, 0.35];  // m · fracción de estelas dibujadas: todas hasta [0], [2] hacia [1] (rango del draw, sin reasignar)   // → HIDRO
+const GRAZE = [0.10, 0.55, 0.06];   // seno del ángulo de elevación de la vista: alfa × [2] por debajo de [0], pleno desde [1] (el rasante no se vuelve una banda blanca)   // → HIDRO
+const STEP_M = 6;                  // m · paso máximo al marchar la cola (menos que una celda: la cola sigue las curvas, sin saltos entre celdas)   // → HIDRO
+const TURN_COS = 0.5;              // coseno mínimo entre pasos sucesivos al marchar la cola (60°); si no, la cola se corta   // → HIDRO
+const STATIC_SUB = 3;               // subdivisiones por tramo en Baja (estelas fijas: 3000 · 7 · 3 · 2 = 126 k tris)   // → HIDRO
 const FEATHER = 0.6;               // px · suavizado del borde de la cinta
 
+/* SUB = subdivisiones por tramo de la cola (define; 1 = animadas, más en Baja): cada tramo entre dos puntos se dibuja como un tramo de
+   spline Catmull-Rom (pasa por los puntos), así la cola es una curva suave y no una polilínea de cuerdas de hasta 60 m. */
 const VS = GLSL_DECL +
   "const int NP = " + NP + ";\nconst int TW = " + TEXW + ";\n" +
   "uniform sampler2D tP;\nuniform vec2 uPx;\nuniform float uHalf;\nuniform vec3 uDist;\n" +
   "varying vec3 vWp;\nvarying float vA;\nvarying float vSide;\n" +
-  "vec4 pt(int p, int k) { int i = p * NP + k; return texelFetch(tP, ivec2(i % TW, i / TW), 0); }\n" +
-  "uniform vec3 uCamPos;\nuniform float uLift;\n" +
-  "vec4 clipOf(vec3 q, out vec3 wp) {\n  vec4 w = modelMatrix * vec4(q, 1.0);\n  w.y -= a6Low(w.xz);\n  w.y += uLift * max(length(uCamPos - w.xyz) - 600.0, 0.0);\n  wp = w.xyz;\n  return projectionMatrix * viewMatrix * w;\n}\n" +
+  "vec3 pt(int p, int k) { int i = p * NP + k; return texelFetch(tP, ivec2(i % TW, i / TW), 0).xyz; }\n" +
+  "uniform vec3 uCamPos;\nuniform float uLift;\nuniform float uLift0;\n" +
+  "vec4 clipOf(vec3 q, out vec3 wp) {\n  vec4 w = modelMatrix * vec4(q, 1.0);\n  w.y -= a6Low(w.xz);\n  w.y += uLift * max(length(uCamPos - w.xyz) - 600.0, 0.0) + uLift0;\n  wp = w.xyz;\n  return projectionMatrix * viewMatrix * w;\n}\n" +
   "void main() {\n" +
-  "  int p = gl_InstanceID, k = gl_VertexID >> 1;\n" +
+  "  int p = gl_InstanceID, v = gl_VertexID >> 1;\n" +
   "  float side = float((gl_VertexID & 1) * 2 - 1);\n" +
-  "  vec4 c0 = pt(p, k);\n  float env = pt(p, 0).w;\n" +
+  "  int seg = min(v / SUB, NP - 2);\n  float t = float(v - seg * SUB) / float(SUB);\n" +
+  "  float env = texelFetch(tP, ivec2((p * NP) % TW, (p * NP) / TW), 0).w;\n" +
+  "  vec3 P0 = pt(p, max(seg - 1, 0)), P1 = pt(p, seg), P2 = pt(p, seg + 1), P3 = pt(p, min(seg + 2, NP - 1));\n" +
+  "  vec3 a1 = P2 - P0, a2 = 2.0 * P0 - 5.0 * P1 + 4.0 * P2 - P3, a3 = -P0 + 3.0 * P1 - 3.0 * P2 + P3;\n" +
+  "  vec3 pos = 0.5 * (2.0 * P1 + a1 * t + a2 * t * t + a3 * t * t * t);\n" +
+  "  vec3 dv = 0.5 * (a1 + 2.0 * a2 * t + 3.0 * a3 * t * t);\n" +
+  "  float dl = length(dv);\n  float eps = 0.5 + 0.01 * length(uCamPos - pos);\n" +
+  "  vec3 dn = dl > 1e-5 ? dv / dl * eps : vec3(0.0);\n" +
   "  vec3 wp, w1, w2;\n" +
-  "  vec4 C = clipOf(c0.xyz, wp);\n" +
-  "  vec4 A = clipOf(pt(p, max(k - 1, 0)).xyz, w1);\n" +
-  "  vec4 B = clipOf(pt(p, min(k + 1, NP - 1)).xyz, w2);\n" +
+  "  vec4 C = clipOf(pos, wp);\n  vec4 A = clipOf(pos - dn, w1);\n  vec4 B = clipOf(pos + dn, w2);\n" +
   "  vWp = wp;\n" +
-  "  if (C.w < 0.01 || A.w < 0.01 || B.w < 0.01 || env <= 0.0) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); vA = 0.0; vSide = 0.0; return; }\n" +
-  // tangente en píxeles (a través de los vecinos), perpendicular y desplazamiento en NDC
+  "  if (C.w < 0.01 || A.w < 0.01 || B.w < 0.01 || env <= 0.0 || dl <= 1e-5) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); vA = 0.0; vSide = 0.0; return; }\n" +
+  // tangente en píxeles, perpendicular y desplazamiento en NDC
   "  vec2 d = (B.xy / B.w - A.xy / A.w) / uPx;\n  float len = length(d);\n" +
   "  vec2 n = len > 1e-4 ? vec2(-d.y, d.x) / len : vec2(0.0);\n" +
   "  gl_Position = C;\n  gl_Position.xy += n * side * uHalf * uPx * C.w;\n" +
-  "  float s = float(k) / float(NP - 1);\n" +
+  "  float s = (float(seg) + t) / float(NP - 1);\n" +
   "  vA = env * pow(1.0 - s, 1.2) * mix(1.0, uDist.z, smoothstep(uDist.x, uDist.y, length(uCamPos - wp)));\n" +
+  "  vA *= mix(" + GRAZE[2].toFixed(3) + ", 1.0, smoothstep(" + GRAZE[0].toFixed(3) + ", " + GRAZE[1].toFixed(3) + ", (uCamPos.y - wp.y) / max(length(uCamPos - wp), 1.0)));\n" +
   "  vSide = side;\n}\n";
 
 const FS =
@@ -80,15 +92,19 @@ const FS =
 export function createParticles(ctx, key, shared, getCanvas) {
   const rnd = ctx.rng(0x7e1a + (key === "multi" ? 1 : 0));
   const geom = new THREE.InstancedBufferGeometry();
-  geom.setAttribute("position", new THREE.BufferAttribute(new Float32Array(2 * NP * 3), 3));   // ficticio: three exige position; el shader usa gl_VertexID
-  const idx = new Uint16Array((NP - 1) * 6);
-  for (let k = 0; k < NP - 1; k++) { const a = 2 * k; idx.set([a, a + 1, a + 2, a + 2, a + 1, a + 3], k * 6); }
-  geom.setIndex(new THREE.BufferAttribute(idx, 1));
+  const setSub = n => {   // índice y vértices ficticios según las subdivisiones por tramo
+    const V = (NP - 1) * n + 1, idx = new Uint16Array((V - 1) * 6);
+    for (let k = 0; k < V - 1; k++) { const a = 2 * k; idx.set([a, a + 1, a + 2, a + 2, a + 1, a + 3], k * 6); }
+    geom.setAttribute("position", new THREE.BufferAttribute(new Float32Array(2 * V * 3), 3));   // ficticio: three exige position; el shader usa gl_VertexID
+    geom.setIndex(new THREE.BufferAttribute(idx, 1));
+    return V;
+  };
+  let sub = 1, nVert = setSub(1);
   geom.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e6);
   geom.instanceCount = 0;
 
   const mat = new THREE.ShaderMaterial({
-    vertexShader: VS, fragmentShader: FS,
+    vertexShader: VS, fragmentShader: FS, defines: { SUB: 1 },
     uniforms: { ...shared, ...withReliefU({}), uFade: scenarioFade[key] || { value: 1 }, tP: { value: null },
       uPx: { value: new THREE.Vector2(0.002, 0.002) }, uHalf: { value: 1 }, uCore: { value: 1 }, uAlfa: { value: PV.alfaCabeza }, uOut: { value: 0 }, uDist: { value: new THREE.Vector3(...DIST_ALFA) },
       tIn: { value: null }, uG: { value: new THREE.Vector4(1, 0, 1, 0) }, uN: { value: new THREE.Vector2(1, 1) } }
@@ -156,18 +172,20 @@ export function createParticles(ctx, key, shared, getCanvas) {
     tdata[base] = x; tdata[base + 1] = yAt(x, z); tdata[base + 2] = z; tdata[base + 3] = env;
     let cx = x, cz = z, alive = sample(x, z) && _v > 0 && (_vx !== 0 || _vz !== 0);
     const sp = alive ? lenFor(_v) / (NP - 1) : 0;
+    const ns = Math.max(1, Math.ceil(sp / STEP_M)), h = sp / ns;
+    let pdx = 0, pdz = 0;   // dirección del paso anterior: un giro brusco (zigzag de celdas sin salida) corta la cola
     for (let k = 1; k < NP; k++) {
-      if (alive) {
+      for (let q = 0; q < ns && alive; q++) {   // varios pasos RK2 cortos por segmento: la cola sigue el campo sin saltar celdas
         sample(cx, cz);
         const l = Math.sqrt(_vx * _vx + _vz * _vz);
-        if (l < 1e-6) alive = false;
-        else {
-          const ux = _vx / l, uz = _vz / l;
-          if (sample(cx - ux * sp * 0.5, cz - uz * sp * 0.5)) {   // punto medio (RK2) aguas arriba
-            const l2 = Math.sqrt(_vx * _vx + _vz * _vz);
-            if (l2 > 1e-6) { cx -= _vx / l2 * sp; cz -= _vz / l2 * sp; } else cx -= ux * sp, cz -= uz * sp;
-          } else alive = false;
-        }
+        if (l < 1e-6) { alive = false; break; }
+        const ux = _vx / l, uz = _vz / l;
+        if ((pdx !== 0 || pdz !== 0) && ux * pdx + uz * pdz < TURN_COS) { alive = false; break; }
+        pdx = ux; pdz = uz;
+        if (sample(cx - ux * h * 0.5, cz - uz * h * 0.5)) {
+          const l2 = Math.sqrt(_vx * _vx + _vz * _vz);
+          if (l2 > 1e-6) { cx -= _vx / l2 * h; cz -= _vz / l2 * h; } else { cx -= ux * h; cz -= uz * h; }
+        } else alive = false;
       }
       const o = base + k * 4;
       tdata[o] = cx; tdata[o + 1] = yAt(cx, cz); tdata[o + 2] = cz; tdata[o + 3] = 1;
@@ -223,7 +241,9 @@ export function createParticles(ctx, key, shared, getCanvas) {
       const nAnim = (PV.presupuesto[q.name] | 0), nStat = q.name === "baja" ? (PV.estaticasBaja | 0) : 0;
       const m = nAnim > 0 ? "anim" : nStat > 0 ? "static" : "off", n = m === "anim" ? nAnim : m === "static" ? nStat : 0;
       if (m === mode && n === want) return;
-      mode = m; want = n; alloc(0); mesh.visible = false;   // la memoria se pide recién al mostrar (simulador apagado = nada asignado)
+      mode = m; want = n; alloc(0); mesh.visible = false;
+      const ns = m === "static" ? STATIC_SUB : 1;
+      if (ns !== sub) { sub = ns; mat.defines.SUB = ns; mat.needsUpdate = true; geom.dispose(); nVert = setSub(ns); }   // la memoria se pide recién al mostrar (simulador apagado = nada asignado)
     },
     /** Campo vigente (cada resultado, también al cambiar la lluvia): solo se cambian referencias; las estelas siguen. */
     setField(G, res, r) {
@@ -290,7 +310,7 @@ export function createParticles(ctx, key, shared, getCanvas) {
     release() { mesh.visible = false; alloc(0); cdf = null; cdfDirty = true; },
     dispose() { api.release(); geom.dispose(); mat.dispose(); },
     get count() { return mesh.visible ? nShow : 0; },
-    get tris() { return mesh.visible ? nShow * (NP - 1) * 2 : 0; },
+    get tris() { return mesh.visible ? nShow * (nVert - 1) * 2 : 0; },
     get texMB() { return tdata ? tdata.byteLength / 1048576 : 0; },
     get tickMs() { return ms; }
   };

@@ -137,7 +137,8 @@ const PART_IDLE_MAX = 8000;   // m · las estelas se ven (y se animan) desde muc
 
 /* Cámara y niebla, compartidos por referencia con lighting.js: los usan los tres materiales (natural, velocidad, estelas). */
 const SHARED = {
-  uCamPos: uniforms.uCamPos, uLift: { value: LIFT },
+  uCamPos: uniforms.uCamPos, uLift: { value: LIFT }, uLift0: { value: 0.4 },   // m · subida fija (cerca): la malla de MapLibre asoma en manchitas ovaladas a < 0,3 m del suelo   // → HIDRO
+   
   uFogColor: uniforms.uFogColor, uFogNear: uniforms.uFogNear, uFogFar: uniforms.uFogFar, uFogMax: uniforms.uFogMax, uFogRel: uniforms.uFogRel
 };
 
