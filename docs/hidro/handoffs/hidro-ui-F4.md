@@ -35,3 +35,5 @@ Servidor 8210, Chromium headless, campo sintético, a 1440/830/500/375 px (scrat
 
 ## Preguntas
 - ¿Preferís que las marcas muestren solo los lados "Frena" (−16 %, −55 %) y "Acelera" sin porcentajes?
+
+- Ajuste post-integración: leyenda de Diferencia sin marca "0" (+122, +19, −16, −55 %) y degradé con los cortes del shader (alfa 0 hasta umbral, rampa 0,7·umbral, colX[0]→colX[1] hasta saturación); captura del mapa en `scratchpad/f4/dif-mapa.png`.
