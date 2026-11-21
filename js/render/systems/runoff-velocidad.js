@@ -12,10 +12,10 @@
    con una rampa de la misma anchura. La salida pasa por la conversión sRGB → lineal → colorspace_fragment del renderer: en
    pantalla el color es exactamente turboCss(t) (la leyenda de la UI). Sin tone mapping (es un mapa de datos, no una superficie iluminada). */
 import * as THREE from "three";
-import { HIDRO } from "../../core/config.js?v=20261122";
-import { GLSL_DECL, withReliefU } from "../../terrain/terrain.js?v=20261122";
-import { GLSL_ADFOG, GLSL_FOG_UNIFORMS, scenarioFade } from "../shaderlib.js?v=20261122";
-import { GLSL_TURBO } from "./runoff-turbo.js?v=20261122";
+import { HIDRO } from "../../core/config.js?v=20261123";
+import { GLSL_DECL, withReliefU } from "../../terrain/terrain.js?v=20261123";
+import { GLSL_ADFOG, GLSL_FOG_UNIFORMS, scenarioFade } from "../shaderlib.js?v=20261123";
+import { GLSL_TURBO } from "./runoff-turbo.js?v=20261123";
 
 const VEL = HIDRO.vis.velocidad;
 

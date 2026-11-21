@@ -8,9 +8,9 @@
    Motivos conocidos de "no disponible": "llano" (campo llano) y "error"/"sin-dem" (no se pudo cargar el DEM).
    Este módulo: decide el relieve deseado (override de sesión setReliefSession > preferencia ad_relieve > default del nivel), lo aplica cuando cambia el nivel de
    calidad y expone el estado a la UI (ui/relief-ui.js). */
-import { on, EVENTS } from "./events.js?v=20261122";
-import { quality, reliefPref, setReliefPref, terrainEnabled } from "./quality.js?v=20261122";
-import * as TER from "../terrain/terrain.js?v=20261122";
+import { on, EVENTS } from "./events.js?v=20261123";
+import { quality, reliefPref, setReliefPref, terrainEnabled } from "./quality.js?v=20261123";
+import * as TER from "../terrain/terrain.js?v=20261123";
 
 for (const n of ["relief:state", "relief:auto-off"]) if (!EVENTS.includes(n)) EVENTS.push(n);   // el bus avisa si el evento no figura en EVENTS (events.js es de P)
 

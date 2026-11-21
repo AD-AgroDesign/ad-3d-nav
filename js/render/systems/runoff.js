@@ -30,20 +30,20 @@
    apagado, así que el desempate entre ellos es solo el orden; contra la malla de terreno de MapLibre se usa depthTest +
    polygonOffset(−2, −4) (mismo criterio que suelo y agua) y yOff por encima del suelo. */
 import * as THREE from "three";
-import { A1_SKY, A4_GROUND, HIDRO } from "../../core/config.js?v=20261122";
-import { quality } from "../../core/quality.js?v=20261122";
-import { on } from "../../core/events.js?v=20261122";
-import { idleDriver } from "../idle.js?v=20261122";
-import { map } from "../../map/style.js?v=20261122";
-import { lights, uniforms } from "../lighting.js?v=20261122";
-import { GLSL_ADFOG, GLSL_FOG_UNIFORMS, scenarioFade } from "../shaderlib.js?v=20261122";
-import { GLSL_DECL, lowAt, terrain, withReliefU } from "../../terrain/terrain.js?v=20261122";
-import { getState } from "../../hydro/state.js?v=20261122";
-import { pxToLonLat } from "../../hydro/grid.js?v=20261122";
-import { getWaveTex } from "./water.js?v=20261122";
-import { makeVelocityMaterial } from "./runoff-velocidad.js?v=20261122";
-import { createParticles } from "./runoff-particulas.js?v=20261122";
-export { turboCss } from "./runoff-turbo.js?v=20261122";   // la leyenda de la UI importa la paleta desde acá
+import { A1_SKY, A4_GROUND, HIDRO } from "../../core/config.js?v=20261123";
+import { quality } from "../../core/quality.js?v=20261123";
+import { on } from "../../core/events.js?v=20261123";
+import { idleDriver } from "../idle.js?v=20261123";
+import { map } from "../../map/style.js?v=20261123";
+import { lights, uniforms } from "../lighting.js?v=20261123";
+import { GLSL_ADFOG, GLSL_FOG_UNIFORMS, scenarioFade } from "../shaderlib.js?v=20261123";
+import { GLSL_DECL, lowAt, terrain, withReliefU } from "../../terrain/terrain.js?v=20261123";
+import { getState } from "../../hydro/state.js?v=20261123";
+import { pxToLonLat } from "../../hydro/grid.js?v=20261123";
+import { getWaveTex } from "./water.js?v=20261123";
+import { makeVelocityMaterial } from "./runoff-velocidad.js?v=20261123";
+import { createParticles } from "./runoff-particulas.js?v=20261123";
+export { turboCss } from "./runoff-turbo.js?v=20261123";   // la leyenda de la UI importa la paleta desde acá
 
 /* ---------- diales: HIDRO.vis.natural (antes constante local NAT) ---------- */
 const NAT = HIDRO.vis.natural;
