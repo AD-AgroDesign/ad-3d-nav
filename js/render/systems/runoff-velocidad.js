@@ -22,7 +22,7 @@ const VEL = HIDRO.vis.velocidad;
 const VS =
   "varying vec3 vWp;\n" +
   "uniform vec3 uCamPos;\nuniform float uLift;\n" +
-  "void main() {\n  vec4 w = modelMatrix * vec4(position, 1.0);\n  w.y -= a6Low(w.xz);\n  w.y += uLift * length(uCamPos - w.xyz);\n  vWp = w.xyz;\n" +
+  "void main() {\n  vec4 w = modelMatrix * vec4(position, 1.0);\n  w.y -= a6Low(w.xz);\n  w.y += uLift * max(length(uCamPos - w.xyz) - 600.0, 0.0);\n  vWp = w.xyz;\n" +
   "  gl_Position = projectionMatrix * viewMatrix * w;\n}\n";
 
 /* uG = afín escena→celda · uN = tamaño de la grilla · uVel = (log10 vMin, 1/rango log10, opacidad, alfa fuera) · uBorde = celdas */
@@ -40,12 +40,10 @@ const FS =
   "  ivec2 i0 = ivec2(floor(f));\n  vec2 t = f - vec2(i0);\n  t = t * t * (3.0 - 2.0 * t);\n" +
   "  float l = mix(mix(lv(i0), lv(i0 + ivec2(1, 0)), t.x), mix(lv(i0 + ivec2(0, 1)), lv(i0 + ivec2(1, 1)), t.x), t.y);\n" +
   "  vec3 col = srgb2lin(turbo((l - uVel.x) * uVel.y));\n" +
-  // dentro del campo (promedio 3×3 de la máscara, separada uBorde celdas) y rampa en el borde de la grilla
-  "  vec2 c = (f + 0.5) / uN;\n  vec2 r = vec2(uBorde) / uN;\n  float ins = 0.0;\n" +
-  "  for (int a = -1; a <= 1; a++) for (int b = -1; b <= 1; b++) ins += texture2D(tIn, c + vec2(float(a), float(b)) * r).r;\n" +
-  "  ins /= 9.0;\n" +
+  // halo del campo (R8 lineal: 1 dentro, 0 a ~300 m del borde) y rampa en el borde de la grilla
+  "  float ins = smoothstep(0.0, 1.0, texture2D(tIn, (f + 0.5) / uN).r);\n" +
   "  vec2 de = min(f, uN - 1.0 - f);\n  float eg = smoothstep(0.0, max(uBorde, 1.0), min(de.x, de.y));\n" +
-  "  float a = uVel.z * mix(uVel.w, 1.0, ins) * eg * uFade;\n" +
+  "  float a = uVel.z * ins * eg * uFade;\n" +
   "  if (a < 0.003) discard;\n" +
   "  gl_FragColor = vec4(col, a);\n" +
   "  #include <colorspace_fragment>\n" +
