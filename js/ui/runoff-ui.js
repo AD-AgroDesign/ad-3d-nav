@@ -13,7 +13,7 @@ const MOTIVOS = {
   llano: "Campo llano: el modelo de terreno no alcanza para simular el escurrimiento",
   "sin-dem": "Sin modelo de terreno"
 };
-const VISTAS = [{ id: "natural", txt: "Agua natural" }, { id: "velocidad", txt: "Velocidad" }];   // "Diferencia" llega en F4
+const VISTAS = [{ id: "natural", txt: "Agua natural" }, { id: "velocidad", txt: "Velocidad" }, { id: "diferencia", txt: "Diferencia" }];
 const LEYENDA_GRAD = "linear-gradient(90deg, #60a0c4, #1e5280)";   // somero → profundo (MODELO §6)
 
 const coma = n => String(n).replace(".", ",");
@@ -33,13 +33,44 @@ function leyendaVelocidad() {
     '<p class="runoff-sr">De ' + coma(HIDRO.vis.vMinMs) + " a " + coma(HIDRO.vis.vMaxMs) + " metros por segundo, en escala logarítmica.</p>" +
     "<p>Estelas: más largas donde el agua va más rápido</p>";
 }
+/* Diferencia: log2(v_multi/v_ini). Barra divergente "Acelera ← Igual → Frena" con los colores de HIDRO.vis.diferencia; marcas en % de cambio
+   de velocidad (%=100·(2^dlog − 1)) en dlog = ±saturación, ±|frenaDlog| y 0. Simétrica: el render pinta con la misma escala a ambos lados. */
+const pct = d => { const p = Math.round(100 * (Math.pow(2, d) - 1)); return (p > 0 ? "+" : p < 0 ? "−" : "") + Math.abs(p) + (p === 0 ? "" : " %"); };
+function leyendaDiferencia() {
+  const D = HIDRO.vis.diferencia, sat = Math.abs(D.saturacion), um = Math.abs(D.umbral), f = Math.abs(HIDRO.stats.frenaDlog);
+  const pos = d => Math.round((0.5 - d / (2 * sat)) * 1000) / 10;   // dlog > 0 (acelera) a la izquierda, < 0 (frena) a la derecha
+  const pu = Math.round(um / sat * 500) / 10;                        // media zona "igual" (|dlog| < umbral): transparente
+  const stops = [D.colAcelera[1] + " 0%", D.colAcelera[0] + " " + (50 - pu) + "%", "rgba(128,128,128,.25) 50%", D.colFrena[0] + " " + (50 + pu) + "%", D.colFrena[1] + " 100%"];
+  const marcas = [sat, f, 0, -f, -sat].map((d, i, a) => {
+    const borde = i === 0 ? " runoff-m-ini" : i === a.length - 1 ? " runoff-m-fin" : "";
+    return '<span class="runoff-marca' + borde + '" style="left:' + pos(d) + '%"><i></i>' + pct(d) + "</span>";
+  }).join("");
+  return '<p class="runoff-titulo">Cambio de velocidad del agua</p>' +
+    '<div class="runoff-barra runoff-vel" style="background:linear-gradient(90deg, ' + stops.join(", ") + ')" aria-hidden="true"></div>' +
+    '<div class="runoff-marcas" aria-hidden="true">' + marcas + "</div>" +
+    '<div class="runoff-escala runoff-escala-dif" aria-hidden="true"><span>Acelera</span><span>Igual</span><span>Frena</span></div>' +
+    '<p class="runoff-sr">Cambio de velocidad respecto del paisaje actual: a la izquierda donde el agua acelera, en el centro donde queda igual y a la derecha donde frena.</p>' +
+    "<p>Dónde el diseño multifuncional frena el agua respecto del paisaje actual.</p>" +
+    '<p class="runoff-traza"><i aria-hidden="true"></i>Línea punteada: corredores y parches del diseño</p>';
+}
+const nf = (n, d) => n.toLocaleString("es-AR", { minimumFractionDigits: d, maximumFractionDigits: d });
+function metricas(s) {
+  const st = s && s.result && s.result.stats;
+  if (!st) return "";
+  const f = Math.round(100 * (1 - Math.pow(2, HIDRO.stats.frenaDlog)));
+  const fila = (t, v) => '<li><span>' + t + "</span><b>" + v + "</b></li>";
+  return '<p class="runoff-titulo">Paisaje Actual → Paisaje Multifuncional</p><ul>' +
+    fila("Agua rápida (&gt; " + coma(HIDRO.stats.vAltaMs) + " m/s)", nf(st.inicial.haVMayor, 1) + " ha → " + nf(st.multi.haVMayor, 1) + " ha") +
+    fila("Velocidad media", nf(st.inicial.vMediaMs, 3) + " → " + nf(st.multi.vMediaMs, 3) + " m/s") +
+    fila("El diseño frena ≥ " + f + " % en", nf(st.frenaHa, 1) + " ha" + (st.campoHa ? " de " + nf(st.campoHa, 0) + " ha" : "")) + "</ul>";
+}
 function leyendaNatural() {
   return '<div class="runoff-barra" style="background:' + LEYENDA_GRAD + '" aria-hidden="true"></div>' +
     '<div class="runoff-escala"><span>Somero</span><span>Profundo</span></div>' +
     "<p>Agua natural: dónde se junta el agua en el pico de la lluvia. La lámina está exagerada a propósito para que se vea.</p>";
 }
 
-let sw, seg, estado, leyenda, leyendaDe = "", lluvia, lluviaIn, lluviaVal, calcTimer = 0, calcVisible = false, marcaMapa, rotulo, nota, bloque, pedidoUrl = null, avisoRelieve = false, modoUrl = "off";   // "off" de arranque: apagado no toca la URL (cero efecto)
+let metr, metrDe = "", sw, seg, estado, leyenda, leyendaDe = "", lluvia, lluviaIn, lluviaVal, calcTimer = 0, calcVisible = false, marcaMapa, rotulo, nota, bloque, pedidoUrl = null, avisoRelieve = false, modoUrl = "off";   // "off" de arranque: apagado no toca la URL (cero efecto)
 
 export function armarEscorrentia() {
   const panel = document.getElementById("panel");
@@ -95,10 +126,13 @@ export function armarEscorrentia() {
   nota = document.createElement("p");
   nota.id = "runoff-nota"; nota.setAttribute("role", "status"); nota.hidden = true;
 
-  bloque.append(fila, estado, seg, lluvia, leyenda, rotulo, nota);
+  metr = document.createElement("div");
+  metr.id = "runoff-metricas"; metr.setAttribute("aria-label", "Métricas del escurrimiento");
+
+  bloque.append(fila, estado, seg, lluvia, leyenda, metr, rotulo, nota);
   panel.insertBefore(bloque, panel.querySelector(".panel-footer"));
 
-  // ?escorrentia=natural|velocidad: se aplica en cuanto el campo admita el simulador
+  // ?escorrentia=natural|velocidad|diferencia: se aplica en cuanto el campo admita el simulador
   const m = location.search.match(/[?&]escorrentia=([^&]*)/);
   if (m && VISTAS.some(v => v.id === m[1])) pedidoUrl = m[1];
   pintar();
@@ -153,7 +187,11 @@ function pintar(s) {
   estado.classList.toggle("runoff-error", !!s.error);
   for (const b of seg.querySelectorAll(".runoff-btn")) b.setAttribute("aria-pressed", String(prendido && b.dataset.vista === s.mode));
   seg.hidden = leyenda.hidden = rotulo.hidden = lluvia.hidden = !prendido;
-  if (prendido && leyendaDe !== s.mode) { leyendaDe = s.mode; leyenda.innerHTML = s.mode === "velocidad" ? leyendaVelocidad() : leyendaNatural(); }
+  if (prendido && leyendaDe !== s.mode) { leyendaDe = s.mode; leyenda.innerHTML = s.mode === "velocidad" ? leyendaVelocidad() : s.mode === "diferencia" ? leyendaDiferencia() : leyendaNatural(); }
+  // métricas en las tres vistas (el resultado trae los dos escenarios siempre); se conserva el último valor mientras recalcula
+  const mt = prendido ? metricas(s) : "";
+  if (mt || !prendido) { if (mt !== metrDe) { metrDe = mt; metr.innerHTML = mt; } }
+  metr.hidden = !metr.innerHTML;
   if (String(lluviaIn.value) !== String(s.rainMmH)) lluviaIn.value = s.rainMmH;
   lluviaVal.textContent = s.rainMmH + " mm/h";
   lluviaIn.setAttribute("aria-valuetext", s.rainMmH + " milímetros por hora");
