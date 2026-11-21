@@ -1,7 +1,7 @@
-import { featureCentroid } from "../core/geo.js?v=20261129";
-import { HOME_VIEW, state } from "../core/state.js?v=20261129";
-import { map } from "../map/style.js?v=20261129";
-import { RAZANTE_CAM, corridorCenterline, flyAlongPath, makeFlight } from "./flight.js?v=20261129";
+import { featureCentroid } from "../core/geo.js?v=20261130";
+import { HOME_VIEW, state } from "../core/state.js?v=20261130";
+import { map } from "../map/style.js?v=20261130";
+import { RAZANTE_CAM, corridorCenterline, flyAlongPath, makeFlight } from "./flight.js?v=20261130";
 
 /* ---------- Tour de dron (recorrido distinto en cada vuelo) ---------- */
 export function shuffled(arr) {

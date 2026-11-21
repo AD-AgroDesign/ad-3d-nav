@@ -1,5 +1,5 @@
 /* hydro/runoff.js · acumulación MFD, caudal racional, Manning, suavizado log y estadísticos. Puro. MODELO §2.6–2.11. */
-import { boxN, NB_DI, NB_DJ } from "./flow.js?v=20261129";
+import { boxN, NB_DI, NB_DJ } from "./flow.js?v=20261130";
 
 /* Acumulación MFD de `peso` (Float64Array) recorriendo de mayor a menor F. `order` = orden de salida de la cola del relleno
    (no decreciente en F): al revés es el recorrido que hace falta. Devuelve Float64Array. */
