@@ -137,7 +137,19 @@
           <path d="M8 3.5 H4.5 A1 1 0 0 0 3.5 4.5 V8 M16 3.5 H19.5 A1 1 0 0 1 20.5 4.5 V8 M8 20.5 H4.5 A1 1 0 0 1 3.5 19.5 V16 M16 20.5 H19.5 A1 1 0 0 0 20.5 19.5 V16"/>
         </svg>
       </button>
-      <button id="btn-panel" title="Mostrar / ocultar panel">☰</button>
+      <button id="btn-runoff" type="button" title="Simulador de escorrentía" aria-label="Simulador de escorrentía" aria-controls="runoff-panel" aria-expanded="false">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M8.5 3.5 C8.5 3.5 4 8.6 4 11.6 a4.5 4.5 0 0 0 9 0 C13 8.6 8.5 3.5 8.5 3.5 Z"/>
+          <path d="M11.5 19.5 H20.5"/>
+          <path d="M17.5 16.5 20.5 19.5 17.5 22"/>
+        </svg>
+      </button>
+      <button id="btn-ajustes" type="button" title="Ajustes de la vista" aria-label="Ajustes de la vista" aria-controls="ajustes-panel" aria-expanded="false">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>
+        </svg>
+      </button>
+      <button id="btn-panel" aria-controls="panel" aria-expanded="true" title="Mostrar / ocultar panel">☰</button>
       <button id="btn-logout" title="Cerrar sesión">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M14.5 3.5H18a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2h-3.5"/>
@@ -182,6 +194,27 @@
     </div>
     <p class="impact-note" id="imp-note"></p>
   </div>
+  <div class="panel-footer">
+    <p>Alterná los escenarios y hacé click sobre las unidades del paisaje para ver su detalle.</p>
+  </div>
+</aside>
+
+<!-- Panel del simulador de escorrentía: hermano de #panel (uno a la vez); el bloque lo arma js/ui/runoff-ui.js -->
+<aside id="runoff-panel" class="panel-extra collapsed" aria-label="Simulador de escorrentía">
+  <button id="runoff-panel-close" class="panel-extra-close" type="button" aria-label="Cerrar panel del simulador" title="Cerrar panel">×</button>
+  <div class="panel-section" id="runoff-desc">
+    <h2 id="runoff-panel-title">Simulador de escorrentía</h2>
+    <p class="panel-extra-sub">Ilustrativo · pico de una lluvia</p>
+  </div>
+</aside>
+
+<!-- Panel "Ajustes": Calidad, Hora del día y Relieve (los arman quality-dd.js, presets-ui.js y relief-ui.js dentro de #quality-section, que vive acá) -->
+<aside id="ajustes-panel" class="panel-extra collapsed" aria-label="Ajustes de la vista">
+  <button id="ajustes-panel-close" class="panel-extra-close" type="button" aria-label="Cerrar ajustes" title="Cerrar panel">×</button>
+  <div class="panel-section" id="ajustes-desc">
+    <h2>Ajustes de la vista</h2>
+    <p class="panel-extra-sub">Calidad, hora del día y relieve</p>
+  </div>
   <div class="panel-section" id="quality-section">
     <h3>Calidad</h3>
     <select id="quality-select" aria-label="Calidad gráfica">
@@ -190,9 +223,6 @@
       <option value="media">Media</option>
       <option value="baja">Baja</option>
     </select>
-  </div>
-  <div class="panel-footer">
-    <p>Alterná los escenarios y hacé click sobre las unidades del paisaje para ver su detalle.</p>
   </div>
 </aside>
 
