@@ -197,3 +197,11 @@ Costo: ~0,5 MB por escenario en el campo sintético. `state.js` no necesita camb
 
 ## Pendiente
 - Quedó resuelta la pregunta de F1 sobre `Q`: se devuelve en ambos escenarios (decisión del dueño). La deuda "Ae/Q no se devuelven" queda cerrada para `Q`; `Ae` sigue sin devolverse.
+
+## F3 (diales nuevos en `HIDRO.vis`)
+Valores existentes sin cambios. Se agregó:
+- `natural`: los mismos valores que `NAT` de `runoff.js` (render puede reemplazar la constante por `HIDRO.vis.natural`; `yOff = A4_GROUND.yOffRelief + 0.04`).
+- `velocidad`: `opacidad` 0.85, `bordeSuaveCeldas` 3 (turbo sobre log10(v) en `[vMinMs, vMaxMs]`).
+- `particulas`: `presupuesto` {ultra 20000, alta 15000, media 8000, baja 0}, `vidaS` [2, 6], `puntosEstela` 8, `exageracion` 160, `anchoPx` 1.75, `alfaCabeza` 0.9, `estaticasBaja` 3000.
+  Cuenta de `exageracion`: la cola abarca ~2 s de historia a velocidad visual v·exageracion, entonces largo = v·exageracion·2 = v·320 (`estelaSegundos`) → 160.
+- `marca.texto`: "Ilustrativo · no es un estudio hidrológico".

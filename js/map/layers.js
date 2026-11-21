@@ -1,9 +1,9 @@
-import { CLASS_META, HERB_HEIGHT, HERB_LIKE_CLASSES, MISC_CLASSES, WOODY_BASE } from "../core/config.js?v=20261122";
-import { state } from "../core/state.js?v=20261122";
-import { setupInteractivity } from "./interact.js?v=20261122";
-import { map } from "./style.js?v=20261122";
-import { host } from "../render/host.js?v=20261122";
-import { terrain } from "../terrain/terrain.js?v=20261122";   // A6: con terreno las extrusiones pasan a fill drapeado (T14)
+import { CLASS_META, HERB_HEIGHT, HERB_LIKE_CLASSES, MISC_CLASSES, WOODY_BASE } from "../core/config.js?v=20261123";
+import { state } from "../core/state.js?v=20261123";
+import { setupInteractivity } from "./interact.js?v=20261123";
+import { map } from "./style.js?v=20261123";
+import { host } from "../render/host.js?v=20261123";
+import { terrain } from "../terrain/terrain.js?v=20261123";   // A6: con terreno las extrusiones pasan a fill drapeado (T14)
 
 export const clsFilter = (...classes) => ["in", ["get", "_cls"], ["literal", classes]];
 

@@ -539,7 +539,42 @@ export const HIDRO = {
     marcasMs: [0.02, 0.05, 0.1, 0.2, 0.5, 1, 1.5],
     hVisibleM: 0.02, hOpacoM: 0.2,         // lámina desde la que se ve el agua / donde ya es opaca
     estelaSegundos: 320, estelaMinM: 45, estelaMaxM: 420,   // largo de estela ≈ v·320 s, acotado
-    difUmbral: 0.06, difSatura: -1.15      // saturado en −55 % de velocidad (log2(0,45) = −1,15)
+    difUmbral: 0.06, difSatura: -1.15,     // saturado en −55 % de velocidad (log2(0,45) = −1,15)
+    /* lámina de agua "natural" (sistema runoff.js; antes la constante NAT) */
+    natural: {
+      colShallow: "#60a0c4", colDeep: "#1e5280",   // somero → profundo (MODELO §6)
+      yOff: A4_GROUND.yOffRelief + 0.04,           // m sobre heightAt: por encima del suelo y del margen de la malla de MapLibre
+      alphaMin: 0.20,                              // alfa de la lámina recién visible (h ≈ hVisibleM)
+      alphaMax: 0.95,                              // alfa con lámina ≥ hOpacoM
+      edgeNoise: 0.6,                              // celdas · distorsión de dominio del borde (ruido estático)
+      outside: 0.35,                               // alfa relativa fuera del campo (cuenca de aporte atenuada)
+      gain: 0.82,                                  // calibración del cuerpo (igual que A4_WATER.gain)
+      waveScale: [5, 11],                          // m · período de las dos capas de normales
+      waveSlope: 0.30,                             // pendiente máx. de las normales
+      waveFade: [160, 600],                        // m · las ondas se aplanan con la distancia
+      cycle: 2.0,                                  // s · ciclo de las dos fases cruzadas del flowmap
+      speedBase: 0.15, speedGain: 2.0,             // rapidez visual de las ondas (m/s) = base + gain·v
+      reflection: 0.55, spec: [300, 0.8], f0: 0.02,   // reflejo, brillo especular [exponente, intensidad], reflectancia a 0°
+      idleMaxDist: 1500                            // m · más lejos no hace falta animar en reposo
+    },
+    /* mapa de velocidad: turbo sobre log10(v) en [vMinMs, vMaxMs] */
+    velocidad: {
+      opacidad: 0.85,                              // alfa del mapa sobre el satélite
+      bordeSuaveCeldas: 3                          // celdas · difuminado del borde del campo
+    },
+    /* partículas de flujo */
+    particulas: {
+      presupuesto: { ultra: 20000, alta: 15000, media: 8000, baja: 0 },   // partículas animadas por calidad
+      vidaS: [2, 6],                               // s · vida de cada partícula (rango aleatorio)
+      puntosEstela: 8,                             // puntos de la cola
+      /* velocidad visual = v·exageracion m/s. La cola abarca ~2 s de historia, así que su largo es
+         v·exageracion·2 = v·estelaSegundos (320) → exageracion = 160 */
+      exageracion: 160,
+      anchoPx: 1.75,                               // px · ancho de la estela
+      alfaCabeza: 0.9,                             // alfa en la cabeza (la cola se desvanece)
+      estaticasBaja: 3000                          // estelas estáticas precalculadas en Baja (sin animación)
+    },
+    marca: { texto: "Ilustrativo · no es un estudio hidrológico" }   // marca chica sobre el mapa mientras el simulador está prendido
   },
   /* --- worker --- */
   worker: { tiempoMaxMs: 1500 }            // objetivo de PLAN §5 (los dos escenarios); solo informativo
