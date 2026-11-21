@@ -16,6 +16,7 @@ import { initTerrain } from "./terrain/terrain.js?v=20261121";   // A6: relieve 
 import "./render/atmo.js?v=20261121";   // A1: capa atmo-fog (se registra sola en host.registerBeforeLayer, antes de addScenarioLayers)
 import "./ui/controls.js?v=20261121";
 import "./ui/presets-ui.js?v=20261121";   // A1 (3.1): botones de modo de hora
+import "./ui/runoff-ui.js?v=20261121";    // F2: bloque "Simulador de escorrentía" (se arma solo al importarse)
 import "./debug/fps.js?v=20261121";
 import "./debug/qa-api.js?v=20261121";
 
