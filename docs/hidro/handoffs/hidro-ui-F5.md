@@ -28,3 +28,7 @@ Los avisos de desborde de `.runoff-marcas`/`.runoff-sr` en velocidad/diferencia 
 ## Preguntas
 - ¿Querés que el interruptor del bloque cambie de rótulo (p. ej. "Mostrar simulación") ahora que el panel ya se titula igual?
 - ¿Cerrar con Escape los paneles? No se hizo (no era obligatorio).
+
+## Ajuste posterior (pedido del dueño)
+- Interruptor ahora dice "Mostrar simulación" (el `aria-labelledby` apunta al mismo rótulo). Mayúscula tras "·": subtítulo del panel, rótulo del bloque y marca del mapa (`HIDRO.vis.marca.texto`, string autorizado).
+- Scrollbar en Ajustes: la causa era el menú de calidad oculto (absoluto) que agrandaba el área desplazable de un panel con `overflow-y: auto`. `#ajustes-panel` pasa a `overflow: visible` (sin relleno de 150 px) y el menú se dibuja por encima del borde; escritorio abre hacia abajo, hoja móvil hacia arriba. El panel del simulador conserva scroll solo si no entra (a 375 px con 800 px de alto, el tope del 45 % de la hoja).

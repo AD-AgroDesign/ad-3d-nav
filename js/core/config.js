@@ -602,7 +602,7 @@ export const HIDRO = {
       /* métricas del panel: nombres exactos en result.stats (ver handoff F4) */
       metricas: ["inicial.haVMayor", "multi.haVMayor", "inicial.vMediaMs", "multi.vMediaMs", "frenaHa"]
     },
-    marca: { texto: "Ilustrativo · no es un estudio hidrológico" }   // marca chica sobre el mapa mientras el simulador está prendido
+    marca: { texto: "Ilustrativo · No es un estudio hidrológico" }   // marca chica sobre el mapa mientras el simulador está prendido
   },
   /* --- worker --- */
   worker: { tiempoMaxMs: 1500 }            // objetivo de PLAN §5 (los dos escenarios); solo informativo

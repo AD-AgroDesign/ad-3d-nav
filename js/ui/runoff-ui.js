@@ -85,7 +85,7 @@ export function armarEscorrentia() {
   const fila = document.createElement("div");
   fila.id = "runoff-fila";
   const lab = document.createElement("span");
-  lab.className = "runoff-label"; lab.id = "runoff-label"; lab.textContent = "Simulador de escorrentía";
+  lab.className = "runoff-label"; lab.id = "runoff-label"; lab.textContent = "Mostrar simulación";
   sw = document.createElement("button");
   sw.type = "button"; sw.id = "runoff-sw"; sw.setAttribute("role", "switch"); sw.setAttribute("aria-labelledby", "runoff-label");
   sw.setAttribute("aria-describedby", "runoff-estado"); sw.innerHTML = '<span class="runoff-knob"></span>';
@@ -218,7 +218,7 @@ function pintar(s) {
   marcarMapa(prendido);
   sincBoton();
   bloque.setAttribute("aria-busy", String(!!calc));
-  rotulo.textContent = "Ilustrativo · pico de una lluvia de " + s.rainMmH + " mm/h · no es un estudio hidrológico";
+  rotulo.textContent = "Ilustrativo · Pico de una lluvia de " + s.rainMmH + " mm/h · No es un estudio hidrológico";
   let n = "";
   if (prendido && !relief.active) n = "El relieve está apagado: el agua se ve mejor con el relieve del terreno prendido.";
   else if (prendido && avisoRelieve) n = "Prendimos el relieve del terreno para esta visita: el agua lo necesita para verse.";
