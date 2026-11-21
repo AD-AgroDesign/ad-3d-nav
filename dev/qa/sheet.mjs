@@ -15,7 +15,7 @@ if (pair) {
 // rótulo "vista · escenario" a partir de "<escenario>[-modo]-<vista>.png"
 const label = (f, tag) => {
   const n = path.basename(f, '.png'), m = n.match(/^(inicial|multi)-(.*)$/);
-  const vista = m ? m[2].replace('sinrelieve-', 'sin relieve · ') : n;
+  const vista = m ? m[2].replace('sinrelieve-', 'sin relieve · ').replace('baja-', 'Baja · ').replace(/-?(\d+)mmh$/, ' · $1 mm/h') : n;
   return (m ? `${vista} · ${m[1]}` : n) + (tag ? ` · ${tag}` : '');
 };
 const cols = pair ? +(a.cols || 2) : +(a.cols || 4);   // pares: 2 por fila por defecto; --cols 4 = dos pares por fila

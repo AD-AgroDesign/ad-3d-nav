@@ -28,6 +28,16 @@ node runoff.mjs --out out/runoff         # antes (apagado) / después (natural):
 node sheet.mjs --pair out/runoff/antes out/runoff/despues --cols 4 --cell 400 --out hoja_g1.jpg
 node panel.mjs --out out/panel --sheet hoja_panel.jpg   # bloque del simulador apagado/prendido/deshabilitado a 1440/830/500/375
 ```
+Simulador, Velocidad (G2, desde F3):
+```bash
+node velocidad.mjs --out out/velocidad   # Velocidad apagado/prendido (home, cenital, 3 de la confluencia, inicial y multi, Alta), Baja, lluvia 10/100,
+                                         # relieve apagado, Agua natural, fundido de escenarios (draws), tick de estelas; medidas.json. Opción --only alta,baja,lluvia,relieve,natural,fundido
+node panel_g2.mjs --out out/panel_g2 --sheet hoja_panel.jpg   # panel en Agua natural y Velocidad (leyenda, deslizador) y la marca "Ilustrativo" a 1440/830/500/375
+node sheet.mjs --pair out/velocidad/alta-antes out/velocidad/alta-despues --cols 4 --cell 440 --out hoja_g2.jpg
+```
+Las estelas son animadas y su dt viene de los frames reales: no son deterministas entre tomas (3-11 % de píxeles distintos entre dos tomas
+del mismo encuadre). Para ruido de las estelas, comparar contra `alta-repeticion`, no contra la línea base.
+
 Opciones de `capture.mjs`: `--base`, `--query` (default `fixture=demo_relieve`), `--extra` (default
 `&terreno=1&calidad=alta`), `--views all|lista`, `--scenario ini|multi|both`, `--hide-ui`, `--runoff modos`, `--wait ms`.
 
