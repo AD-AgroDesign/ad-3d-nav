@@ -6,11 +6,11 @@
      - evento "relief:state"    payload { active, available, reason }   cada vez que cambia el estado
      - evento "relief:auto-off" payload { reason }                      A6 lo apagó sola por fluidez
    Motivos conocidos de "no disponible": "llano" (campo llano) y "error"/"sin-dem" (no se pudo cargar el DEM).
-   Este módulo: decide el relieve deseado (preferencia ad_relieve > default del nivel), lo aplica cuando cambia el nivel de
+   Este módulo: decide el relieve deseado (override de sesión setReliefSession > preferencia ad_relieve > default del nivel), lo aplica cuando cambia el nivel de
    calidad y expone el estado a la UI (ui/relief-ui.js). */
-import { on, EVENTS } from "./events.js?v=20261120";
-import { quality, reliefPref, setReliefPref, terrainEnabled } from "./quality.js?v=20261120";
-import * as TER from "../terrain/terrain.js?v=20261120";
+import { on, EVENTS } from "./events.js?v=20261201";
+import { quality, reliefPref, setReliefPref, terrainEnabled } from "./quality.js?v=20261201";
+import * as TER from "../terrain/terrain.js?v=20261201";
 
 for (const n of ["relief:state", "relief:auto-off"]) if (!EVENTS.includes(n)) EVENTS.push(n);   // el bus avisa si el evento no figura en EVENTS (events.js es de P)
 
@@ -52,7 +52,7 @@ export async function syncRelief({ animate = true } = {}) {
   try {
     do {
       again = false;
-      const want = relief.autoOff && reliefPref() === null ? false : terrainEnabled(quality);
+      const want = _sesion !== null ? _sesion : relief.autoOff && reliefPref() === null ? false : terrainEnabled(quality);
       if (relief.available !== false && want !== relief.active) {
         const r = apiSetRelief(want, { animate });
         if (r && r.then) await r;
@@ -63,8 +63,19 @@ export async function syncRelief({ animate = true } = {}) {
   busy = false;
 }
 
-/* El usuario toca el conmutador: se recuerda y se aplica. */
+/* Override SOLO de esta visita (en memoria, sin localStorage): lo usa el simulador de escorrentía para prender el relieve que
+   el usuario tenía apagado sin pisar su preferencia ad_relieve; al recargar vuelve a lo de siempre. Manda sobre la preferencia
+   y el default del nivel, y sobrevive a los cambios de calidad. */
+let _sesion = null;
+export function setReliefSession(on_) {
+  _sesion = !!on_;
+  if (_sesion) relief.autoOff = false;   // igual que setReliefUser: pedido explícito, se aplica aunque A6 lo haya apagado por fluidez
+  return syncRelief({ animate: true });
+}
+
+/* El usuario toca el conmutador: se recuerda y se aplica (y borra el override de sesión: manda lo que toca). */
 export function setReliefUser(on_) {
+  _sesion = null;
   setReliefPref(!!on_);
   relief.autoOff = false;
   return syncRelief({ animate: true });

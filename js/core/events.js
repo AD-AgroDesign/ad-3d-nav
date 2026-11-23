@@ -3,8 +3,9 @@
      "scenario"  payload: { key, prev }        al cambiar de escenario (map/scenario.js)
      "preset"    payload: { name }             modo de hora (A1, Ola 3; todavía nadie lo emite)
      "quality"   payload: quality              al cambiar el nivel de calidad (core/quality.js)
-     "frame"     payload: frame                cada frame de la capa custom (render/host.js) */
-export const EVENTS = ["scenario", "preset", "quality", "frame"];
+     "frame"     payload: frame                cada frame de la capa custom (render/host.js)
+     "runoff"    payload: estado del simulador al cambiar lluvia/suelo/escenario (hydro/state.js) */
+export const EVENTS = ["scenario", "preset", "quality", "frame", "runoff"];
 
 const handlers = {};
 

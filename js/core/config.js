@@ -488,3 +488,124 @@ export const A5_FAUNA = {
   if ((q.has("debug") || q.has("qa")) && q.get("fauna") === "0") A5_FAUNA.enabled = false;
 }
 /* === A5: fin === */
+
+/* === HIDRO: inicio === */
+/* Simulador de escorrentía (js/hydro/**). Modelo y fuentes de cada número: docs/hidro/MODELO.md.
+   Los módulos de cálculo (grid/fill/flow/classes/runoff) son puros y corren también en el worker y en Node, donde
+   este archivo no se puede importar (toca window/location): reciben estos valores por parámetro (state.js los arma
+   con `paramsMotor()` y los manda en el mensaje al worker). Nada de números mágicos en hydro/. */
+export const HIDRO = {
+  /* --- lluvia --- */
+  rain: { default: 50, min: 10, max: 100, step: 5 },   // mm/h, intensidad en el pico (deslizador F3)
+  pCn: 80,                  // mm · lámina de diseño con la que se calcula C = Q_cn(P)/P (MODELO §2.6)
+  /* --- grilla --- */
+  zoom: 13,                 // DEM terrarium z13 (mismo que A6_TERRAIN.demZoom)
+  metrosPorPx0: 156543.03392,   // m/píxel a z0 en el ecuador (la celda es esto / 2^z · cos(lat))
+  margenCuencaM: 1500,      // m · margen alrededor del campo: el agua viene de afuera del lote
+  /* --- relleno y flujo --- */
+  epsFill: 1e-4,            // m · épsilon del Priority-Flood (Barnes 2014)
+  mfdP: 3,                  // exponente de Holmgren
+  contorno: { cardinal: 0.5, diagonal: 0.354 },   // largos de contorno de Quinn
+  sMin: 0.004,              // m/m · piso de la pendiente local
+  pasadasDir: 2,            // cajas 3×3 sobre la dirección media
+  pasadasPendiente: 2,      // cajas 3×3 sobre el DEM antes de derivar
+  eps: { dir: 1e-9, hMin: 1e-6, vMin: 1e-4 },   // normalización de la dirección · piso de h en v=q/h · piso de v en log
+  /* --- clases: _cls → CN (grupo B) y n de Manning (MODELO §3). "supuesto" = a validar por un especialista --- */
+  claseFuera: "agri",       // lo que no cae en ningún polígono se trata como agrícola
+  clases: {
+    "agri":          { cn: 78, n: 0.10 },   // TR-55 cultivo en hileras
+    "zona1":         { cn: 78, n: 0.10 },
+    "zona2":         { cn: 78, n: 0.10 },
+    "zona3":         { cn: 78, n: 0.10 },
+    "otros":         { cn: 78, n: 0.10 },
+    "corr-herb":     { cn: 61, n: 0.24 },   // TR-55 pastura buena, dense grasses
+    "parche-herb":   { cn: 61, n: 0.24 },
+    "corr-le":       { cn: 55, n: 0.40 },   // TR-55 bosque bueno, woods light underbrush
+    "parche-le":     { cn: 55, n: 0.40 },
+    "instalaciones": { cn: 86, n: 0.05 },   // supuesto
+    "camino":        { cn: 82, n: 0.03 },   // TR-55 caminos de tierra
+    "ganaderia":     { cn: 69, n: 0.15 },   // supuesto, a validar
+    "suelo-desnudo": { cn: 86, n: 0.05 },   // supuesto, a validar
+    "bajo":          { cn: 70, n: 0.24 },   // supuesto, a validar
+    "agua":          { cn: 98, n: 0.03 }    // supuesto
+  },
+  /* --- disponibilidad (MODELO §4): mismos umbrales que la activación automática del terreno --- */
+  disponibilidad: { desvioResidual: A6_TERRAIN.auto.desvioResidual, pendienteP95: A6_TERRAIN.auto.pendienteP95 },
+  /* --- estadísticos --- */
+  stats: { vAltaMs: 0.3, frenaDlog: -0.25 },   // ha con v > 0,3 m/s · "frena ≥ 16 %" = log2(v_multi/v_ini) < −0,25
+  /* --- visualización (la usan render y UI; el motor solo la guarda) --- */
+  vis: {
+    opacidad: { default: 1, min: 0.1, max: 1, step: 0.05 },   // slider del panel: transparencia de las capas del simulador (independiente del diseño)
+    vMinMs: 0.02, vMaxMs: 1.5,             // rango de la paleta turbo (log10) y de la leyenda
+    marcasMs: [0.02, 0.05, 0.1, 0.2, 0.5, 1, 1.5],
+    hVisibleM: 0.02, hOpacoM: 0.2,         // lámina desde la que se ve el agua / donde ya es opaca
+    estelaSegundos: 320, estelaMinM: 45, estelaMaxM: 420,   // largo de estela ≈ v·320 s, acotado
+    /* lámina de agua "natural" (sistema runoff.js; antes la constante NAT) */
+    natural: {
+      colShallow: "#60a0c4", colDeep: "#1e5280",   // somero → profundo (MODELO §6)
+      yOff: A4_GROUND.yOffRelief + 0.04,           // m sobre heightAt: por encima del suelo y del margen de la malla de MapLibre
+      alphaMin: 0.20,                              // alfa de la lámina recién visible (h ≈ hVisibleM)
+      alphaMax: 0.95,                              // alfa con lámina ≥ hOpacoM
+      edgeNoise: 0.6,                              // celdas · distorsión de dominio del borde (ruido estático)
+      outside: 0.35,                               // alfa relativa fuera del campo (cuenca de aporte atenuada)
+      gain: 0.82,                                  // calibración del cuerpo (igual que A4_WATER.gain)
+      waveScale: [5, 11],                          // m · período de las dos capas de normales
+      waveSlope: 0.30,                             // pendiente máx. de las normales
+      waveFade: [160, 600],                        // m · las ondas se aplanan con la distancia
+      cycle: 2.0,                                  // s · ciclo de las dos fases cruzadas del flowmap
+      speedBase: 0.15, speedGain: 2.0,             // rapidez visual de las ondas (m/s) = base + gain·v
+      reflection: 0.55, spec: [300, 0.8], f0: 0.02,   // reflejo, brillo especular [exponente, intensidad], reflectancia a 0°
+      idleMaxDist: 1500                            // m · más lejos no hace falta animar en reposo
+    },
+    /* mapa de velocidad: turbo sobre log10(v) en [vMinMs, vMaxMs] */
+    velocidad: {
+      opacidad: 0.85,                              // alfa del mapa sobre el satélite
+      bordeSuaveCeldas: 3,                         // celdas · difuminado del borde del campo
+      /* subida del agua sobre el relieve (uLift; en runoff.js era LIFT/uLift0): y += liftDist·max(dist_cam − liftDistDesdeM, 0) + liftFijoM.
+         liftDist (m por m) y liftDistDesdeM aplican a TODAS las capas (natural, velocidad, estelas); liftFijoM solo a velocidad y estelas (la natural no lo usa) */
+      liftDist: 0.002, liftDistDesdeM: 600, liftFijoM: 0.4,
+      haloM: 300                                   // m · el mapa se desvanece a 0 a esta distancia del borde del campo
+    },
+    /* partículas de flujo */
+    particulas: {
+      presupuesto: { ultra: 20000, alta: 15000, media: 8000, baja: 0 },   // partículas animadas por calidad
+      vidaS: [2, 6],                               // s · vida de cada partícula (rango aleatorio)
+      puntosEstela: 8,                             // puntos de la cola
+      /* velocidad visual = v·exageracion m/s. La cola abarca ~2 s de historia, así que su largo es
+         v·exageracion·2 = v·estelaSegundos (320) → exageracion = 160 */
+      exageracion: 160,
+      anchoPx: 1.75,                               // px · ancho de la estela
+      alfaCabeza: 0.9,                             // alfa en la cabeza (la cola se desvanece)
+      estaticasBaja: 3000,                         // estelas estáticas precalculadas en Baja (sin animación)
+      factorMovil: 0.5,                            // × presupuesto de partículas con IS_MOBILE (G2-1a); lo aplica el render
+      idleMaxDistM: 8000,                          // m · las estelas se animan en reposo hasta esta distancia de la cámara (la natural: 1500)
+      yExtraM: 0.06,                               // m · sobre la grilla del mapa de velocidad
+      pesoFuera: 0.05,                             // peso de reaparición de una celda fuera del campo vs una de adentro
+      pesoRapidez: 2.0,                            // peso extra en celdas rápidas (cauces angostos)
+      fadeInS: 0.4, fadeOutS: 0.6,                 // s · envolvente de alfa al nacer / al morir
+      distAlfa: [1500, 5000, 0.5],                 // m · alfa pleno hasta [0], baja a [2]× hacia [1]
+      distFrac: [2500, 7000, 0.35],                // m · fracción de estelas dibujadas: todas hasta [0], [2] hacia [1]
+      rasante: [0.10, 0.55, 0.06],                 // seno de elevación de la vista: alfa × [2] bajo [0], pleno desde [1]
+      pasoColaM: 6,                                // m · paso máximo al marchar la cola
+      giroColaCos: 0.5,                            // coseno mínimo entre pasos de la cola (60°); si no, se corta
+      subdivBaja: 3                                // subdivisiones por tramo en Baja (estelas fijas)
+    },
+    /* vista Diferencia (MODELO §6): log2(v_multi/v_ini) divergente; frena = azul, acelera = naranja/rojo */
+    diferencia: {
+      umbral: 0.06, saturacion: -1.15,             // única fuente (antes difUmbral/difSatura); saturado en −55 % de velocidad (log2(0,45) = −1,15)
+      colFrena: ["#96cdff", "#1946c8"],            // de umbral a saturación, desaturando hacia el satélite
+      colAcelera: ["#ffbe8c", "#c8321e"],
+      opacidad: 0.85,                              // igual que velocidad
+      traza: {                                     // contorno punteado del diseño (corredores y parches)
+        clases: ["corr-herb", "corr-le", "parche-herb", "parche-le"],
+        color: "#ffffff", alfa: 0.9, rayaPx: 8, huecoPx: 6, anchoPx: 1.5
+      },
+      /* métricas del panel: nombres exactos en result.stats (ver handoff F4) */
+      metricas: ["inicial.haVMayor", "multi.haVMayor", "inicial.vMediaMs", "multi.vMediaMs", "frenaHa"]
+    },
+    marca: { texto: "Ilustrativo · No es un estudio hidrológico" }   // marca chica sobre el mapa mientras el simulador está prendido
+  },
+  /* --- worker --- */
+  worker: { tiempoMaxMs: 1500 }            // objetivo de PLAN §5 (los dos escenarios); solo informativo
+};
+/* === HIDRO: fin === */

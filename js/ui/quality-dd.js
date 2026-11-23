@@ -39,7 +39,7 @@ export function armarQualityDD() {
     e.stopPropagation(); sync();
     const abrir = !dd.classList.contains("open");
     if (abrir) {   // el panel recorta (overflow-y): si el menú no entra debajo del botón, se abre hacia arriba
-      const panel = document.getElementById("panel"), lim = panel ? panel.getBoundingClientRect().bottom : innerHeight;
+      const panel = btn.closest("aside"), lim = panel ? panel.getBoundingClientRect().bottom : innerHeight;
       dd.classList.toggle("arriba", btn.getBoundingClientRect().bottom + menu.offsetHeight + 10 > lim);
     }
     dd.classList.toggle("open", abrir); btn.setAttribute("aria-expanded", String(abrir));

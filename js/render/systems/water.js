@@ -22,15 +22,15 @@
        document.hidden, y no repinta si el tiempo está congelado (freezeTime). Calidad Baja: sin malla (plano de MapLibre).
    T9: `*-agua-fill` queda con opacidad 0,001 (clic/popup); `*-agua-line` en config (0). En Baja se restauran (0,38 / 0,7). */
 import * as THREE from "three";
-import { A1_SKY, A4_GROUND, A4_WATER as CFG } from "../../core/config.js?v=20261120";
-import { HOME_VIEW, params } from "../../core/state.js?v=20261120";
-import { quality } from "../../core/quality.js?v=20261120";
-import { idleDriver } from "../idle.js?v=20261120";
-import { map } from "../../map/style.js?v=20261120";
-import { lights, uniforms } from "../lighting.js?v=20261120";
-import { GLSL_ADFOG, GLSL_FOG_UNIFORMS, scenarioFade } from "../shaderlib.js?v=20261120";
-import { GLSL_DECL, lowAt, withReliefU } from "../../terrain/terrain.js?v=20261120";   // A6 relieve en vivo
-import { dedupRing, triangulatePoly } from "./ground.js?v=20261120";
+import { A1_SKY, A4_GROUND, A4_WATER as CFG } from "../../core/config.js?v=20261201";
+import { HOME_VIEW, params } from "../../core/state.js?v=20261201";
+import { quality } from "../../core/quality.js?v=20261201";
+import { idleDriver } from "../idle.js?v=20261201";
+import { map } from "../../map/style.js?v=20261201";
+import { lights, uniforms } from "../lighting.js?v=20261201";
+import { GLSL_ADFOG, GLSL_FOG_UNIFORMS, scenarioFade } from "../shaderlib.js?v=20261201";
+import { GLSL_DECL, lowAt, withReliefU } from "../../terrain/terrain.js?v=20261201";   // A6 relieve en vivo
+import { dedupRing, triangulatePoly } from "./ground.js?v=20261201";
 
 const wanted = () => CFG.enabled && !((params.has("qa") || params.has("debug")) && params.get("agua") === "off");   // ?agua=off: solo ?qa/?debug
 
@@ -39,7 +39,7 @@ const wanted = () => CFG.enabled && !((params.has("qa") || params.has("debug")) 
    envoltura. RG = pendiente (x,z) codificada 0..1 alrededor de 0,5; B = altura (variación del reborde y de la profundidad). */
 const WN = 256;
 let waveTex = null;
-function getWaveTex() {
+export function getWaveTex() {
   if (waveTex) return waveTex;
   const N = WN, h = new Float32Array(N * N);
   let seed = 0x5eed0a4;

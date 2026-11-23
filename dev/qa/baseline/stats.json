@@ -1,0 +1,3189 @@
+{
+  "gpu": {
+    "vendor": "Google Inc. (Google)",
+    "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)"
+  },
+  "url": "http://localhost:8080/?fixture=demo_relieve&qa&terreno=1&calidad=alta",
+  "stats": {
+    "inicial-cenital": {
+      "scenario": "inicial",
+      "drawCalls": 10,
+      "triangles": 31875,
+      "instances": {
+        "inicial": {
+          "visible": true,
+          "trees": 441,
+          "treeSpecies": {
+            "tala": 209,
+            "algarrobo": 151,
+            "chanar": 81
+          },
+          "treeChunks": 6,
+          "treeNearCells": 0,
+          "treeFarCells": 6,
+          "pasto": "nuevo",
+          "grass": {
+            "corr-herb": 0,
+            "parche-herb": 0
+          },
+          "grassTotal": 0,
+          "grassDibujadas": 0,
+          "grassChunks": 0,
+          "grassChunksVisibles": 0,
+          "grassCeldas": {
+            "candidatas": 0,
+            "activas": 0,
+            "visibles": 0,
+            "porTier": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "pool": 0,
+            "mallasCreadas": 0
+          },
+          "grassGen": {
+            "celdasGeneradas": 0,
+            "msCeldaMedio": 0,
+            "msCeldaMax": 0,
+            "msCuadroMax": 0,
+            "msCuadroP95": 0,
+            "cuadrosConGeneracion": 0
+          },
+          "grassPrep": {
+            "ms": 0.1,
+            "poligonos": 0,
+            "raster": null
+          },
+          "grassAtlasMs": {
+            "total": 41.2,
+            "dibujo": 10.3,
+            "relleno": 16.2,
+            "mipmaps": 14.7,
+            "pasos": 18
+          },
+          "grassMsaa": false,
+          "suelo": {
+            "verts": 5137,
+            "tris": 9835,
+            "topTris": 9777,
+            "ribTris": 58,
+            "polys": 4,
+            "failed": 0,
+            "tiny": 0,
+            "furrowTris": 28209,
+            "lots": 12,
+            "buildMs": 333,
+            "texMs": 232,
+            "texSize": 1024,
+            "modo": "completo",
+            "variante": "v3",
+            "texMean": {
+              "corr": [
+                62,
+                69,
+                40
+              ],
+              "parche": [
+                48,
+                70,
+                35
+              ],
+              "camino": [
+                165,
+                145,
+                111
+              ]
+            }
+          },
+          "agua": {
+            "hasRelief": true,
+            "verts": 0,
+            "tris": 0,
+            "shoreTex": "1x1@1.00m",
+            "polys": 0,
+            "failed": 0,
+            "tiny": 0,
+            "cells": 0,
+            "buildMs": 11
+          },
+          "shadows": {
+            "map": 2048,
+            "blobs": 441,
+            "boxHalfM": 1440,
+            "passRenders": 1,
+            "passDraws": 6,
+            "passTris": 14112,
+            "cellsNear": 0,
+            "cellsFar": 6,
+            "grassReceive": false,
+            "passMs": null
+          },
+          "fauna": {
+            "aves": 10,
+            "bandadas": 1,
+            "tamBandadas": [
+              10
+            ],
+            "polinizadores": 0,
+            "celdasPolinizadores": 0,
+            "enCuadro": {
+              "aves": 0,
+              "polinizadores": 0,
+              "celdas": 0
+            }
+          }
+        },
+        "multi": {
+          "visible": false,
+          "trees": 886,
+          "treeSpecies": {
+            "tala": 426,
+            "algarrobo": 295,
+            "chanar": 165
+          },
+          "treeChunks": 10,
+          "treeNearCells": 0,
+          "treeFarCells": 10,
+          "pasto": "nuevo",
+          "grass": {
+            "corr-herb": 0,
+            "parche-herb": 0
+          },
+          "grassTotal": 0,
+          "grassDibujadas": 0,
+          "grassChunks": 0,
+          "grassChunksVisibles": 0,
+          "grassCeldas": {
+            "candidatas": 264,
+            "activas": 0,
+            "visibles": 0,
+            "porTier": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "pool": 0,
+            "mallasCreadas": 0
+          },
+          "grassGen": {
+            "celdasGeneradas": 0,
+            "msCeldaMedio": 0,
+            "msCeldaMax": 0,
+            "msCuadroMax": 0,
+            "msCuadroP95": 0,
+            "cuadrosConGeneracion": 0
+          },
+          "grassPrep": {
+            "ms": 2,
+            "poligonos": 7,
+            "raster": {
+              "W": 240,
+              "H": 180
+            }
+          },
+          "grassAtlasMs": {
+            "total": 41.2,
+            "dibujo": 10.3,
+            "relleno": 16.2,
+            "mipmaps": 14.7,
+            "pasos": 18
+          },
+          "grassMsaa": false,
+          "suelo": {
+            "verts": 17384,
+            "tris": 33187,
+            "topTris": 33027,
+            "ribTris": 160,
+            "polys": 14,
+            "failed": 0,
+            "tiny": 0,
+            "furrowTris": 31158,
+            "lots": 26,
+            "buildMs": 138,
+            "texMs": 232,
+            "texSize": 1024,
+            "modo": "completo",
+            "variante": "v3",
+            "texMean": {
+              "corr": [
+                62,
+                69,
+                40
+              ],
+              "parche": [
+                48,
+                70,
+                35
+              ],
+              "camino": [
+                165,
+                145,
+                111
+              ]
+            }
+          },
+          "agua": {
+            "hasRelief": true,
+            "verts": 0,
+            "tris": 0,
+            "shoreTex": "1x1@1.00m",
+            "polys": 0,
+            "failed": 0,
+            "tiny": 0,
+            "cells": 0,
+            "buildMs": 0
+          },
+          "shadows": {
+            "map": 2048,
+            "blobs": 886,
+            "boxHalfM": 1440,
+            "passRenders": 1,
+            "passDraws": 6,
+            "passTris": 14112,
+            "cellsNear": 0,
+            "cellsFar": 6,
+            "grassReceive": false,
+            "passMs": null
+          },
+          "fauna": {
+            "aves": 40,
+            "bandadas": 3,
+            "tamBandadas": [
+              9,
+              12,
+              19
+            ],
+            "polinizadores": 292,
+            "celdasPolinizadores": 59,
+            "enCuadro": {
+              "aves": 0,
+              "polinizadores": 0,
+              "celdas": 0
+            }
+          }
+        }
+      },
+      "textures": 9,
+      "geometries": 11,
+      "heapMB": 55.6
+    },
+    "inicial-home": {
+      "scenario": "inicial",
+      "drawCalls": 10,
+      "triangles": 31875,
+      "instances": {
+        "inicial": {
+          "visible": true,
+          "trees": 441,
+          "treeSpecies": {
+            "tala": 209,
+            "algarrobo": 151,
+            "chanar": 81
+          },
+          "treeChunks": 6,
+          "treeNearCells": 0,
+          "treeFarCells": 6,
+          "pasto": "nuevo",
+          "grass": {
+            "corr-herb": 0,
+            "parche-herb": 0
+          },
+          "grassTotal": 0,
+          "grassDibujadas": 0,
+          "grassChunks": 0,
+          "grassChunksVisibles": 0,
+          "grassCeldas": {
+            "candidatas": 0,
+            "activas": 0,
+            "visibles": 0,
+            "porTier": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "pool": 0,
+            "mallasCreadas": 0
+          },
+          "grassGen": {
+            "celdasGeneradas": 0,
+            "msCeldaMedio": 0,
+            "msCeldaMax": 0,
+            "msCuadroMax": 0,
+            "msCuadroP95": 0,
+            "cuadrosConGeneracion": 0
+          },
+          "grassPrep": {
+            "ms": 0.1,
+            "poligonos": 0,
+            "raster": null
+          },
+          "grassAtlasMs": {
+            "total": 41.2,
+            "dibujo": 10.3,
+            "relleno": 16.2,
+            "mipmaps": 14.7,
+            "pasos": 18
+          },
+          "grassMsaa": false,
+          "suelo": {
+            "verts": 5137,
+            "tris": 9835,
+            "topTris": 9777,
+            "ribTris": 58,
+            "polys": 4,
+            "failed": 0,
+            "tiny": 0,
+            "furrowTris": 28209,
+            "lots": 12,
+            "buildMs": 333,
+            "texMs": 232,
+            "texSize": 1024,
+            "modo": "completo",
+            "variante": "v3",
+            "texMean": {
+              "corr": [
+                62,
+                69,
+                40
+              ],
+              "parche": [
+                48,
+                70,
+                35
+              ],
+              "camino": [
+                165,
+                145,
+                111
+              ]
+            }
+          },
+          "agua": {
+            "hasRelief": true,
+            "verts": 0,
+            "tris": 0,
+            "shoreTex": "1x1@1.00m",
+            "polys": 0,
+            "failed": 0,
+            "tiny": 0,
+            "cells": 0,
+            "buildMs": 11
+          },
+          "shadows": {
+            "map": 2048,
+            "blobs": 441,
+            "boxHalfM": 1440,
+            "passRenders": 1,
+            "passDraws": 6,
+            "passTris": 14112,
+            "cellsNear": 0,
+            "cellsFar": 6,
+            "grassReceive": false,
+            "passMs": null
+          },
+          "fauna": {
+            "aves": 10,
+            "bandadas": 1,
+            "tamBandadas": [
+              10
+            ],
+            "polinizadores": 0,
+            "celdasPolinizadores": 0,
+            "enCuadro": {
+              "aves": 0,
+              "polinizadores": 0,
+              "celdas": 0
+            }
+          }
+        },
+        "multi": {
+          "visible": false,
+          "trees": 886,
+          "treeSpecies": {
+            "tala": 426,
+            "algarrobo": 295,
+            "chanar": 165
+          },
+          "treeChunks": 10,
+          "treeNearCells": 0,
+          "treeFarCells": 10,
+          "pasto": "nuevo",
+          "grass": {
+            "corr-herb": 0,
+            "parche-herb": 0
+          },
+          "grassTotal": 0,
+          "grassDibujadas": 0,
+          "grassChunks": 0,
+          "grassChunksVisibles": 0,
+          "grassCeldas": {
+            "candidatas": 264,
+            "activas": 0,
+            "visibles": 0,
+            "porTier": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "pool": 0,
+            "mallasCreadas": 0
+          },
+          "grassGen": {
+            "celdasGeneradas": 0,
+            "msCeldaMedio": 0,
+            "msCeldaMax": 0,
+            "msCuadroMax": 0,
+            "msCuadroP95": 0,
+            "cuadrosConGeneracion": 0
+          },
+          "grassPrep": {
+            "ms": 2,
+            "poligonos": 7,
+            "raster": {
+              "W": 240,
+              "H": 180
+            }
+          },
+          "grassAtlasMs": {
+            "total": 41.2,
+            "dibujo": 10.3,
+            "relleno": 16.2,
+            "mipmaps": 14.7,
+            "pasos": 18
+          },
+          "grassMsaa": false,
+          "suelo": {
+            "verts": 17384,
+            "tris": 33187,
+            "topTris": 33027,
+            "ribTris": 160,
+            "polys": 14,
+            "failed": 0,
+            "tiny": 0,
+            "furrowTris": 31158,
+            "lots": 26,
+            "buildMs": 138,
+            "texMs": 232,
+            "texSize": 1024,
+            "modo": "completo",
+            "variante": "v3",
+            "texMean": {
+              "corr": [
+                62,
+                69,
+                40
+              ],
+              "parche": [
+                48,
+                70,
+                35
+              ],
+              "camino": [
+                165,
+                145,
+                111
+              ]
+            }
+          },
+          "agua": {
+            "hasRelief": true,
+            "verts": 0,
+            "tris": 0,
+            "shoreTex": "1x1@1.00m",
+            "polys": 0,
+            "failed": 0,
+            "tiny": 0,
+            "cells": 0,
+            "buildMs": 0
+          },
+          "shadows": {
+            "map": 2048,
+            "blobs": 886,
+            "boxHalfM": 1440,
+            "passRenders": 1,
+            "passDraws": 6,
+            "passTris": 14112,
+            "cellsNear": 0,
+            "cellsFar": 6,
+            "grassReceive": false,
+            "passMs": null
+          },
+          "fauna": {
+            "aves": 40,
+            "bandadas": 3,
+            "tamBandadas": [
+              9,
+              12,
+              19
+            ],
+            "polinizadores": 292,
+            "celdasPolinizadores": 59,
+            "enCuadro": {
+              "aves": 0,
+              "polinizadores": 0,
+              "celdas": 0
+            }
+          }
+        }
+      },
+      "textures": 9,
+      "geometries": 11,
+      "heapMB": 42.6
+    },
+    "inicial-rasante": {
+      "scenario": "inicial",
+      "drawCalls": 9,
+      "triangles": 92236,
+      "instances": {
+        "inicial": {
+          "visible": true,
+          "trees": 441,
+          "treeSpecies": {
+            "tala": 209,
+            "algarrobo": 151,
+            "chanar": 81
+          },
+          "treeChunks": 6,
+          "treeNearCells": 2,
+          "treeFarCells": 6,
+          "pasto": "nuevo",
+          "grass": {
+            "corr-herb": 0,
+            "parche-herb": 0
+          },
+          "grassTotal": 0,
+          "grassDibujadas": 0,
+          "grassChunks": 0,
+          "grassChunksVisibles": 0,
+          "grassCeldas": {
+            "candidatas": 0,
+            "activas": 0,
+            "visibles": 0,
+            "porTier": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "pool": 0,
+            "mallasCreadas": 0
+          },
+          "grassGen": {
+            "celdasGeneradas": 0,
+            "msCeldaMedio": 0,
+            "msCeldaMax": 0,
+            "msCuadroMax": 0,
+            "msCuadroP95": 0,
+            "cuadrosConGeneracion": 0
+          },
+          "grassPrep": {
+            "ms": 0.1,
+            "poligonos": 0,
+            "raster": null
+          },
+          "grassAtlasMs": {
+            "total": 41.2,
+            "dibujo": 10.3,
+            "relleno": 16.2,
+            "mipmaps": 14.7,
+            "pasos": 18
+          },
+          "grassMsaa": false,
+          "suelo": {
+            "verts": 5137,
+            "tris": 9835,
+            "topTris": 9777,
+            "ribTris": 58,
+            "polys": 4,
+            "failed": 0,
+            "tiny": 0,
+            "furrowTris": 28209,
+            "lots": 12,
+            "buildMs": 333,
+            "texMs": 232,
+            "texSize": 1024,
+            "modo": "completo",
+            "variante": "v3",
+            "texMean": {
+              "corr": [
+                62,
+                69,
+                40
+              ],
+              "parche": [
+                48,
+                70,
+                35
+              ],
+              "camino": [
+                165,
+                145,
+                111
+              ]
+            }
+          },
+          "agua": {
+            "hasRelief": true,
+            "verts": 0,
+            "tris": 0,
+            "shoreTex": "1x1@1.00m",
+            "polys": 0,
+            "failed": 0,
+            "tiny": 0,
+            "cells": 0,
+            "buildMs": 11
+          },
+          "shadows": {
+            "map": 2048,
+            "blobs": 441,
+            "boxHalfM": 283,
+            "passRenders": 2,
+            "passDraws": 0,
+            "passTris": 0,
+            "cellsNear": 0,
+            "cellsFar": 0,
+            "grassReceive": false,
+            "passMs": null
+          },
+          "fauna": {
+            "aves": 10,
+            "bandadas": 1,
+            "tamBandadas": [
+              10
+            ],
+            "polinizadores": 0,
+            "celdasPolinizadores": 0,
+            "enCuadro": {
+              "aves": 10,
+              "polinizadores": 0,
+              "celdas": 0
+            }
+          }
+        },
+        "multi": {
+          "visible": false,
+          "trees": 886,
+          "treeSpecies": {
+            "tala": 426,
+            "algarrobo": 295,
+            "chanar": 165
+          },
+          "treeChunks": 10,
+          "treeNearCells": 2,
+          "treeFarCells": 10,
+          "pasto": "nuevo",
+          "grass": {
+            "corr-herb": 0,
+            "parche-herb": 0
+          },
+          "grassTotal": 0,
+          "grassDibujadas": 0,
+          "grassChunks": 0,
+          "grassChunksVisibles": 0,
+          "grassCeldas": {
+            "candidatas": 264,
+            "activas": 0,
+            "visibles": 0,
+            "porTier": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "pool": 0,
+            "mallasCreadas": 0
+          },
+          "grassGen": {
+            "celdasGeneradas": 0,
+            "msCeldaMedio": 0,
+            "msCeldaMax": 0,
+            "msCuadroMax": 0,
+            "msCuadroP95": 0,
+            "cuadrosConGeneracion": 0
+          },
+          "grassPrep": {
+            "ms": 2,
+            "poligonos": 7,
+            "raster": {
+              "W": 240,
+              "H": 180
+            }
+          },
+          "grassAtlasMs": {
+            "total": 41.2,
+            "dibujo": 10.3,
+            "relleno": 16.2,
+            "mipmaps": 14.7,
+            "pasos": 18
+          },
+          "grassMsaa": false,
+          "suelo": {
+            "verts": 17384,
+            "tris": 33187,
+            "topTris": 33027,
+            "ribTris": 160,
+            "polys": 14,
+            "failed": 0,
+            "tiny": 0,
+            "furrowTris": 31158,
+            "lots": 26,
+            "buildMs": 138,
+            "texMs": 232,
+            "texSize": 1024,
+            "modo": "completo",
+            "variante": "v3",
+            "texMean": {
+              "corr": [
+                62,
+                69,
+                40
+              ],
+              "parche": [
+                48,
+                70,
+                35
+              ],
+              "camino": [
+                165,
+                145,
+                111
+              ]
+            }
+          },
+          "agua": {
+            "hasRelief": true,
+            "verts": 0,
+            "tris": 0,
+            "shoreTex": "1x1@1.00m",
+            "polys": 0,
+            "failed": 0,
+            "tiny": 0,
+            "cells": 0,
+            "buildMs": 0
+          },
+          "shadows": {
+            "map": 2048,
+            "blobs": 886,
+            "boxHalfM": 283,
+            "passRenders": 2,
+            "passDraws": 0,
+            "passTris": 0,
+            "cellsNear": 0,
+            "cellsFar": 0,
+            "grassReceive": false,
+            "passMs": null
+          },
+          "fauna": {
+            "aves": 40,
+            "bandadas": 3,
+            "tamBandadas": [
+              9,
+              12,
+              19
+            ],
+            "polinizadores": 292,
+            "celdasPolinizadores": 59,
+            "enCuadro": {
+              "aves": 10,
+              "polinizadores": 0,
+              "celdas": 0
+            }
+          }
+        }
+      },
+      "textures": 10,
+      "geometries": 15,
+      "heapMB": 77.5
+    },
+    "inicial-rasante-medio": {
+      "scenario": "inicial",
+      "drawCalls": 9,
+      "triangles": 92236,
+      "instances": {
+        "inicial": {
+          "visible": true,
+          "trees": 441,
+          "treeSpecies": {
+            "tala": 209,
+            "algarrobo": 151,
+            "chanar": 81
+          },
+          "treeChunks": 6,
+          "treeNearCells": 2,
+          "treeFarCells": 6,
+          "pasto": "nuevo",
+          "grass": {
+            "corr-herb": 0,
+            "parche-herb": 0
+          },
+          "grassTotal": 0,
+          "grassDibujadas": 0,
+          "grassChunks": 0,
+          "grassChunksVisibles": 0,
+          "grassCeldas": {
+            "candidatas": 0,
+            "activas": 0,
+            "visibles": 0,
+            "porTier": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "pool": 0,
+            "mallasCreadas": 0
+          },
+          "grassGen": {
+            "celdasGeneradas": 0,
+            "msCeldaMedio": 0,
+            "msCeldaMax": 0,
+            "msCuadroMax": 0,
+            "msCuadroP95": 0,
+            "cuadrosConGeneracion": 0
+          },
+          "grassPrep": {
+            "ms": 0.1,
+            "poligonos": 0,
+            "raster": null
+          },
+          "grassAtlasMs": {
+            "total": 41.2,
+            "dibujo": 10.3,
+            "relleno": 16.2,
+            "mipmaps": 14.7,
+            "pasos": 18
+          },
+          "grassMsaa": false,
+          "suelo": {
+            "verts": 5137,
+            "tris": 9835,
+            "topTris": 9777,
+            "ribTris": 58,
+            "polys": 4,
+            "failed": 0,
+            "tiny": 0,
+            "furrowTris": 28209,
+            "lots": 12,
+            "buildMs": 333,
+            "texMs": 232,
+            "texSize": 1024,
+            "modo": "completo",
+            "variante": "v3",
+            "texMean": {
+              "corr": [
+                62,
+                69,
+                40
+              ],
+              "parche": [
+                48,
+                70,
+                35
+              ],
+              "camino": [
+                165,
+                145,
+                111
+              ]
+            }
+          },
+          "agua": {
+            "hasRelief": true,
+            "verts": 0,
+            "tris": 0,
+            "shoreTex": "1x1@1.00m",
+            "polys": 0,
+            "failed": 0,
+            "tiny": 0,
+            "cells": 0,
+            "buildMs": 11
+          },
+          "shadows": {
+            "map": 2048,
+            "blobs": 441,
+            "boxHalfM": 283,
+            "passRenders": 3,
+            "passDraws": 0,
+            "passTris": 0,
+            "cellsNear": 0,
+            "cellsFar": 0,
+            "grassReceive": false,
+            "passMs": null
+          },
+          "fauna": {
+            "aves": 10,
+            "bandadas": 1,
+            "tamBandadas": [
+              10
+            ],
+            "polinizadores": 0,
+            "celdasPolinizadores": 0,
+            "enCuadro": {
+              "aves": 10,
+              "polinizadores": 0,
+              "celdas": 0
+            }
+          }
+        },
+        "multi": {
+          "visible": false,
+          "trees": 886,
+          "treeSpecies": {
+            "tala": 426,
+            "algarrobo": 295,
+            "chanar": 165
+          },
+          "treeChunks": 10,
+          "treeNearCells": 2,
+          "treeFarCells": 10,
+          "pasto": "nuevo",
+          "grass": {
+            "corr-herb": 0,
+            "parche-herb": 0
+          },
+          "grassTotal": 0,
+          "grassDibujadas": 0,
+          "grassChunks": 0,
+          "grassChunksVisibles": 0,
+          "grassCeldas": {
+            "candidatas": 264,
+            "activas": 0,
+            "visibles": 0,
+            "porTier": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "pool": 0,
+            "mallasCreadas": 0
+          },
+          "grassGen": {
+            "celdasGeneradas": 0,
+            "msCeldaMedio": 0,
+            "msCeldaMax": 0,
+            "msCuadroMax": 0,
+            "msCuadroP95": 0,
+            "cuadrosConGeneracion": 0
+          },
+          "grassPrep": {
+            "ms": 2,
+            "poligonos": 7,
+            "raster": {
+              "W": 240,
+              "H": 180
+            }
+          },
+          "grassAtlasMs": {
+            "total": 41.2,
+            "dibujo": 10.3,
+            "relleno": 16.2,
+            "mipmaps": 14.7,
+            "pasos": 18
+          },
+          "grassMsaa": false,
+          "suelo": {
+            "verts": 17384,
+            "tris": 33187,
+            "topTris": 33027,
+            "ribTris": 160,
+            "polys": 14,
+            "failed": 0,
+            "tiny": 0,
+            "furrowTris": 31158,
+            "lots": 26,
+            "buildMs": 138,
+            "texMs": 232,
+            "texSize": 1024,
+            "modo": "completo",
+            "variante": "v3",
+            "texMean": {
+              "corr": [
+                62,
+                69,
+                40
+              ],
+              "parche": [
+                48,
+                70,
+                35
+              ],
+              "camino": [
+                165,
+                145,
+                111
+              ]
+            }
+          },
+          "agua": {
+            "hasRelief": true,
+            "verts": 0,
+            "tris": 0,
+            "shoreTex": "1x1@1.00m",
+            "polys": 0,
+            "failed": 0,
+            "tiny": 0,
+            "cells": 0,
+            "buildMs": 0
+          },
+          "shadows": {
+            "map": 2048,
+            "blobs": 886,
+            "boxHalfM": 283,
+            "passRenders": 3,
+            "passDraws": 0,
+            "passTris": 0,
+            "cellsNear": 0,
+            "cellsFar": 0,
+            "grassReceive": false,
+            "passMs": null
+          },
+          "fauna": {
+            "aves": 40,
+            "bandadas": 3,
+            "tamBandadas": [
+              9,
+              12,
+              19
+            ],
+            "polinizadores": 292,
+            "celdasPolinizadores": 59,
+            "enCuadro": {
+              "aves": 10,
+              "polinizadores": 0,
+              "celdas": 0
+            }
+          }
+        }
+      },
+      "textures": 10,
+      "geometries": 15,
+      "heapMB": 67.6
+    },
+    "inicial-parche": {
+      "scenario": "inicial",
+      "drawCalls": 13,
+      "triangles": 93124,
+      "instances": {
+        "inicial": {
+          "visible": true,
+          "trees": 441,
+          "treeSpecies": {
+            "tala": 209,
+            "algarrobo": 151,
+            "chanar": 81
+          },
+          "treeChunks": 6,
+          "treeNearCells": 2,
+          "treeFarCells": 5,
+          "pasto": "nuevo",
+          "grass": {
+            "corr-herb": 0,
+            "parche-herb": 0
+          },
+          "grassTotal": 0,
+          "grassDibujadas": 0,
+          "grassChunks": 0,
+          "grassChunksVisibles": 0,
+          "grassCeldas": {
+            "candidatas": 0,
+            "activas": 0,
+            "visibles": 0,
+            "porTier": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "pool": 0,
+            "mallasCreadas": 0
+          },
+          "grassGen": {
+            "celdasGeneradas": 0,
+            "msCeldaMedio": 0,
+            "msCeldaMax": 0,
+            "msCuadroMax": 0,
+            "msCuadroP95": 0,
+            "cuadrosConGeneracion": 0
+          },
+          "grassPrep": {
+            "ms": 0.1,
+            "poligonos": 0,
+            "raster": null
+          },
+          "grassAtlasMs": {
+            "total": 41.2,
+            "dibujo": 10.3,
+            "relleno": 16.2,
+            "mipmaps": 14.7,
+            "pasos": 18
+          },
+          "grassMsaa": false,
+          "suelo": {
+            "verts": 5137,
+            "tris": 9835,
+            "topTris": 9777,
+            "ribTris": 58,
+            "polys": 4,
+            "failed": 0,
+            "tiny": 0,
+            "furrowTris": 28209,
+            "lots": 12,
+            "buildMs": 333,
+            "texMs": 232,
+            "texSize": 1024,
+            "modo": "completo",
+            "variante": "v3",
+            "texMean": {
+              "corr": [
+                62,
+                69,
+                40
+              ],
+              "parche": [
+                48,
+                70,
+                35
+              ],
+              "camino": [
+                165,
+                145,
+                111
+              ]
+            }
+          },
+          "agua": {
+            "hasRelief": true,
+            "verts": 0,
+            "tris": 0,
+            "shoreTex": "1x1@1.00m",
+            "polys": 0,
+            "failed": 0,
+            "tiny": 0,
+            "cells": 0,
+            "buildMs": 11
+          },
+          "shadows": {
+            "map": 2048,
+            "blobs": 441,
+            "boxHalfM": 354,
+            "passRenders": 4,
+            "passDraws": 6,
+            "passTris": 51428,
+            "cellsNear": 2,
+            "cellsFar": 0,
+            "grassReceive": false,
+            "passMs": null
+          },
+          "fauna": {
+            "aves": 10,
+            "bandadas": 1,
+            "tamBandadas": [
+              10
+            ],
+            "polinizadores": 0,
+            "celdasPolinizadores": 0,
+            "enCuadro": {
+              "aves": 8,
+              "polinizadores": 0,
+              "celdas": 0
+            }
+          }
+        },
+        "multi": {
+          "visible": false,
+          "trees": 886,
+          "treeSpecies": {
+            "tala": 426,
+            "algarrobo": 295,
+            "chanar": 165
+          },
+          "treeChunks": 10,
+          "treeNearCells": 5,
+          "treeFarCells": 8,
+          "pasto": "nuevo",
+          "grass": {
+            "corr-herb": 0,
+            "parche-herb": 0
+          },
+          "grassTotal": 0,
+          "grassDibujadas": 0,
+          "grassChunks": 0,
+          "grassChunksVisibles": 0,
+          "grassCeldas": {
+            "candidatas": 264,
+            "activas": 0,
+            "visibles": 0,
+            "porTier": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "pool": 0,
+            "mallasCreadas": 0
+          },
+          "grassGen": {
+            "celdasGeneradas": 0,
+            "msCeldaMedio": 0,
+            "msCeldaMax": 0,
+            "msCuadroMax": 0,
+            "msCuadroP95": 0,
+            "cuadrosConGeneracion": 0
+          },
+          "grassPrep": {
+            "ms": 2,
+            "poligonos": 7,
+            "raster": {
+              "W": 240,
+              "H": 180
+            }
+          },
+          "grassAtlasMs": {
+            "total": 41.2,
+            "dibujo": 10.3,
+            "relleno": 16.2,
+            "mipmaps": 14.7,
+            "pasos": 18
+          },
+          "grassMsaa": false,
+          "suelo": {
+            "verts": 17384,
+            "tris": 33187,
+            "topTris": 33027,
+            "ribTris": 160,
+            "polys": 14,
+            "failed": 0,
+            "tiny": 0,
+            "furrowTris": 31158,
+            "lots": 26,
+            "buildMs": 138,
+            "texMs": 232,
+            "texSize": 1024,
+            "modo": "completo",
+            "variante": "v3",
+            "texMean": {
+              "corr": [
+                62,
+                69,
+                40
+              ],
+              "parche": [
+                48,
+                70,
+                35
+              ],
+              "camino": [
+                165,
+                145,
+                111
+              ]
+            }
+          },
+          "agua": {
+            "hasRelief": true,
+            "verts": 0,
+            "tris": 0,
+            "shoreTex": "1x1@1.00m",
+            "polys": 0,
+            "failed": 0,
+            "tiny": 0,
+            "cells": 0,
+            "buildMs": 0
+          },
+          "shadows": {
+            "map": 2048,
+            "blobs": 886,
+            "boxHalfM": 354,
+            "passRenders": 4,
+            "passDraws": 6,
+            "passTris": 51428,
+            "cellsNear": 2,
+            "cellsFar": 0,
+            "grassReceive": false,
+            "passMs": null
+          },
+          "fauna": {
+            "aves": 40,
+            "bandadas": 3,
+            "tamBandadas": [
+              9,
+              12,
+              19
+            ],
+            "polinizadores": 292,
+            "celdasPolinizadores": 59,
+            "enCuadro": {
+              "aves": 8,
+              "polinizadores": 0,
+              "celdas": 0
+            }
+          }
+        }
+      },
+      "textures": 10,
+      "geometries": 15,
+      "heapMB": 71.1
+    },
+    "inicial-horizonte": {
+      "scenario": "inicial",
+      "drawCalls": 17,
+      "triangles": 111512,
+      "instances": {
+        "inicial": {
+          "visible": true,
+          "trees": 441,
+          "treeSpecies": {
+            "tala": 209,
+            "algarrobo": 151,
+            "chanar": 81
+          },
+          "treeChunks": 6,
+          "treeNearCells": 2,
+          "treeFarCells": 6,
+          "pasto": "nuevo",
+          "grass": {
+            "corr-herb": 0,
+            "parche-herb": 0
+          },
+          "grassTotal": 0,
+          "grassDibujadas": 0,
+          "grassChunks": 0,
+          "grassChunksVisibles": 0,
+          "grassCeldas": {
+            "candidatas": 0,
+            "activas": 0,
+            "visibles": 0,
+            "porTier": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "pool": 0,
+            "mallasCreadas": 0
+          },
+          "grassGen": {
+            "celdasGeneradas": 0,
+            "msCeldaMedio": 0,
+            "msCeldaMax": 0,
+            "msCuadroMax": 0,
+            "msCuadroP95": 0,
+            "cuadrosConGeneracion": 0
+          },
+          "grassPrep": {
+            "ms": 0.1,
+            "poligonos": 0,
+            "raster": null
+          },
+          "grassAtlasMs": {
+            "total": 41.2,
+            "dibujo": 10.3,
+            "relleno": 16.2,
+            "mipmaps": 14.7,
+            "pasos": 18
+          },
+          "grassMsaa": false,
+          "suelo": {
+            "verts": 5137,
+            "tris": 9835,
+            "topTris": 9777,
+            "ribTris": 58,
+            "polys": 4,
+            "failed": 0,
+            "tiny": 0,
+            "furrowTris": 28209,
+            "lots": 12,
+            "buildMs": 333,
+            "texMs": 232,
+            "texSize": 1024,
+            "modo": "completo",
+            "variante": "v3",
+            "texMean": {
+              "corr": [
+                62,
+                69,
+                40
+              ],
+              "parche": [
+                48,
+                70,
+                35
+              ],
+              "camino": [
+                165,
+                145,
+                111
+              ]
+            }
+          },
+          "agua": {
+            "hasRelief": true,
+            "verts": 0,
+            "tris": 0,
+            "shoreTex": "1x1@1.00m",
+            "polys": 0,
+            "failed": 0,
+            "tiny": 0,
+            "cells": 0,
+            "buildMs": 11
+          },
+          "shadows": {
+            "map": 2048,
+            "blobs": 441,
+            "boxHalfM": 1080,
+            "passRenders": 5,
+            "passDraws": 6,
+            "passTris": 14112,
+            "cellsNear": 0,
+            "cellsFar": 6,
+            "grassReceive": false,
+            "passMs": null
+          },
+          "fauna": {
+            "aves": 10,
+            "bandadas": 1,
+            "tamBandadas": [
+              10
+            ],
+            "polinizadores": 0,
+            "celdasPolinizadores": 0,
+            "enCuadro": {
+              "aves": 10,
+              "polinizadores": 0,
+              "celdas": 0
+            }
+          }
+        },
+        "multi": {
+          "visible": false,
+          "trees": 886,
+          "treeSpecies": {
+            "tala": 426,
+            "algarrobo": 295,
+            "chanar": 165
+          },
+          "treeChunks": 10,
+          "treeNearCells": 4,
+          "treeFarCells": 9,
+          "pasto": "nuevo",
+          "grass": {
+            "corr-herb": 0,
+            "parche-herb": 0
+          },
+          "grassTotal": 0,
+          "grassDibujadas": 0,
+          "grassChunks": 0,
+          "grassChunksVisibles": 0,
+          "grassCeldas": {
+            "candidatas": 264,
+            "activas": 0,
+            "visibles": 0,
+            "porTier": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "pool": 0,
+            "mallasCreadas": 0
+          },
+          "grassGen": {
+            "celdasGeneradas": 0,
+            "msCeldaMedio": 0,
+            "msCeldaMax": 0,
+            "msCuadroMax": 0,
+            "msCuadroP95": 0,
+            "cuadrosConGeneracion": 0
+          },
+          "grassPrep": {
+            "ms": 2,
+            "poligonos": 7,
+            "raster": {
+              "W": 240,
+              "H": 180
+            }
+          },
+          "grassAtlasMs": {
+            "total": 41.2,
+            "dibujo": 10.3,
+            "relleno": 16.2,
+            "mipmaps": 14.7,
+            "pasos": 18
+          },
+          "grassMsaa": false,
+          "suelo": {
+            "verts": 17384,
+            "tris": 33187,
+            "topTris": 33027,
+            "ribTris": 160,
+            "polys": 14,
+            "failed": 0,
+            "tiny": 0,
+            "furrowTris": 31158,
+            "lots": 26,
+            "buildMs": 138,
+            "texMs": 232,
+            "texSize": 1024,
+            "modo": "completo",
+            "variante": "v3",
+            "texMean": {
+              "corr": [
+                62,
+                69,
+                40
+              ],
+              "parche": [
+                48,
+                70,
+                35
+              ],
+              "camino": [
+                165,
+                145,
+                111
+              ]
+            }
+          },
+          "agua": {
+            "hasRelief": true,
+            "verts": 0,
+            "tris": 0,
+            "shoreTex": "1x1@1.00m",
+            "polys": 0,
+            "failed": 0,
+            "tiny": 0,
+            "cells": 0,
+            "buildMs": 0
+          },
+          "shadows": {
+            "map": 2048,
+            "blobs": 886,
+            "boxHalfM": 1080,
+            "passRenders": 5,
+            "passDraws": 6,
+            "passTris": 14112,
+            "cellsNear": 0,
+            "cellsFar": 6,
+            "grassReceive": false,
+            "passMs": null
+          },
+          "fauna": {
+            "aves": 40,
+            "bandadas": 3,
+            "tamBandadas": [
+              9,
+              12,
+              19
+            ],
+            "polinizadores": 292,
+            "celdasPolinizadores": 59,
+            "enCuadro": {
+              "aves": 10,
+              "polinizadores": 0,
+              "celdas": 0
+            }
+          }
+        }
+      },
+      "textures": 10,
+      "geometries": 15,
+      "heapMB": 68.1
+    },
+    "multi-cenital": {
+      "scenario": "multi",
+      "drawCalls": 14,
+      "triangles": 59027,
+      "instances": {
+        "inicial": {
+          "visible": false,
+          "trees": 441,
+          "treeSpecies": {
+            "tala": 209,
+            "algarrobo": 151,
+            "chanar": 81
+          },
+          "treeChunks": 6,
+          "treeNearCells": 0,
+          "treeFarCells": 6,
+          "pasto": "nuevo",
+          "grass": {
+            "corr-herb": 0,
+            "parche-herb": 0
+          },
+          "grassTotal": 0,
+          "grassDibujadas": 0,
+          "grassChunks": 0,
+          "grassChunksVisibles": 0,
+          "grassCeldas": {
+            "candidatas": 0,
+            "activas": 0,
+            "visibles": 0,
+            "porTier": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "pool": 0,
+            "mallasCreadas": 0
+          },
+          "grassGen": {
+            "celdasGeneradas": 0,
+            "msCeldaMedio": 0,
+            "msCeldaMax": 0,
+            "msCuadroMax": 0,
+            "msCuadroP95": 0,
+            "cuadrosConGeneracion": 0
+          },
+          "grassPrep": {
+            "ms": 0.1,
+            "poligonos": 0,
+            "raster": null
+          },
+          "grassAtlasMs": {
+            "total": 41.2,
+            "dibujo": 10.3,
+            "relleno": 16.2,
+            "mipmaps": 14.7,
+            "pasos": 18
+          },
+          "grassMsaa": false,
+          "suelo": {
+            "verts": 5137,
+            "tris": 9835,
+            "topTris": 9777,
+            "ribTris": 58,
+            "polys": 4,
+            "failed": 0,
+            "tiny": 0,
+            "furrowTris": 28209,
+            "lots": 12,
+            "buildMs": 333,
+            "texMs": 232,
+            "texSize": 1024,
+            "modo": "completo",
+            "variante": "v3",
+            "texMean": {
+              "corr": [
+                62,
+                69,
+                40
+              ],
+              "parche": [
+                48,
+                70,
+                35
+              ],
+              "camino": [
+                165,
+                145,
+                111
+              ]
+            }
+          },
+          "agua": {
+            "hasRelief": true,
+            "verts": 0,
+            "tris": 0,
+            "shoreTex": "1x1@1.00m",
+            "polys": 0,
+            "failed": 0,
+            "tiny": 0,
+            "cells": 0,
+            "buildMs": 11
+          },
+          "shadows": {
+            "map": 2048,
+            "blobs": 441,
+            "boxHalfM": 1440,
+            "passRenders": 7,
+            "passDraws": 10,
+            "passTris": 28352,
+            "cellsNear": 0,
+            "cellsFar": 10,
+            "grassReceive": false,
+            "passMs": null
+          },
+          "fauna": {
+            "aves": 10,
+            "bandadas": 1,
+            "tamBandadas": [
+              10
+            ],
+            "polinizadores": 0,
+            "celdasPolinizadores": 0,
+            "enCuadro": {
+              "aves": 0,
+              "polinizadores": 0,
+              "celdas": 0
+            }
+          }
+        },
+        "multi": {
+          "visible": true,
+          "trees": 886,
+          "treeSpecies": {
+            "tala": 426,
+            "algarrobo": 295,
+            "chanar": 165
+          },
+          "treeChunks": 10,
+          "treeNearCells": 0,
+          "treeFarCells": 10,
+          "pasto": "nuevo",
+          "grass": {
+            "corr-herb": 0,
+            "parche-herb": 0
+          },
+          "grassTotal": 0,
+          "grassDibujadas": 0,
+          "grassChunks": 0,
+          "grassChunksVisibles": 0,
+          "grassCeldas": {
+            "candidatas": 264,
+            "activas": 0,
+            "visibles": 0,
+            "porTier": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "pool": 0,
+            "mallasCreadas": 0
+          },
+          "grassGen": {
+            "celdasGeneradas": 0,
+            "msCeldaMedio": 0,
+            "msCeldaMax": 0,
+            "msCuadroMax": 0,
+            "msCuadroP95": 0,
+            "cuadrosConGeneracion": 0
+          },
+          "grassPrep": {
+            "ms": 2,
+            "poligonos": 7,
+            "raster": {
+              "W": 240,
+              "H": 180
+            }
+          },
+          "grassAtlasMs": {
+            "total": 41.2,
+            "dibujo": 10.3,
+            "relleno": 16.2,
+            "mipmaps": 14.7,
+            "pasos": 18
+          },
+          "grassMsaa": false,
+          "suelo": {
+            "verts": 17384,
+            "tris": 33187,
+            "topTris": 33027,
+            "ribTris": 160,
+            "polys": 14,
+            "failed": 0,
+            "tiny": 0,
+            "furrowTris": 31158,
+            "lots": 26,
+            "buildMs": 138,
+            "texMs": 232,
+            "texSize": 1024,
+            "modo": "completo",
+            "variante": "v3",
+            "texMean": {
+              "corr": [
+                62,
+                69,
+                40
+              ],
+              "parche": [
+                48,
+                70,
+                35
+              ],
+              "camino": [
+                165,
+                145,
+                111
+              ]
+            }
+          },
+          "agua": {
+            "hasRelief": true,
+            "verts": 0,
+            "tris": 0,
+            "shoreTex": "1x1@1.00m",
+            "polys": 0,
+            "failed": 0,
+            "tiny": 0,
+            "cells": 0,
+            "buildMs": 0
+          },
+          "shadows": {
+            "map": 2048,
+            "blobs": 886,
+            "boxHalfM": 1440,
+            "passRenders": 7,
+            "passDraws": 10,
+            "passTris": 28352,
+            "cellsNear": 0,
+            "cellsFar": 10,
+            "grassReceive": false,
+            "passMs": null
+          },
+          "fauna": {
+            "aves": 40,
+            "bandadas": 3,
+            "tamBandadas": [
+              9,
+              12,
+              19
+            ],
+            "polinizadores": 292,
+            "celdasPolinizadores": 59,
+            "enCuadro": {
+              "aves": 0,
+              "polinizadores": 0,
+              "celdas": 0
+            }
+          }
+        }
+      },
+      "textures": 11,
+      "geometries": 30,
+      "heapMB": 85.9
+    },
+    "multi-home": {
+      "scenario": "multi",
+      "drawCalls": 14,
+      "triangles": 59027,
+      "instances": {
+        "inicial": {
+          "visible": false,
+          "trees": 441,
+          "treeSpecies": {
+            "tala": 209,
+            "algarrobo": 151,
+            "chanar": 81
+          },
+          "treeChunks": 6,
+          "treeNearCells": 0,
+          "treeFarCells": 6,
+          "pasto": "nuevo",
+          "grass": {
+            "corr-herb": 0,
+            "parche-herb": 0
+          },
+          "grassTotal": 0,
+          "grassDibujadas": 0,
+          "grassChunks": 0,
+          "grassChunksVisibles": 0,
+          "grassCeldas": {
+            "candidatas": 0,
+            "activas": 0,
+            "visibles": 0,
+            "porTier": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "pool": 0,
+            "mallasCreadas": 0
+          },
+          "grassGen": {
+            "celdasGeneradas": 0,
+            "msCeldaMedio": 0,
+            "msCeldaMax": 0,
+            "msCuadroMax": 0,
+            "msCuadroP95": 0,
+            "cuadrosConGeneracion": 0
+          },
+          "grassPrep": {
+            "ms": 0.1,
+            "poligonos": 0,
+            "raster": null
+          },
+          "grassAtlasMs": {
+            "total": 41.2,
+            "dibujo": 10.3,
+            "relleno": 16.2,
+            "mipmaps": 14.7,
+            "pasos": 18
+          },
+          "grassMsaa": false,
+          "suelo": {
+            "verts": 5137,
+            "tris": 9835,
+            "topTris": 9777,
+            "ribTris": 58,
+            "polys": 4,
+            "failed": 0,
+            "tiny": 0,
+            "furrowTris": 28209,
+            "lots": 12,
+            "buildMs": 333,
+            "texMs": 232,
+            "texSize": 1024,
+            "modo": "completo",
+            "variante": "v3",
+            "texMean": {
+              "corr": [
+                62,
+                69,
+                40
+              ],
+              "parche": [
+                48,
+                70,
+                35
+              ],
+              "camino": [
+                165,
+                145,
+                111
+              ]
+            }
+          },
+          "agua": {
+            "hasRelief": true,
+            "verts": 0,
+            "tris": 0,
+            "shoreTex": "1x1@1.00m",
+            "polys": 0,
+            "failed": 0,
+            "tiny": 0,
+            "cells": 0,
+            "buildMs": 11
+          },
+          "shadows": {
+            "map": 2048,
+            "blobs": 441,
+            "boxHalfM": 1440,
+            "passRenders": 7,
+            "passDraws": 10,
+            "passTris": 28352,
+            "cellsNear": 0,
+            "cellsFar": 10,
+            "grassReceive": false,
+            "passMs": null
+          },
+          "fauna": {
+            "aves": 10,
+            "bandadas": 1,
+            "tamBandadas": [
+              10
+            ],
+            "polinizadores": 0,
+            "celdasPolinizadores": 0,
+            "enCuadro": {
+              "aves": 0,
+              "polinizadores": 0,
+              "celdas": 0
+            }
+          }
+        },
+        "multi": {
+          "visible": true,
+          "trees": 886,
+          "treeSpecies": {
+            "tala": 426,
+            "algarrobo": 295,
+            "chanar": 165
+          },
+          "treeChunks": 10,
+          "treeNearCells": 0,
+          "treeFarCells": 10,
+          "pasto": "nuevo",
+          "grass": {
+            "corr-herb": 0,
+            "parche-herb": 0
+          },
+          "grassTotal": 0,
+          "grassDibujadas": 0,
+          "grassChunks": 0,
+          "grassChunksVisibles": 0,
+          "grassCeldas": {
+            "candidatas": 264,
+            "activas": 0,
+            "visibles": 0,
+            "porTier": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "pool": 0,
+            "mallasCreadas": 0
+          },
+          "grassGen": {
+            "celdasGeneradas": 0,
+            "msCeldaMedio": 0,
+            "msCeldaMax": 0,
+            "msCuadroMax": 0,
+            "msCuadroP95": 0,
+            "cuadrosConGeneracion": 0
+          },
+          "grassPrep": {
+            "ms": 2,
+            "poligonos": 7,
+            "raster": {
+              "W": 240,
+              "H": 180
+            }
+          },
+          "grassAtlasMs": {
+            "total": 41.2,
+            "dibujo": 10.3,
+            "relleno": 16.2,
+            "mipmaps": 14.7,
+            "pasos": 18
+          },
+          "grassMsaa": false,
+          "suelo": {
+            "verts": 17384,
+            "tris": 33187,
+            "topTris": 33027,
+            "ribTris": 160,
+            "polys": 14,
+            "failed": 0,
+            "tiny": 0,
+            "furrowTris": 31158,
+            "lots": 26,
+            "buildMs": 138,
+            "texMs": 232,
+            "texSize": 1024,
+            "modo": "completo",
+            "variante": "v3",
+            "texMean": {
+              "corr": [
+                62,
+                69,
+                40
+              ],
+              "parche": [
+                48,
+                70,
+                35
+              ],
+              "camino": [
+                165,
+                145,
+                111
+              ]
+            }
+          },
+          "agua": {
+            "hasRelief": true,
+            "verts": 0,
+            "tris": 0,
+            "shoreTex": "1x1@1.00m",
+            "polys": 0,
+            "failed": 0,
+            "tiny": 0,
+            "cells": 0,
+            "buildMs": 0
+          },
+          "shadows": {
+            "map": 2048,
+            "blobs": 886,
+            "boxHalfM": 1440,
+            "passRenders": 7,
+            "passDraws": 10,
+            "passTris": 28352,
+            "cellsNear": 0,
+            "cellsFar": 10,
+            "grassReceive": false,
+            "passMs": null
+          },
+          "fauna": {
+            "aves": 40,
+            "bandadas": 3,
+            "tamBandadas": [
+              9,
+              12,
+              19
+            ],
+            "polinizadores": 292,
+            "celdasPolinizadores": 59,
+            "enCuadro": {
+              "aves": 0,
+              "polinizadores": 0,
+              "celdas": 0
+            }
+          }
+        }
+      },
+      "textures": 11,
+      "geometries": 30,
+      "heapMB": 59.4
+    },
+    "multi-rasante": {
+      "scenario": "multi",
+      "drawCalls": 18,
+      "triangles": 135985,
+      "instances": {
+        "inicial": {
+          "visible": false,
+          "trees": 441,
+          "treeSpecies": {
+            "tala": 209,
+            "algarrobo": 151,
+            "chanar": 81
+          },
+          "treeChunks": 6,
+          "treeNearCells": 2,
+          "treeFarCells": 6,
+          "pasto": "nuevo",
+          "grass": {
+            "corr-herb": 0,
+            "parche-herb": 0
+          },
+          "grassTotal": 0,
+          "grassDibujadas": 0,
+          "grassChunks": 0,
+          "grassChunksVisibles": 0,
+          "grassCeldas": {
+            "candidatas": 0,
+            "activas": 0,
+            "visibles": 0,
+            "porTier": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "pool": 0,
+            "mallasCreadas": 7
+          },
+          "grassGen": {
+            "celdasGeneradas": 7,
+            "msCeldaMedio": 3.99,
+            "msCeldaMax": 7,
+            "msCuadroMax": 2.5,
+            "msCuadroP95": 2.5,
+            "cuadrosConGeneracion": 15
+          },
+          "grassPrep": {
+            "ms": 0.1,
+            "poligonos": 0,
+            "raster": null
+          },
+          "grassAtlasMs": {
+            "total": 41.2,
+            "dibujo": 10.3,
+            "relleno": 16.2,
+            "mipmaps": 14.7,
+            "pasos": 18
+          },
+          "grassMsaa": false,
+          "suelo": {
+            "verts": 5137,
+            "tris": 9835,
+            "topTris": 9777,
+            "ribTris": 58,
+            "polys": 4,
+            "failed": 0,
+            "tiny": 0,
+            "furrowTris": 28209,
+            "lots": 12,
+            "buildMs": 333,
+            "texMs": 232,
+            "texSize": 1024,
+            "modo": "completo",
+            "variante": "v3",
+            "texMean": {
+              "corr": [
+                62,
+                69,
+                40
+              ],
+              "parche": [
+                48,
+                70,
+                35
+              ],
+              "camino": [
+                165,
+                145,
+                111
+              ]
+            }
+          },
+          "agua": {
+            "hasRelief": true,
+            "verts": 0,
+            "tris": 0,
+            "shoreTex": "1x1@1.00m",
+            "polys": 0,
+            "failed": 0,
+            "tiny": 0,
+            "cells": 0,
+            "buildMs": 11
+          },
+          "shadows": {
+            "map": 2048,
+            "blobs": 441,
+            "boxHalfM": 283,
+            "passRenders": 8,
+            "passDraws": 0,
+            "passTris": 0,
+            "cellsNear": 0,
+            "cellsFar": 0,
+            "grassReceive": false,
+            "passMs": null
+          },
+          "fauna": {
+            "aves": 10,
+            "bandadas": 1,
+            "tamBandadas": [
+              10
+            ],
+            "polinizadores": 0,
+            "celdasPolinizadores": 0,
+            "enCuadro": {
+              "aves": 7,
+              "polinizadores": 8,
+              "celdas": 5
+            }
+          }
+        },
+        "multi": {
+          "visible": true,
+          "trees": 886,
+          "treeSpecies": {
+            "tala": 426,
+            "algarrobo": 295,
+            "chanar": 165
+          },
+          "treeChunks": 10,
+          "treeNearCells": 2,
+          "treeFarCells": 10,
+          "pasto": "nuevo",
+          "grass": {
+            "corr-herb": 24275,
+            "parche-herb": 0
+          },
+          "grassTotal": 24275,
+          "grassDibujadas": 13354,
+          "grassChunks": 7,
+          "grassChunksVisibles": 7,
+          "grassCeldas": {
+            "candidatas": 264,
+            "activas": 7,
+            "visibles": 7,
+            "porTier": [
+              0,
+              0,
+              1,
+              6
+            ],
+            "pool": 0,
+            "mallasCreadas": 7
+          },
+          "grassGen": {
+            "celdasGeneradas": 7,
+            "msCeldaMedio": 3.99,
+            "msCeldaMax": 7,
+            "msCuadroMax": 2.5,
+            "msCuadroP95": 2.5,
+            "cuadrosConGeneracion": 15
+          },
+          "grassPrep": {
+            "ms": 2,
+            "poligonos": 7,
+            "raster": {
+              "W": 240,
+              "H": 180
+            }
+          },
+          "grassAtlasMs": {
+            "total": 41.2,
+            "dibujo": 10.3,
+            "relleno": 16.2,
+            "mipmaps": 14.7,
+            "pasos": 18
+          },
+          "grassMsaa": false,
+          "suelo": {
+            "verts": 17384,
+            "tris": 33187,
+            "topTris": 33027,
+            "ribTris": 160,
+            "polys": 14,
+            "failed": 0,
+            "tiny": 0,
+            "furrowTris": 31158,
+            "lots": 26,
+            "buildMs": 138,
+            "texMs": 232,
+            "texSize": 1024,
+            "modo": "completo",
+            "variante": "v3",
+            "texMean": {
+              "corr": [
+                62,
+                69,
+                40
+              ],
+              "parche": [
+                48,
+                70,
+                35
+              ],
+              "camino": [
+                165,
+                145,
+                111
+              ]
+            }
+          },
+          "agua": {
+            "hasRelief": true,
+            "verts": 0,
+            "tris": 0,
+            "shoreTex": "1x1@1.00m",
+            "polys": 0,
+            "failed": 0,
+            "tiny": 0,
+            "cells": 0,
+            "buildMs": 0
+          },
+          "shadows": {
+            "map": 2048,
+            "blobs": 886,
+            "boxHalfM": 283,
+            "passRenders": 8,
+            "passDraws": 0,
+            "passTris": 0,
+            "cellsNear": 0,
+            "cellsFar": 0,
+            "grassReceive": false,
+            "passMs": null
+          },
+          "fauna": {
+            "aves": 40,
+            "bandadas": 3,
+            "tamBandadas": [
+              9,
+              12,
+              19
+            ],
+            "polinizadores": 292,
+            "celdasPolinizadores": 59,
+            "enCuadro": {
+              "aves": 7,
+              "polinizadores": 8,
+              "celdas": 5
+            }
+          }
+        }
+      },
+      "textures": 12,
+      "geometries": 34,
+      "heapMB": 69.9
+    },
+    "multi-rasante-medio": {
+      "scenario": "multi",
+      "drawCalls": 36,
+      "triangles": 209329,
+      "instances": {
+        "inicial": {
+          "visible": false,
+          "trees": 441,
+          "treeSpecies": {
+            "tala": 209,
+            "algarrobo": 151,
+            "chanar": 81
+          },
+          "treeChunks": 6,
+          "treeNearCells": 2,
+          "treeFarCells": 6,
+          "pasto": "nuevo",
+          "grass": {
+            "corr-herb": 0,
+            "parche-herb": 0
+          },
+          "grassTotal": 0,
+          "grassDibujadas": 0,
+          "grassChunks": 0,
+          "grassChunksVisibles": 0,
+          "grassCeldas": {
+            "candidatas": 0,
+            "activas": 0,
+            "visibles": 0,
+            "porTier": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "pool": 0,
+            "mallasCreadas": 29
+          },
+          "grassGen": {
+            "celdasGeneradas": 31,
+            "msCeldaMedio": 1.65,
+            "msCeldaMax": 7,
+            "msCuadroMax": 2.5,
+            "msCuadroP95": 2.3,
+            "cuadrosConGeneracion": 27
+          },
+          "grassPrep": {
+            "ms": 0.1,
+            "poligonos": 0,
+            "raster": null
+          },
+          "grassAtlasMs": {
+            "total": 41.2,
+            "dibujo": 10.3,
+            "relleno": 16.2,
+            "mipmaps": 14.7,
+            "pasos": 18
+          },
+          "grassMsaa": false,
+          "suelo": {
+            "verts": 5137,
+            "tris": 9835,
+            "topTris": 9777,
+            "ribTris": 58,
+            "polys": 4,
+            "failed": 0,
+            "tiny": 0,
+            "furrowTris": 28209,
+            "lots": 12,
+            "buildMs": 333,
+            "texMs": 232,
+            "texSize": 1024,
+            "modo": "completo",
+            "variante": "v3",
+            "texMean": {
+              "corr": [
+                62,
+                69,
+                40
+              ],
+              "parche": [
+                48,
+                70,
+                35
+              ],
+              "camino": [
+                165,
+                145,
+                111
+              ]
+            }
+          },
+          "agua": {
+            "hasRelief": true,
+            "verts": 0,
+            "tris": 0,
+            "shoreTex": "1x1@1.00m",
+            "polys": 0,
+            "failed": 0,
+            "tiny": 0,
+            "cells": 0,
+            "buildMs": 11
+          },
+          "shadows": {
+            "map": 2048,
+            "blobs": 441,
+            "boxHalfM": 283,
+            "passRenders": 9,
+            "passDraws": 0,
+            "passTris": 0,
+            "cellsNear": 0,
+            "cellsFar": 0,
+            "grassReceive": false,
+            "passMs": null
+          },
+          "fauna": {
+            "aves": 10,
+            "bandadas": 1,
+            "tamBandadas": [
+              10
+            ],
+            "polinizadores": 0,
+            "celdasPolinizadores": 0,
+            "enCuadro": {
+              "aves": 31,
+              "polinizadores": 15,
+              "celdas": 5
+            }
+          }
+        },
+        "multi": {
+          "visible": true,
+          "trees": 886,
+          "treeSpecies": {
+            "tala": 426,
+            "algarrobo": 295,
+            "chanar": 165
+          },
+          "treeChunks": 10,
+          "treeNearCells": 2,
+          "treeFarCells": 10,
+          "pasto": "nuevo",
+          "grass": {
+            "corr-herb": 53539,
+            "parche-herb": 0
+          },
+          "grassTotal": 53539,
+          "grassDibujadas": 25955,
+          "grassChunks": 29,
+          "grassChunksVisibles": 29,
+          "grassCeldas": {
+            "candidatas": 264,
+            "activas": 29,
+            "visibles": 29,
+            "porTier": [
+              10,
+              5,
+              4,
+              10
+            ],
+            "pool": 0,
+            "mallasCreadas": 29
+          },
+          "grassGen": {
+            "celdasGeneradas": 31,
+            "msCeldaMedio": 1.65,
+            "msCeldaMax": 7,
+            "msCuadroMax": 2.5,
+            "msCuadroP95": 2.3,
+            "cuadrosConGeneracion": 27
+          },
+          "grassPrep": {
+            "ms": 2,
+            "poligonos": 7,
+            "raster": {
+              "W": 240,
+              "H": 180
+            }
+          },
+          "grassAtlasMs": {
+            "total": 41.2,
+            "dibujo": 10.3,
+            "relleno": 16.2,
+            "mipmaps": 14.7,
+            "pasos": 18
+          },
+          "grassMsaa": false,
+          "suelo": {
+            "verts": 17384,
+            "tris": 33187,
+            "topTris": 33027,
+            "ribTris": 160,
+            "polys": 14,
+            "failed": 0,
+            "tiny": 0,
+            "furrowTris": 31158,
+            "lots": 26,
+            "buildMs": 138,
+            "texMs": 232,
+            "texSize": 1024,
+            "modo": "completo",
+            "variante": "v3",
+            "texMean": {
+              "corr": [
+                62,
+                69,
+                40
+              ],
+              "parche": [
+                48,
+                70,
+                35
+              ],
+              "camino": [
+                165,
+                145,
+                111
+              ]
+            }
+          },
+          "agua": {
+            "hasRelief": true,
+            "verts": 0,
+            "tris": 0,
+            "shoreTex": "1x1@1.00m",
+            "polys": 0,
+            "failed": 0,
+            "tiny": 0,
+            "cells": 0,
+            "buildMs": 0
+          },
+          "shadows": {
+            "map": 2048,
+            "blobs": 886,
+            "boxHalfM": 283,
+            "passRenders": 9,
+            "passDraws": 0,
+            "passTris": 0,
+            "cellsNear": 0,
+            "cellsFar": 0,
+            "grassReceive": false,
+            "passMs": null
+          },
+          "fauna": {
+            "aves": 40,
+            "bandadas": 3,
+            "tamBandadas": [
+              9,
+              12,
+              19
+            ],
+            "polinizadores": 292,
+            "celdasPolinizadores": 59,
+            "enCuadro": {
+              "aves": 31,
+              "polinizadores": 15,
+              "celdas": 5
+            }
+          }
+        }
+      },
+      "textures": 12,
+      "geometries": 54,
+      "heapMB": 68.9
+    },
+    "multi-parche": {
+      "scenario": "multi",
+      "drawCalls": 25,
+      "triangles": 169203,
+      "instances": {
+        "inicial": {
+          "visible": false,
+          "trees": 441,
+          "treeSpecies": {
+            "tala": 209,
+            "algarrobo": 151,
+            "chanar": 81
+          },
+          "treeChunks": 6,
+          "treeNearCells": 2,
+          "treeFarCells": 5,
+          "pasto": "nuevo",
+          "grass": {
+            "corr-herb": 0,
+            "parche-herb": 0
+          },
+          "grassTotal": 0,
+          "grassDibujadas": 0,
+          "grassChunks": 0,
+          "grassChunksVisibles": 0,
+          "grassCeldas": {
+            "candidatas": 0,
+            "activas": 0,
+            "visibles": 0,
+            "porTier": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "pool": 29,
+            "mallasCreadas": 29
+          },
+          "grassGen": {
+            "celdasGeneradas": 31,
+            "msCeldaMedio": 1.65,
+            "msCeldaMax": 7,
+            "msCuadroMax": 2.5,
+            "msCuadroP95": 2.3,
+            "cuadrosConGeneracion": 27
+          },
+          "grassPrep": {
+            "ms": 0.1,
+            "poligonos": 0,
+            "raster": null
+          },
+          "grassAtlasMs": {
+            "total": 41.2,
+            "dibujo": 10.3,
+            "relleno": 16.2,
+            "mipmaps": 14.7,
+            "pasos": 18
+          },
+          "grassMsaa": false,
+          "suelo": {
+            "verts": 5137,
+            "tris": 9835,
+            "topTris": 9777,
+            "ribTris": 58,
+            "polys": 4,
+            "failed": 0,
+            "tiny": 0,
+            "furrowTris": 28209,
+            "lots": 12,
+            "buildMs": 333,
+            "texMs": 232,
+            "texSize": 1024,
+            "modo": "completo",
+            "variante": "v3",
+            "texMean": {
+              "corr": [
+                62,
+                69,
+                40
+              ],
+              "parche": [
+                48,
+                70,
+                35
+              ],
+              "camino": [
+                165,
+                145,
+                111
+              ]
+            }
+          },
+          "agua": {
+            "hasRelief": true,
+            "verts": 0,
+            "tris": 0,
+            "shoreTex": "1x1@1.00m",
+            "polys": 0,
+            "failed": 0,
+            "tiny": 0,
+            "cells": 0,
+            "buildMs": 11
+          },
+          "shadows": {
+            "map": 2048,
+            "blobs": 441,
+            "boxHalfM": 354,
+            "passRenders": 10,
+            "passDraws": 10,
+            "passTris": 65036,
+            "cellsNear": 3,
+            "cellsFar": 2,
+            "grassReceive": false,
+            "passMs": null
+          },
+          "fauna": {
+            "aves": 10,
+            "bandadas": 1,
+            "tamBandadas": [
+              10
+            ],
+            "polinizadores": 0,
+            "celdasPolinizadores": 0,
+            "enCuadro": {
+              "aves": 31,
+              "polinizadores": 0,
+              "celdas": 0
+            }
+          }
+        },
+        "multi": {
+          "visible": true,
+          "trees": 886,
+          "treeSpecies": {
+            "tala": 426,
+            "algarrobo": 295,
+            "chanar": 165
+          },
+          "treeChunks": 10,
+          "treeNearCells": 5,
+          "treeFarCells": 8,
+          "pasto": "nuevo",
+          "grass": {
+            "corr-herb": 0,
+            "parche-herb": 0
+          },
+          "grassTotal": 0,
+          "grassDibujadas": 0,
+          "grassChunks": 0,
+          "grassChunksVisibles": 0,
+          "grassCeldas": {
+            "candidatas": 264,
+            "activas": 0,
+            "visibles": 0,
+            "porTier": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "pool": 29,
+            "mallasCreadas": 29
+          },
+          "grassGen": {
+            "celdasGeneradas": 31,
+            "msCeldaMedio": 1.65,
+            "msCeldaMax": 7,
+            "msCuadroMax": 2.5,
+            "msCuadroP95": 2.3,
+            "cuadrosConGeneracion": 27
+          },
+          "grassPrep": {
+            "ms": 2,
+            "poligonos": 7,
+            "raster": {
+              "W": 240,
+              "H": 180
+            }
+          },
+          "grassAtlasMs": {
+            "total": 41.2,
+            "dibujo": 10.3,
+            "relleno": 16.2,
+            "mipmaps": 14.7,
+            "pasos": 18
+          },
+          "grassMsaa": false,
+          "suelo": {
+            "verts": 17384,
+            "tris": 33187,
+            "topTris": 33027,
+            "ribTris": 160,
+            "polys": 14,
+            "failed": 0,
+            "tiny": 0,
+            "furrowTris": 31158,
+            "lots": 26,
+            "buildMs": 138,
+            "texMs": 232,
+            "texSize": 1024,
+            "modo": "completo",
+            "variante": "v3",
+            "texMean": {
+              "corr": [
+                62,
+                69,
+                40
+              ],
+              "parche": [
+                48,
+                70,
+                35
+              ],
+              "camino": [
+                165,
+                145,
+                111
+              ]
+            }
+          },
+          "agua": {
+            "hasRelief": true,
+            "verts": 0,
+            "tris": 0,
+            "shoreTex": "1x1@1.00m",
+            "polys": 0,
+            "failed": 0,
+            "tiny": 0,
+            "cells": 0,
+            "buildMs": 0
+          },
+          "shadows": {
+            "map": 2048,
+            "blobs": 886,
+            "boxHalfM": 354,
+            "passRenders": 10,
+            "passDraws": 10,
+            "passTris": 65036,
+            "cellsNear": 3,
+            "cellsFar": 2,
+            "grassReceive": false,
+            "passMs": null
+          },
+          "fauna": {
+            "aves": 40,
+            "bandadas": 3,
+            "tamBandadas": [
+              9,
+              12,
+              19
+            ],
+            "polinizadores": 292,
+            "celdasPolinizadores": 59,
+            "enCuadro": {
+              "aves": 31,
+              "polinizadores": 0,
+              "celdas": 0
+            }
+          }
+        }
+      },
+      "textures": 12,
+      "geometries": 54,
+      "heapMB": 71
+    },
+    "multi-horizonte": {
+      "scenario": "multi",
+      "drawCalls": 26,
+      "triangles": 167927,
+      "instances": {
+        "inicial": {
+          "visible": false,
+          "trees": 441,
+          "treeSpecies": {
+            "tala": 209,
+            "algarrobo": 151,
+            "chanar": 81
+          },
+          "treeChunks": 6,
+          "treeNearCells": 2,
+          "treeFarCells": 6,
+          "pasto": "nuevo",
+          "grass": {
+            "corr-herb": 0,
+            "parche-herb": 0
+          },
+          "grassTotal": 0,
+          "grassDibujadas": 0,
+          "grassChunks": 0,
+          "grassChunksVisibles": 0,
+          "grassCeldas": {
+            "candidatas": 0,
+            "activas": 0,
+            "visibles": 0,
+            "porTier": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "pool": 29,
+            "mallasCreadas": 29
+          },
+          "grassGen": {
+            "celdasGeneradas": 31,
+            "msCeldaMedio": 1.65,
+            "msCeldaMax": 7,
+            "msCuadroMax": 2.5,
+            "msCuadroP95": 2.3,
+            "cuadrosConGeneracion": 27
+          },
+          "grassPrep": {
+            "ms": 0.1,
+            "poligonos": 0,
+            "raster": null
+          },
+          "grassAtlasMs": {
+            "total": 41.2,
+            "dibujo": 10.3,
+            "relleno": 16.2,
+            "mipmaps": 14.7,
+            "pasos": 18
+          },
+          "grassMsaa": false,
+          "suelo": {
+            "verts": 5137,
+            "tris": 9835,
+            "topTris": 9777,
+            "ribTris": 58,
+            "polys": 4,
+            "failed": 0,
+            "tiny": 0,
+            "furrowTris": 28209,
+            "lots": 12,
+            "buildMs": 333,
+            "texMs": 232,
+            "texSize": 1024,
+            "modo": "completo",
+            "variante": "v3",
+            "texMean": {
+              "corr": [
+                62,
+                69,
+                40
+              ],
+              "parche": [
+                48,
+                70,
+                35
+              ],
+              "camino": [
+                165,
+                145,
+                111
+              ]
+            }
+          },
+          "agua": {
+            "hasRelief": true,
+            "verts": 0,
+            "tris": 0,
+            "shoreTex": "1x1@1.00m",
+            "polys": 0,
+            "failed": 0,
+            "tiny": 0,
+            "cells": 0,
+            "buildMs": 11
+          },
+          "shadows": {
+            "map": 2048,
+            "blobs": 441,
+            "boxHalfM": 1080,
+            "passRenders": 11,
+            "passDraws": 10,
+            "passTris": 28352,
+            "cellsNear": 0,
+            "cellsFar": 10,
+            "grassReceive": false,
+            "passMs": null
+          },
+          "fauna": {
+            "aves": 10,
+            "bandadas": 1,
+            "tamBandadas": [
+              10
+            ],
+            "polinizadores": 0,
+            "celdasPolinizadores": 0,
+            "enCuadro": {
+              "aves": 31,
+              "polinizadores": 0,
+              "celdas": 0
+            }
+          }
+        },
+        "multi": {
+          "visible": true,
+          "trees": 886,
+          "treeSpecies": {
+            "tala": 426,
+            "algarrobo": 295,
+            "chanar": 165
+          },
+          "treeChunks": 10,
+          "treeNearCells": 4,
+          "treeFarCells": 9,
+          "pasto": "nuevo",
+          "grass": {
+            "corr-herb": 0,
+            "parche-herb": 0
+          },
+          "grassTotal": 0,
+          "grassDibujadas": 0,
+          "grassChunks": 0,
+          "grassChunksVisibles": 0,
+          "grassCeldas": {
+            "candidatas": 264,
+            "activas": 0,
+            "visibles": 0,
+            "porTier": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "pool": 29,
+            "mallasCreadas": 29
+          },
+          "grassGen": {
+            "celdasGeneradas": 31,
+            "msCeldaMedio": 1.65,
+            "msCeldaMax": 7,
+            "msCuadroMax": 2.5,
+            "msCuadroP95": 2.3,
+            "cuadrosConGeneracion": 27
+          },
+          "grassPrep": {
+            "ms": 2,
+            "poligonos": 7,
+            "raster": {
+              "W": 240,
+              "H": 180
+            }
+          },
+          "grassAtlasMs": {
+            "total": 41.2,
+            "dibujo": 10.3,
+            "relleno": 16.2,
+            "mipmaps": 14.7,
+            "pasos": 18
+          },
+          "grassMsaa": false,
+          "suelo": {
+            "verts": 17384,
+            "tris": 33187,
+            "topTris": 33027,
+            "ribTris": 160,
+            "polys": 14,
+            "failed": 0,
+            "tiny": 0,
+            "furrowTris": 31158,
+            "lots": 26,
+            "buildMs": 138,
+            "texMs": 232,
+            "texSize": 1024,
+            "modo": "completo",
+            "variante": "v3",
+            "texMean": {
+              "corr": [
+                62,
+                69,
+                40
+              ],
+              "parche": [
+                48,
+                70,
+                35
+              ],
+              "camino": [
+                165,
+                145,
+                111
+              ]
+            }
+          },
+          "agua": {
+            "hasRelief": true,
+            "verts": 0,
+            "tris": 0,
+            "shoreTex": "1x1@1.00m",
+            "polys": 0,
+            "failed": 0,
+            "tiny": 0,
+            "cells": 0,
+            "buildMs": 0
+          },
+          "shadows": {
+            "map": 2048,
+            "blobs": 886,
+            "boxHalfM": 1080,
+            "passRenders": 11,
+            "passDraws": 10,
+            "passTris": 28352,
+            "cellsNear": 0,
+            "cellsFar": 10,
+            "grassReceive": false,
+            "passMs": null
+          },
+          "fauna": {
+            "aves": 40,
+            "bandadas": 3,
+            "tamBandadas": [
+              9,
+              12,
+              19
+            ],
+            "polinizadores": 292,
+            "celdasPolinizadores": 59,
+            "enCuadro": {
+              "aves": 31,
+              "polinizadores": 0,
+              "celdas": 0
+            }
+          }
+        }
+      },
+      "textures": 12,
+      "geometries": 54,
+      "heapMB": 74.2
+    }
+  }
+}

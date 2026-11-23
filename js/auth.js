@@ -32,6 +32,14 @@ let _sb = null;
 const HOST_DEV = /^(localhost|127\.0\.0\.1|\[::1\]|.+\.localhost)$/i.test(location.hostname);
 const MODO_LOCAL = HOST_DEV && new URLSearchParams(location.search).has("local");
 
+/* ---------- Modo fixture (campo sintético, sin login) ----------
+   ?fixture=<id> lee fixtures/campos.fixture.json y sirve los GeoJSON desde fixtures/ (todo inventado, sin datos de
+   clientes). Se permite en hosts de desarrollo y en el staging; en 3d.agrodesign.site (o cualquier otro host) el
+   parámetro se ignora y sigue el login normal. */
+const HOST_FIXTURE = HOST_DEV || location.hostname === "3d-staging.agrodesign.site";
+const FIXTURE_ID = HOST_FIXTURE ? new URLSearchParams(location.search).get("fixture") : null;
+const MODO_FIXTURE = !!FIXTURE_ID && !MODO_LOCAL;   // ?local manda si vienen los dos
+
 /* Contrato con main.js: éste lee AD_AUTH.campo y AD_AUTH.signedUrlFor() */
 const AD_AUTH = {
   sb: null,
@@ -291,6 +299,7 @@ function entrarAlVisor(campo) {
 async function signedUrlFor(path) {
   if (!path) throw new Error("El campo no tiene cargada la ruta de sus datos GIS.");
   if (MODO_LOCAL) return `data/${path}`;
+  if (MODO_FIXTURE) return `fixtures/${path}`;
   const { data, error } = await _sb.storage
     .from(GIS_BUCKET)
     .createSignedUrl(path, SIGNED_URL_TTL);
@@ -300,7 +309,7 @@ async function signedUrlFor(path) {
 
 /* ---------- Cerrar sesión ---------- */
 async function doLogout() {
-  if (!MODO_LOCAL) {
+  if (!MODO_LOCAL && !MODO_FIXTURE) {
     try { await _sb.auth.signOut(); } catch (e) { console.warn(e); }
   }
   location.replace(location.pathname);   // limpia también el ?campo=
@@ -355,9 +364,42 @@ async function arrancarLocal() {
   entrarAlVisor(AD_AUTH.campos.find(c => c.id === pedido) || AD_AUTH.campos[0]);
 }
 
+/* ---------- Arranque en modo fixture: igual que el local, con el campo sintético ---------- */
+async function arrancarFixture() {
+  try {
+    const r = await fetch("fixtures/campos.fixture.json", { cache: "no-store" });
+    if (!r.ok) throw new Error(`fixtures/campos.fixture.json respondió ${r.status}`);
+    AD_AUTH.campos = await r.json();
+  } catch (err) {
+    console.error("Modo fixture: no se pudo leer fixtures/campos.fixture.json:", err);
+    setCardState("form");
+    showError("Modo fixture: falta fixtures/campos.fixture.json.");
+    return;
+  }
+  const campo = AD_AUTH.campos.find(c => c.id === FIXTURE_ID);
+  if (!campo) {
+    console.error(`Modo fixture: no hay un campo "${FIXTURE_ID}" en fixtures/campos.fixture.json`);
+    setCardState("form");
+    showError(`Modo fixture: no existe el campo "${FIXTURE_ID}".`);
+    return;
+  }
+
+  /* Misma marca discreta que el modo local, para no confundir esta sesión con una real */
+  const marca = document.createElement("div");
+  marca.textContent = "campo sintético";
+  marca.style.cssText = "position:fixed;left:6px;bottom:4px;z-index:9999;font:10px/1 sans-serif;" +
+    "letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.55);" +
+    "background:rgba(0,0,0,.35);padding:3px 6px;border-radius:3px;pointer-events:none";
+  document.body.appendChild(marca);
+
+  entrarAlVisor(campo);
+}
+
 /* ---------- Arranque ---------- */
 if (MODO_LOCAL) {
   arrancarLocal();
+} else if (MODO_FIXTURE) {
+  arrancarFixture();
 } else if (initSupabase()) {
   /* Si la sesión anterior sigue viva (supabase-js la guarda y la renueva sola
      en localStorage) el usuario no vuelve a escribir la contraseña. Mientras se

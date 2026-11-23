@@ -3,7 +3,7 @@
 // Uso:  node tools/stamp_version.mjs <VERSION>        (p. ej. 20261113)
 //       node tools/stamp_version.mjs --check          (verifica que no haya mezcla; sale 1 si la hay)
 // Idempotente: reemplaza la versión anterior. Toca solo especificadores relativos (./ y ../) de
-// import / export ... from / import() dentro de js/**/*.js, y las referencias locales de index.html
+// import / export ... from / import() / new URL("./x.js", import.meta.url) dentro de js/**/*.js, y las referencias locales de index.html
 // (js/auth.js, js/app.js, css/style.css, vendor/maplibre-gl.css). No toca URLs absolutas, el
 // importmap ("three" -> vendor/three.module.js) ni el contenido de vendor/.
 // Un módulo importado con y sin query serían dos instancias (estado duplicado): por eso todo o nada.
@@ -26,6 +26,8 @@ function* walk(dir) {
 }
 // (from | import | import( ) + comilla + especificador relativo .js + ?v= opcional
 const RE_JS = /((?:\bfrom|\bimport)\s*\(?\s*)(["'])(\.{1,2}\/[^"'?]*\.js)(?:\?v=[^"']*)?\2/g;
+// new URL("./x.js", import.meta.url) (p. ej. el Worker de módulo del simulador): también es un módulo del grafo
+const RE_URL = /(\bnew\s+URL\(\s*)(["'])(\.{1,2}\/[^"'?]*\.js)(?:\?v=[^"']*)?\2(\s*,\s*import\.meta\.url)/g;
 // referencias locales de index.html
 const RE_HTML = /((?:src|href)=")((?:js\/auth\.js|js\/app\.js|css\/style\.css|vendor\/maplibre-gl\.css))(?:\?v=[^"]*)?(")/g;
 
@@ -35,9 +37,11 @@ const sufijo = CHECK ? null : "?v=" + arg;
 for (const f of walk(join(RAIZ, "js"))) {
   const src = readFileSync(f, "utf8");
   let n = 0;
-  const out = src.replace(RE_JS, (m, pre, q, esp) => { n++; return CHECK ? m : pre + q + esp + sufijo + q; });
+  const out = src
+    .replace(RE_JS, (m, pre, q, esp) => { n++; return CHECK ? m : pre + q + esp + sufijo + q; })
+    .replace(RE_URL, (m, pre, q, esp, post) => { n++; return CHECK ? m : pre + q + esp + sufijo + q + post; });
   specs += n;
-  if (CHECK) { for (const m of src.matchAll(RE_JS)) if (!m[0].includes("?v=")) sinSello.push(f + ": " + m[3]); }
+  if (CHECK) { for (const m of [...src.matchAll(RE_JS), ...src.matchAll(RE_URL)]) if (!m[0].includes("?v=")) sinSello.push(f + ": " + m[3]); }
   if (!CHECK && out !== src) { writeFileSync(f, out); tocados++; }
 }
 const html = join(RAIZ, "index.html");
