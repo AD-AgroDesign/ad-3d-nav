@@ -6,19 +6,19 @@
    Supabase: ver js/auth.js.
    ============================================================ */
 
-import { loadCampos, loadData } from "./map/data.js?v=20261130";
-import { addScenarioLayers, applyGrowth, applyOpacity } from "./map/layers.js?v=20261130";
-import { applyRasterGrade, map } from "./map/style.js?v=20261130";
-import { updatePanel } from "./ui/panel.js?v=20261130";
-import { mapStyle } from "./map/style.js?v=20261130";
-import { DEBUG, state } from "./core/state.js?v=20261130";
-import { initTerrain } from "./terrain/terrain.js?v=20261130";   // A6: relieve (DEM terrarium), hillshade y terreno 3D automático
-import "./render/atmo.js?v=20261130";   // A1: capa atmo-fog (se registra sola en host.registerBeforeLayer, antes de addScenarioLayers)
-import "./ui/controls.js?v=20261130";
-import "./ui/presets-ui.js?v=20261130";   // A1 (3.1): botones de modo de hora
-import "./ui/runoff-ui.js?v=20261130";    // F2: bloque "Simulador de escorrentía" (se arma solo al importarse)
-import "./debug/fps.js?v=20261130";
-import "./debug/qa-api.js?v=20261130";
+import { loadCampos, loadData } from "./map/data.js?v=20261201";
+import { addScenarioLayers, applyGrowth, applyOpacity } from "./map/layers.js?v=20261201";
+import { applyRasterGrade, map } from "./map/style.js?v=20261201";
+import { updatePanel } from "./ui/panel.js?v=20261201";
+import { mapStyle } from "./map/style.js?v=20261201";
+import { DEBUG, state } from "./core/state.js?v=20261201";
+import { initTerrain } from "./terrain/terrain.js?v=20261201";   // A6: relieve (DEM terrarium), hillshade y terreno 3D automático
+import "./render/atmo.js?v=20261201";   // A1: capa atmo-fog (se registra sola en host.registerBeforeLayer, antes de addScenarioLayers)
+import "./ui/controls.js?v=20261201";
+import "./ui/presets-ui.js?v=20261201";   // A1 (3.1): botones de modo de hora
+import "./ui/runoff-ui.js?v=20261201";    // F2: bloque "Simulador de escorrentía" (se arma solo al importarse)
+import "./debug/fps.js?v=20261201";
+import "./debug/qa-api.js?v=20261201";
 
 /* Con ?debug se exponen el mapa, su estilo y el estado en window (inspección desde
    la consola). Antes vivía junto a la creación del mapa en main.js. */

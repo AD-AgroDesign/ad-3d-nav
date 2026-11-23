@@ -4,9 +4,9 @@
    para todo lo que todavía nadie consume (§6.3). Los materiales los toman por
    referencia (shaderlib.patch), así que cambiar `.value` los actualiza a todos. */
 import * as THREE from "three";
-import { A1_CAMPOS, A1_FOG, A1_HORAS, A1_LIGHT, A1_RASTER, A1_RENDER, A1_SKY, A1_SUN, A3_SHADOWS, A6_NIEBLA } from "../core/config.js?v=20261130";
-import { emit, on } from "../core/events.js?v=20261130";
-import { quality } from "../core/quality.js?v=20261130";
+import { A1_CAMPOS, A1_FOG, A1_HORAS, A1_LIGHT, A1_RASTER, A1_RENDER, A1_SKY, A1_SUN, A3_SHADOWS, A6_NIEBLA } from "../core/config.js?v=20261201";
+import { emit, on } from "../core/events.js?v=20261201";
+import { quality } from "../core/quality.js?v=20261201";
 
 /* Color (1.3): ColorManagement ENCENDIDO. Las paletas del proyecto están definidas "a ojo" en
    sRGB (hex); Three las convierte a lineal, ilumina en lineal y host.js saca sRGB + tone mapping

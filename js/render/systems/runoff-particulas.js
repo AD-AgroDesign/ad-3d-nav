@@ -18,10 +18,10 @@
    de velocidad) + un margen, y el vertex shader resta la bajada viva a6Low (sin hundirse con el relieve apagándose).
    Baja: sin animación; `estaticasBaja` estelas precalculadas (mismo armado de cola, una sola subida de textura). */
 import * as THREE from "three";
-import { HIDRO, IS_MOBILE } from "../../core/config.js?v=20261130";
-import { GLSL_DECL, withReliefU } from "../../terrain/terrain.js?v=20261130";
-import { GLSL_ADFOG, GLSL_FOG_UNIFORMS, scenarioFade } from "../shaderlib.js?v=20261130";
-import { simFade } from "./runoff-fade.js?v=20261130";
+import { HIDRO, IS_MOBILE } from "../../core/config.js?v=20261201";
+import { GLSL_DECL, withReliefU } from "../../terrain/terrain.js?v=20261201";
+import { GLSL_ADFOG, GLSL_FOG_UNIFORMS, scenarioFade } from "../shaderlib.js?v=20261201";
+import { simFade } from "./runoff-fade.js?v=20261201";
 
 const VIS = HIDRO.vis, PV = VIS.particulas;
 const NP = Math.max(2, PV.puntosEstela | 0);

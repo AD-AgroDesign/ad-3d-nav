@@ -13,13 +13,13 @@
              error     "" o el mensaje del último fallo
              opacity   opacidad visual de las capas del simulador (HIDRO.vis.opacidad; no calcula nada)
    Evento "runoff" (core/events.js): payload = getState() + { cambio: "mode"|"rain"|"availability"|"computing"|"result"|"error"|"opacity" }. */
-import { HIDRO, A6_TERRAIN } from "../core/config.js?v=20261130";
-import { state as appState } from "../core/state.js?v=20261130";
-import { emit } from "../core/events.js?v=20261130";
-import { terrain } from "../terrain/terrain.js?v=20261130";
-import { cargarEntradaGrilla } from "./load.js?v=20261130";
-import { sceneToCell } from "./grid.js?v=20261130";
-import { paramsMotor } from "./params.js?v=20261130";
+import { HIDRO, A6_TERRAIN } from "../core/config.js?v=20261201";
+import { state as appState } from "../core/state.js?v=20261201";
+import { emit } from "../core/events.js?v=20261201";
+import { terrain } from "../terrain/terrain.js?v=20261201";
+import { cargarEntradaGrilla } from "./load.js?v=20261201";
+import { sceneToCell } from "./grid.js?v=20261201";
+import { paramsMotor } from "./params.js?v=20261201";
 
 export { paramsMotor };
 
@@ -118,7 +118,7 @@ const featuresDe = key => appState.data[key].features.filter(f => f.geometry)
   .map(f => ({ cls: f.properties._cls, type: f.geometry.type, coordinates: f.geometry.coordinates }));
 
 function crearWorker() {
-  worker = new Worker(new URL("./worker.js?v=20261130", import.meta.url), { type: "module" });
+  worker = new Worker(new URL("./worker.js?v=20261201", import.meta.url), { type: "module" });
   worker.onmessage = (ev) => {
     const m = ev.data, p = pendientes.get(m.id);
     if (!p) return;
