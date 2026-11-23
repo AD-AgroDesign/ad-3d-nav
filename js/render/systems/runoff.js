@@ -37,7 +37,9 @@ import { idleDriver } from "../idle.js?v=20261130";
 import { map } from "../../map/style.js?v=20261130";
 import { lights, uniforms } from "../lighting.js?v=20261130";
 import { GLSL_ADFOG, GLSL_FOG_UNIFORMS, scenarioFade } from "../shaderlib.js?v=20261130";
+import { simFade } from "./runoff-fade.js?v=20261130";
 import { GLSL_DECL, lowAt, terrain, withReliefU } from "../../terrain/terrain.js?v=20261130";
+import { state as appState } from "../../core/state.js?v=20261130";
 import { getState } from "../../hydro/state.js?v=20261130";
 import { pxToLonLat } from "../../hydro/grid.js?v=20261130";
 import { getWaveTex } from "./water.js?v=20261130";
@@ -163,7 +165,7 @@ const U = {   // uniforms comunes a los dos escenarios (compartidos por referenc
 function makeMaterial(key) {
   const m = new THREE.ShaderMaterial({
     vertexShader: GLSL_DECL + VS, fragmentShader: FS,
-    uniforms: { ...U, ...withReliefU({}), uFade: scenarioFade[key] || { value: 1 },
+    uniforms: { ...U, ...withReliefU({}), uFade: simFade[key] || { value: 1 },
       tD: { value: null }, tIn: { value: null }, tWave: { value: null }, uG: { value: new THREE.Vector4(1, 0, 1, 0) }, uN: { value: new THREE.Vector2(1, 1) } }
   });
   m.side = THREE.DoubleSide;
@@ -394,6 +396,7 @@ export default {
       subscribed = true;
       on("runoff", p => {
         mode = p.mode;
+        if (p.cambio === "opacity") { if (shown()) map.triggerRepaint(); return; }   // el update() recalcula uFade en el próximo cuadro
         if (p.cambio === "result" && p.result) setResult(p.result);
         else applyVisibility();
       });
@@ -407,8 +410,12 @@ export default {
   update(frame) {
     if (!shown()) { if (wantReq) { wantReq = false; idleDriver.request("runoff", false); } return; }
     const vel = mode === "velocidad", dif = mode === "diferencia";
+    /* fundido propio: el del escenario sin el factor del diseño (se divide por designOpacity, que nunca baja de 0,2) × opacidad del simulador */
+    const dOp = Math.max(0.05, appState.designOpacity || 1), sOp = getState().opacity;
+    simFade.inicial.value = Math.min(1, scenarioFade.inicial.value / dOp) * sOp;
+    simFade.multi.value = Math.min(1, scenarioFade.multi.value / dOp) * sOp;
     if (dif) {   // una sola capa: fade = opacidad del diseño; la dibuja un solo grupo; la raya de la traza se mide en píxeles de pantalla
-      DIF_FADE.value = Math.min(1, scenarioFade.inicial.value + scenarioFade.multi.value);
+      DIF_FADE.value = Math.min(1, (scenarioFade.inicial.value + scenarioFade.multi.value) / dOp) * sOp;
       for (const k in S) { const s = S[k]; s.dmesh.visible = s.hasData && difActive(k); s.tmesh.visible = s.dmesh.visible && traza.points > 0; }
       traza.setViewport(); traza.updatePx(frame.viewProj);
     }
