@@ -535,6 +535,7 @@ export const HIDRO = {
   stats: { vAltaMs: 0.3, frenaDlog: -0.25 },   // ha con v > 0,3 m/s · "frena ≥ 16 %" = log2(v_multi/v_ini) < −0,25
   /* --- visualización (la usan render y UI; el motor solo la guarda) --- */
   vis: {
+    opacidad: { default: 1, min: 0.1, max: 1, step: 0.05 },   // slider del panel: transparencia de las capas del simulador (independiente del diseño)
     vMinMs: 0.02, vMaxMs: 1.5,             // rango de la paleta turbo (log10) y de la leyenda
     marcasMs: [0.02, 0.05, 0.1, 0.2, 0.5, 1, 1.5],
     hVisibleM: 0.02, hOpacoM: 0.2,         // lámina desde la que se ve el agua / donde ya es opaca

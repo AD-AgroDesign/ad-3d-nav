@@ -11,7 +11,8 @@
              computing hay un cálculo en vuelo
              result    null o el resultado (ver más abajo); su rainMmH puede ir atrás de `rainMmH` mientras recalcula
              error     "" o el mensaje del último fallo
-   Evento "runoff" (core/events.js): payload = getState() + { cambio: "mode"|"rain"|"availability"|"computing"|"result"|"error" }. */
+             opacity   opacidad visual de las capas del simulador (HIDRO.vis.opacidad; no calcula nada)
+   Evento "runoff" (core/events.js): payload = getState() + { cambio: "mode"|"rain"|"availability"|"computing"|"result"|"error"|"opacity" }. */
 import { HIDRO, A6_TERRAIN } from "../core/config.js?v=20261130";
 import { state as appState } from "../core/state.js?v=20261130";
 import { emit } from "../core/events.js?v=20261130";
@@ -24,7 +25,7 @@ export { paramsMotor };
 
 export const MODES = ["off", "natural", "velocidad", "diferencia"];
 
-const S = { mode: "off", rainMmH: HIDRO.rain.default, available: false, reason: "sin-dem", computing: false, result: null, error: "" };
+const S = { mode: "off", rainMmH: HIDRO.rain.default, available: false, reason: "sin-dem", computing: false, result: null, error: "", opacity: HIDRO.vis.opacidad.default };
 
 let worker = null, seq = 0, tieneCache = false, primerCalculoEnCurso = null;
 const pendientes = new Map();   // id → { resolve, reject }
@@ -41,7 +42,7 @@ function disponibilidad() {
 export function getState() {
   const d = disponibilidad();
   S.available = d.available; S.reason = d.reason;
-  return { mode: S.mode, rainMmH: S.rainMmH, available: S.available, reason: S.reason, computing: S.computing, result: S.result, error: S.error };
+  return { mode: S.mode, rainMmH: S.rainMmH, available: S.available, reason: S.reason, computing: S.computing, result: S.result, error: S.error, opacity: S.opacity };
 }
 function avisar(cambio) { emit("runoff", { ...getState(), cambio }); }
 
@@ -66,6 +67,14 @@ export function setRain(mmh, commit = true) {
   avisar("rain");
   if (commit && S.mode !== "off") ensureComputed();
   return S.rainMmH;
+}
+
+/* Opacidad visual de agua / velocidades / diferencia, acotada a HIDRO.vis.opacidad. Solo avisa: no calcula ni crea el worker. */
+export function setOpacity(v) {
+  const o = HIDRO.vis.opacidad, n = Number(v);
+  S.opacity = Math.min(o.max, Math.max(o.min, Number.isFinite(n) ? n : o.default));
+  avisar("opacity");
+  return S.opacity;
 }
 
 /* Promesa del resultado vigente para `rainMmH` (lo calcula si falta). Resuelve null si el campo no admite simulador o falló.
