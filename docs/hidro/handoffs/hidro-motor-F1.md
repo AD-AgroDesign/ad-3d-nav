@@ -234,3 +234,7 @@ Stats para la UI (en `result.stats`, ya existentes; `HIDRO.vis.diferencia.metric
 - ha con v > 0,3 m/s: `stats.inicial.haVMayor` → `stats.multi.haVMayor`
 - velocidad media: `stats.inicial.vMediaMs` → `stats.multi.vMediaMs` (m/s); también `stats.reduccionVMediaPct`
 - ha donde frena ≥ 16 %: `stats.frenaHa`; total del campo: `stats.campoHa`
+
+## F5 (opacidad del simulador)
+- `HIDRO.vis.opacidad = { default: 1, min: 0.1, max: 1, step: 0.05 }`.
+- `state.js`: `export function setOpacity(v): number` (acota a [min, max], emite `"runoff"` con `cambio: "opacity"`, devuelve el valor). `getState().opacity` y el payload del evento lo incluyen. Solo visual: no calcula ni crea worker. El render la aplica a agua, velocidades/estelas y diferencia; el diseño sigue con el slider de la tabla.

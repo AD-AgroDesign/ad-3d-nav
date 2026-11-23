@@ -12,10 +12,11 @@
    con una rampa de la misma anchura. La salida pasa por la conversión sRGB → lineal → colorspace_fragment del renderer: en
    pantalla el color es exactamente turboCss(t) (la leyenda de la UI). Sin tone mapping (es un mapa de datos, no una superficie iluminada). */
 import * as THREE from "three";
-import { HIDRO } from "../../core/config.js?v=20261130";
-import { GLSL_DECL, withReliefU } from "../../terrain/terrain.js?v=20261130";
-import { GLSL_ADFOG, GLSL_FOG_UNIFORMS, scenarioFade } from "../shaderlib.js?v=20261130";
-import { GLSL_TURBO } from "./runoff-turbo.js?v=20261130";
+import { HIDRO } from "../../core/config.js?v=20261201";
+import { GLSL_DECL, withReliefU } from "../../terrain/terrain.js?v=20261201";
+import { GLSL_ADFOG, GLSL_FOG_UNIFORMS, scenarioFade } from "../shaderlib.js?v=20261201";
+import { simFade } from "./runoff-fade.js?v=20261201";
+import { GLSL_TURBO } from "./runoff-turbo.js?v=20261201";
 
 const VEL = HIDRO.vis.velocidad;
 const LIFT_FROM = (s => /[.e]/.test(s) ? s : s + ".0")(String(+VEL.liftDistDesdeM));   // literal float de GLSL
@@ -55,7 +56,7 @@ export function makeVelocityMaterial(key, shared) {
   const vMin = Math.log10(HIDRO.vis.vMinMs), vMax = Math.log10(HIDRO.vis.vMaxMs);
   const m = new THREE.ShaderMaterial({
     vertexShader: GLSL_DECL + VS, fragmentShader: FS,
-    uniforms: { ...shared, ...withReliefU({}), uFade: scenarioFade[key] || { value: 1 },
+    uniforms: { ...shared, ...withReliefU({}), uFade: simFade[key] || { value: 1 },
       tD: { value: null }, tIn: { value: null }, uG: { value: new THREE.Vector4(1, 0, 1, 0) }, uN: { value: new THREE.Vector2(1, 1) },
       uVel: { value: new THREE.Vector4(vMin, 1 / (vMax - vMin), VEL.opacidad, HIDRO.vis.natural.outside) },
       uBorde: { value: VEL.bordeSuaveCeldas } }

@@ -3,12 +3,12 @@
    evento "runoff") y llama setMode. El relieve se prende por core/relief.js (setReliefSession: solo esta visita, no pisa la preferencia guardada del conmutador de relieve).
    La disponibilidad depende de terrain.stats, que llega asíncrono: se re-evalúa al armar y en "runoff", "relief:state" y "scenario".
    Se arma solo al importarse (el #panel ya está en el HTML); también se exporta armarEscorrentia() por si hace falta llamarlo. */
-import { on } from "../core/events.js?v=20261130";
-import { relief, onRelief, setReliefSession } from "../core/relief.js?v=20261130";
-import { getState, setMode, setRain } from "../hydro/state.js?v=20261130";
-import { turboCss } from "../render/systems/runoff-turbo.js?v=20261130";   // misma paleta (y misma t) que el shader
-import { registrarPanel, abrirPanel as abrirPanelExcl } from "./paneles-ui.js?v=20261130";
-import { HIDRO } from "../core/config.js?v=20261130";
+import { on } from "../core/events.js?v=20261201";
+import { relief, onRelief, setReliefSession } from "../core/relief.js?v=20261201";
+import { getState, setMode, setRain, setOpacity } from "../hydro/state.js?v=20261201";
+import { turboCss } from "../render/systems/runoff-turbo.js?v=20261201";   // misma paleta (y misma t) que el shader
+import { registrarPanel, abrirPanel as abrirPanelExcl } from "./paneles-ui.js?v=20261201";
+import { HIDRO } from "../core/config.js?v=20261201";
 
 const MOTIVOS = {
   llano: "Campo llano: el modelo de terreno no alcanza para simular el escurrimiento",
@@ -144,23 +144,27 @@ export function armarEscorrentia() {
   pintar();
 }
 
-/* "Opacidad del diseño" también acá (el de la tabla sigue donde está). Se sincronizan por eventos sobre #opacity-slider, sin tocar controls.js:
-   al mover este se escribe el valor allá y se despacha "input" (corre la lógica existente); al moverse aquel se refleja acá.
-   Bucle: una bandera ignora el "input" que despachamos nosotros; reflejar no despacha nada. */
+/* "Opacidad de la simulación": opacidad propia de las capas del simulador (agua / velocidades / diferencia), vía setOpacity de state.js.
+   No tiene ningún vínculo con la opacidad del diseño (#opacity-slider de la tabla). Sin capas que mostrar no tiene efecto: se deshabilita (ver pintar). */
+let opIn, opVal, opSec;
 function armarOpacidad() {
-  const orig = document.getElementById("opacity-slider");
-  const sec = document.createElement("div");
-  sec.className = "panel-section"; sec.id = "runoff-opacity-section";
-  sec.innerHTML = '<h3>Opacidad del diseño</h3><div class="opacity-row"><input type="range" id="runoff-opacity-slider" min="20" max="100" value="100" aria-label="Opacidad del diseño"><span id="runoff-opacity-val">100%</span></div>';
-  const inp = sec.querySelector("input"), val = sec.querySelector("#runoff-opacity-val");
-  let propio = false;
-  const reflejar = v => { inp.value = v; val.textContent = inp.value + "%"; };
-  if (orig) {
-    reflejar(orig.value);
-    inp.addEventListener("input", () => { val.textContent = inp.value + "%"; orig.value = inp.value; propio = true; orig.dispatchEvent(new Event("input")); propio = false; });
-    orig.addEventListener("input", () => { if (!propio) reflejar(orig.value); });
-  }
-  return sec;
+  const o = HIDRO.vis.opacidad, pc = x => Math.round(x * 100);
+  opSec = document.createElement("div");
+  opSec.className = "panel-section"; opSec.id = "runoff-opacity-section";
+  opSec.innerHTML = '<h3>Opacidad de la simulación</h3><div class="opacity-row"><input type="range" id="runoff-opacity-slider" min="' + pc(o.min) + '" max="' + pc(o.max) + '" step="' + pc(o.step) + '" value="' + pc(getState().opacity) + '" aria-label="Opacidad de la simulación"><span id="runoff-opacity-val"></span></div>';
+  opIn = opSec.querySelector("input"); opVal = opSec.querySelector("#runoff-opacity-val");
+  opVal.textContent = opIn.value + "%";
+  opIn.addEventListener("input", () => { if (opIn.getAttribute("aria-disabled") === "true") return; opVal.textContent = opIn.value + "%"; setOpacity(Number(opIn.value) / 100); });
+  return opSec;
+}
+function pintarOpacidad(s, deshabilitado) {
+  if (!opIn) return;
+  const v = String(Math.round(s.opacity * 100));
+  if (opIn.value !== v) opIn.value = v;
+  opVal.textContent = v + "%";
+  opIn.setAttribute("aria-valuetext", v + " por ciento");
+  opSec.classList.toggle("runoff-off", deshabilitado);
+  if (deshabilitado) { opIn.setAttribute("aria-disabled", "true"); opIn.tabIndex = -1; } else { opIn.removeAttribute("aria-disabled"); opIn.removeAttribute("tabindex"); }
 }
 
 /* Panel propio (#runoff-panel): la exclusión con la tabla y los demás paneles y el estado del botón los resuelve paneles-ui.js */
@@ -234,6 +238,7 @@ function pintar(s) {
   if (String(lluviaIn.value) !== String(s.rainMmH)) lluviaIn.value = s.rainMmH;
   lluviaVal.textContent = s.rainMmH + " mm/h";
   lluviaIn.setAttribute("aria-valuetext", s.rainMmH + " milímetros por hora");
+  pintarOpacidad(s, !prendido);
   marcarMapa(prendido);
   sincBoton();
   bloque.setAttribute("aria-busy", String(!!calc));

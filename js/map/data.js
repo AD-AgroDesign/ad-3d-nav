@@ -1,7 +1,7 @@
-import { CROWN_PALETTE, NATURE_CLASSES, WOODY_CLASSES } from "../core/config.js?v=20261130";
-import { blobRing, normalizeGeometry, offsetRing, ringAreaHa, ringBBox, scatterInClasses } from "../core/geo.js?v=20261130";
-import { HOME_VIEW, setHomeView, state } from "../core/state.js?v=20261130";
-import { map, mapStyle } from "./style.js?v=20261130";
+import { CROWN_PALETTE, NATURE_CLASSES, WOODY_CLASSES } from "../core/config.js?v=20261201";
+import { blobRing, normalizeGeometry, offsetRing, ringAreaHa, ringBBox, scatterInClasses } from "../core/geo.js?v=20261201";
+import { HOME_VIEW, setHomeView, state } from "../core/state.js?v=20261201";
+import { map, mapStyle } from "./style.js?v=20261201";
 
 /* ---------- Carga de configuración y datos ---------- */
 /* La lista de campos y cuál abrir los resuelve auth.js contra Supabase: la base

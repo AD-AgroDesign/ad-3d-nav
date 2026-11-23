@@ -18,9 +18,10 @@
    de velocidad) + un margen, y el vertex shader resta la bajada viva a6Low (sin hundirse con el relieve apagándose).
    Baja: sin animación; `estaticasBaja` estelas precalculadas (mismo armado de cola, una sola subida de textura). */
 import * as THREE from "three";
-import { HIDRO, IS_MOBILE } from "../../core/config.js?v=20261130";
-import { GLSL_DECL, withReliefU } from "../../terrain/terrain.js?v=20261130";
-import { GLSL_ADFOG, GLSL_FOG_UNIFORMS, scenarioFade } from "../shaderlib.js?v=20261130";
+import { HIDRO, IS_MOBILE } from "../../core/config.js?v=20261201";
+import { GLSL_DECL, withReliefU } from "../../terrain/terrain.js?v=20261201";
+import { GLSL_ADFOG, GLSL_FOG_UNIFORMS, scenarioFade } from "../shaderlib.js?v=20261201";
+import { simFade } from "./runoff-fade.js?v=20261201";
 
 const VIS = HIDRO.vis, PV = VIS.particulas;
 const NP = Math.max(2, PV.puntosEstela | 0);
@@ -106,7 +107,7 @@ export function createParticles(ctx, key, shared, getCanvas) {
 
   const mat = new THREE.ShaderMaterial({
     vertexShader: VS, fragmentShader: FS, defines: { SUB: 1 },
-    uniforms: { ...shared, ...withReliefU({}), uFade: scenarioFade[key] || { value: 1 }, tP: { value: null },
+    uniforms: { ...shared, ...withReliefU({}), uFade: simFade[key] || { value: 1 }, tP: { value: null },
       uPx: { value: new THREE.Vector2(0.002, 0.002) }, uHalf: { value: 1 }, uCore: { value: 1 }, uAlfa: { value: PV.alfaCabeza }, uOut: { value: 0 }, uDist: { value: new THREE.Vector3(...DIST_ALFA) },
       tIn: { value: null }, uG: { value: new THREE.Vector4(1, 0, 1, 0) }, uN: { value: new THREE.Vector2(1, 1) } }
   });
