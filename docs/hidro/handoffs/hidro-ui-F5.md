@@ -38,3 +38,6 @@ Sección "Opacidad del diseño" arriba del bloque (`#runoff-opacity-slider` / `#
 
 ## Ajustes: tres secciones separadas
 Calidad / Hora del día / Relieve con la misma línea fina (`rgba(255,255,255,.08)`, a todo el ancho) y el mismo espaciado (16 px) que `.panel-section`. Solo CSS en la sección HIDRO sobre `#ajustes-panel` (margen negativo, porque los módulos agregan sus filas a `#quality-section` en runtime y no conviene envolver nodos). Desplegable de calidad y sin scrollbar verificados a 1440 y 375 px.
+
+## Opacidad de la simulación (pedido del dueño, reemplaza la sección "Opacidad del diseño" del panel)
+`#runoff-opacity-slider` ya no se sincroniza con `#opacity-slider` (sin vínculo con la opacidad del diseño; la tabla no cambia). Título "Opacidad de la simulación"; rango 10–100 % paso 5 (de `HIDRO.vis.opacidad`); `input` llama `setOpacity(v/100)`; refleja cambios externos en el evento `"runoff"`. Arriba de todo y siempre visible; con el simulador apagado o no disponible queda atenuado con `aria-disabled` (y fuera del tab). Verificado con Playwright a 1440 y 375 px: mover el slider da `getState().opacity = 0.4`, `#opacity-slider` sigue en 100, consola limpia.
