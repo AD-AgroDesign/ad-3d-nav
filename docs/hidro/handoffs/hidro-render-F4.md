@@ -61,3 +61,12 @@ Todos de `HIDRO.vis.diferencia` (`umbral`, `saturacion`, `colFrena`, `colAcelera
 
 ## Preguntas
 - ¿Se quiere que Diferencia muestre también la lámina o la velocidad por debajo (hoy es solo la diferencia sobre el satélite)? Recomendación: no.
+
+## Opacidad propia del simulador (pedido del dueño)
+- `js/render/systems/runoff-fade.js` (nuevo): `simFade[key]` = `min(1, scenarioFade[key] / designOpacity) · getState().opacity`. Lo escribe `runoff.update()` en cada
+  cuadro (dos divisiones; `designOpacity` protegido con `max(0,05, …)`). Los shaders de Natural, Velocidad y estelas leen `simFade` como `uFade`; Diferencia
+  usa `DIF_FADE = min(1, (fadeIni + fadeMulti) / designOpacity) · opacity` (sigue siendo una sola capa visible).
+- El evento `"runoff"` con cambio `"opacity"` hace `map.triggerRepaint()` si el simulador se ve (sin rAF propio). Simulador apagado: `update` sale antes, cero costo.
+- Verificación (home, `?fixture=demo_relieve&qa&terreno=1`): diseño 30 % + simulador 100 % → Natural y Diferencia idénticos a diseño 100 % (0,2 % de píxeles, ruido
+  de animación); Velocidad igual salvo estelas en movimiento y los árboles del diseño (que sí se aclaran). Diseño 100 % + simulador 40 % → simulador más transparente.
+  Fundido inicial↔multi con diseño 50 %: simFade pasa 1→0 / 0→1 sin dip. Apagado: diff 0 % contra `dev/qa/baseline`. Consola sin errores (solo avisos de driver GL).
